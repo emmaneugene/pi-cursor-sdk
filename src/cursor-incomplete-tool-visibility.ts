@@ -28,7 +28,7 @@ export interface IncompleteCursorToolRunOutcomeInput {
 	assistantTextProduced?: boolean;
 }
 
-export type IncompleteCursorToolVisibilityDecision = "emit" | "suppress" | "debugOnly";
+export type IncompleteCursorToolVisibilityDecision = "emit" | "debugOnly";
 
 export function buildIncompleteCursorToolRunOutcome(
 	outcome: IncompleteCursorToolRunOutcomeInput = {},
@@ -45,16 +45,25 @@ export function buildIncompleteCursorToolRunOutcome(
 	};
 }
 
+/**
+ * Policy: on a successful text-producing run, started calls with no completion
+ * are debug-only for all tools. Verified against installed @cursor/sdk 1.0.30
+ * (`beforeShellExecution` deny-hook reproduction): a tool call denied by a
+ * permission policy or hook emits `tool-call-started` and then nothing on any
+ * public SDK surface — no `tool-call-completed` delta, no `toolCall` step, no
+ * conversation entry — while the model's own reply shows it observed the
+ * denial. Those runs previously ended with red "did not complete" cards for
+ * failures that never happened. The SDK gives no way to distinguish a denial
+ * from a genuinely lost completion, so suppressing on successful runs is a
+ * deliberate trade-off: a lost completion would be hidden from the TUI too,
+ * but every discard is still recorded as
+ * `discarded-incomplete-started-tool-call` in debug artifacts. Failed,
+ * aborted, and no-text runs keep visible incomplete cards.
+ */
 export function resolveIncompleteCursorToolVisibility(
-	toolCall: unknown,
 	outcome: IncompleteCursorToolRunOutcome,
 ): IncompleteCursorToolVisibilityDecision {
-	const visibility = classifyCursorToolVisibility(toolCall);
-	if (
-		outcome.reason === DISCARDED_INCOMPLETE_TOOL_CALL_REASON &&
-		outcome.assistantTextProduced &&
-		visibility.fastLocalDiscovery
-	) {
+	if (outcome.reason === DISCARDED_INCOMPLETE_TOOL_CALL_REASON && outcome.assistantTextProduced) {
 		return "debugOnly";
 	}
 	return "emit";

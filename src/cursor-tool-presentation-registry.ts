@@ -73,7 +73,6 @@ export interface CursorToolVisibilityPolicy {
 	incompleteTitle?: string;
 	lifecycleTitle?: string;
 	lifecycleEligible?: boolean;
-	fastLocalDiscovery?: boolean;
 }
 
 export interface CursorToolReplayDisplayPolicy {
@@ -117,25 +116,25 @@ export const CURSOR_TOOL_PRESENTATION_SPECS = [
 		normalizedName: "read",
 		nameAliases: ["read_file"],
 		displayLabel: "read",
-		visibility: { incompleteTitle: "Cursor read", fastLocalDiscovery: true },
+		visibility: { incompleteTitle: "Cursor read" },
 	},
 	{
 		normalizedName: "grep",
 		nameAliases: ["grep_search", "search"],
 		displayLabel: "grep",
-		visibility: { incompleteTitle: "Cursor grep", fastLocalDiscovery: true },
+		visibility: { incompleteTitle: "Cursor grep" },
 	},
 	{
 		normalizedName: "glob",
 		nameAliases: ["file_search"],
 		displayLabel: "glob",
-		visibility: { incompleteTitle: "Cursor find", fastLocalDiscovery: true },
+		visibility: { incompleteTitle: "Cursor find" },
 	},
 	{
 		normalizedName: "ls",
 		nameAliases: ["list_dir"],
 		displayLabel: "ls",
-		visibility: { incompleteTitle: "Cursor ls", fastLocalDiscovery: true },
+		visibility: { incompleteTitle: "Cursor ls" },
 	},
 	{
 		normalizedName: "shell",

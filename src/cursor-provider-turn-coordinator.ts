@@ -113,6 +113,7 @@ export class CursorSdkTurnCoordinator {
 	discardIncompleteStartedToolCalls(
 		outcome: IncompleteCursorToolRunOutcome = buildIncompleteCursorToolRunOutcome(),
 	): void {
+		const visibilityDecision = resolveIncompleteCursorToolVisibility(outcome);
 		for (const [callId, toolCall] of this.ledger.startedToolCallEntries()) {
 			const toolName = getNormalizedCursorToolName(toolCall);
 			recordDiscardedIncompleteStartedToolCall(this.debugRecorder, process.env, {
@@ -120,14 +121,8 @@ export class CursorSdkTurnCoordinator {
 				callId,
 				reason: outcome.reason,
 			});
-			const visibilityDecision = resolveIncompleteCursorToolVisibility(toolCall, outcome);
-			if (visibilityDecision !== "emit") {
-				this.displayRouter.recordIncompleteSkip(
-					toolName,
-					visibilityDecision === "debugOnly" && outcome.assistantTextProduced
-						? "successful-run-text-produced"
-						: visibilityDecision,
-				);
+			if (visibilityDecision === "debugOnly") {
+				this.displayRouter.recordIncompleteSkip(toolName, "successful-run-text-produced");
 				continue;
 			}
 			const action = this.displayRouter.routeIncompleteStartedToolCall(toolCall, outcome.reason);

@@ -24,7 +24,11 @@ type CursorOnStepPayload = Parameters<NonNullable<SendOptions["onStep"]>>[0];
 describe("streamCursor incomplete tools", () => {
 	beforeEach(resetCursorProviderTestState);
 
-		it("surfaces incomplete started Cursor tool calls with neutral activity traces", async () => {
+		it("suppresses incomplete started Cursor tool calls after a successful text-producing run", async () => {
+			// Installed @cursor/sdk 1.0.30: a policy/hook-denied tool call emits
+			// tool-call-started and then nothing (no completion delta, step, or
+			// conversation entry) and cannot be told apart from a lost completion,
+			// so missing completions on successful runs are suppressed by policy.
 			const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 				opts.onDelta({ update: { type: "tool-call-started", toolCall: { name: "shell", args: { command: "sleep 10" } }, callId: "c1" } });
 				return asMockCursorRun({
@@ -47,9 +51,35 @@ describe("streamCursor incomplete tools", () => {
 			const trace = collectThinkingDeltas(events);
 			const text = collectTextDeltas(events);
 
+			expect(trace).not.toContain("Cursor shell did not complete");
+			expect(text).toBe("done");
+			expect(hasEventType(events, "toolcall_start")).toBe(false);
+		});
+
+		it("surfaces incomplete started Cursor tool calls when the run produced no assistant text", async () => {
+			const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
+				opts.onDelta({ update: { type: "tool-call-started", toolCall: { name: "shell", args: { command: "sleep 10" } }, callId: "c1" } });
+				return asMockCursorRun({
+					id: "run-1",
+					agentId: "agent-1",
+					status: "finished",
+					wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "" }),
+					cancel: vi.fn(),
+					supports: () => true,
+					unsupportedReason: () => undefined,
+				});
+			});
+			mockCreatedAgent({
+				send: mockSend,
+				[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
+			});
+
+			const stream = streamCursor(makeModel(), makeContext(), { apiKey: "test-key" });
+			const events = await collectEvents(stream);
+			const trace = collectThinkingDeltas(events);
+
 			expect(trace).toContain("Cursor shell did not complete");
 			expect(trace).toContain("missing completion");
-			expect(text).toBe("done");
 			expect(hasEventType(events, "toolcall_start")).toBe(false);
 		});
 
@@ -66,7 +96,7 @@ describe("streamCursor incomplete tools", () => {
 					id: "run-1",
 					agentId: "agent-1",
 					status: "finished",
-					wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "done" }),
+					wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "" }),
 					cancel: vi.fn(),
 					supports: () => true,
 					unsupportedReason: () => undefined,
@@ -96,7 +126,7 @@ describe("streamCursor incomplete tools", () => {
 					id: "run-1",
 					agentId: "agent-1",
 					status: "finished",
-					wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "done" }),
+					wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "" }),
 					cancel: vi.fn(),
 					supports: () => true,
 					unsupportedReason: () => undefined,
@@ -180,7 +210,7 @@ describe("streamCursor incomplete tools", () => {
 				expect(coordinatorEvents).toContain("discarded-incomplete-started-tool-call");
 				expect(coordinatorEvents).toContain('"toolName":"read"');
 				expect(coordinatorEvents).not.toContain("c-missing");
-				expect(displayDecisions).toContain('"action":"skip-incomplete-fast-local"');
+				expect(displayDecisions).toContain('"action":"skip-incomplete-successful-run"');
 				expect(displayDecisions).toContain('"toolName":"read"');
 			} finally {
 				delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;

@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { classifyCursorToolVisibility, isFastLocalDiscoveryTool } from "../src/cursor-tool-visibility.js";
+import { classifyCursorToolVisibility } from "../src/cursor-tool-visibility.js";
 import { buildCursorPiToolDisplay } from "../src/cursor-tool-transcript.js";
 
 describe("cursor tool visibility classification", () => {
-	it("classifies fast local discovery tools from the shared policy", () => {
+	it("classifies lifecycle eligibility from the shared policy", () => {
 		for (const name of ["read", "grep", "glob", "ls"]) {
-			expect(isFastLocalDiscoveryTool({ name })).toBe(true);
 			expect(classifyCursorToolVisibility({ name }).lifecycleEligible).toBe(false);
 		}
 
-		expect(isFastLocalDiscoveryTool({ name: "shell" })).toBe(false);
 		expect(classifyCursorToolVisibility({ name: "shell" })).toMatchObject({
 			normalizedName: "shell",
 			activityTitle: "Cursor shell",

@@ -83,7 +83,7 @@ describe("installed Cursor SDK turn-ended usage contract", () => {
 	it("locks published SDK TokenUsage transform separately from observed raw turn-ended semantics", () => {
 		expect(fixture.provenance.sdkPackage).toBe("@cursor/sdk");
 		expect(fixture.provenance.sdkVersion).toBe("1.0.23");
-		expect(installedSdkVersion).toBe("1.0.27");
+		expect(installedSdkVersion).toBe("1.0.30");
 		expect(fixture.provenance.issue).toContain("/issues/196");
 
 		const usageTypes = readFileSync(join(sdkRoot, "dist/esm/usage-types.d.ts"), "utf8");

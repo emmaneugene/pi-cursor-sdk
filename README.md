@@ -1,6 +1,8 @@
-# pi-cursor-sdk
+# @emmaneugene/pi-cursor-sdk
 
 A pi provider extension that lets pi use Cursor models through the local-by-default `@cursor/sdk` agent runtime, with explicit minimal Cursor Cloud opt-in.
+
+This is a maintained fork of [fitchmultz/pi-cursor-sdk](https://github.com/fitchmultz/pi-cursor-sdk)
 
 Use this extension if you primarily use Cursor models inside pi and want Cursor's SDK agent loop preserved while pi adds native model selection, auth, thinking/context controls, session behavior, replay UI, optional local pi tool bridging, and explicit cloud runs when requested.
 
@@ -29,13 +31,13 @@ For pi users, that translation is usually the wrong abstraction. `pi-cursor-sdk`
 1. Install the package:
 
 ```bash
-pi install npm:pi-cursor-sdk
+pi install npm:@emmaneugene/pi-cursor-sdk
 ```
 
 Or install from GitHub:
 
 ```bash
-pi install https://github.com/fitchmultz/pi-cursor-sdk
+pi install https://github.com/emmaneugene/pi-cursor-sdk
 ```
 
 2. Start pi with a Cursor model:
@@ -54,20 +56,20 @@ If pi started without a key, run `/cursor-refresh-models` after `/login` to refr
 - Pi 0.84.0 or later; pi core peer metadata remains optional and uses `"*"` ranges per Pi package guidance
 - a Cursor SDK API key saved through `/login`, available as `CURSOR_API_KEY`, or passed with pi's `--api-key`
 
-No global `@cursor/sdk` install is required. This package depends on exact `@cursor/sdk@1.0.27`, so normal package installation brings in the SDK version this extension was built and tested against. Cursor SDK 1.0.27 declares its Node ConnectRPC transport dependency directly, so npm installs place `@connectrpc/connect-node` where the SDK can resolve it. The extension intentionally does not bundle `@cursor/sdk` or its platform packages, because packing from one maintainer OS can otherwise ship the wrong optional SDK binary for another OS. Cursor SDK 1.0.27 keeps the older `sqlite3 -> node-gyp@8` dependency chain out of the runtime tree, so deprecated install warnings for `inflight`, `rimraf`, `glob@7`, `npmlog`, `gauge`, `are-we-there-yet`, and `tar@6` from that chain are not expected. Older Pi and Cursor SDK compatibility paths are not maintained.
+No global `@cursor/sdk` install is required. This package depends on exact `@cursor/sdk@1.0.30`, so normal package installation brings in the SDK version this extension was built and tested against. Cursor SDK 1.0.30 declares its Node ConnectRPC transport dependency directly, so npm installs place `@connectrpc/connect-node` where the SDK can resolve it. The extension intentionally does not bundle `@cursor/sdk` or its platform packages, because packing from one maintainer OS can otherwise ship the wrong optional SDK binary for another OS. Cursor SDK 1.0.30 keeps the older `sqlite3 -> node-gyp@8` dependency chain out of the runtime tree, so deprecated install warnings for `inflight`, `rimraf`, `glob@7`, `npmlog`, `gauge`, `are-we-there-yet`, and `tar@6` from that chain are not expected. Older Pi and Cursor SDK compatibility paths are not maintained.
 
 ## Install
 
 ### Global install
 
 ```bash
-pi install npm:pi-cursor-sdk
+pi install npm:@emmaneugene/pi-cursor-sdk
 ```
 
 Alternative GitHub install:
 
 ```bash
-pi install https://github.com/fitchmultz/pi-cursor-sdk
+pi install https://github.com/emmaneugene/pi-cursor-sdk
 ```
 
 ### Project-local install
@@ -75,7 +77,7 @@ pi install https://github.com/fitchmultz/pi-cursor-sdk
 Use `-l` if you want the package recorded in the current project's `.pi/settings.json` instead of your global pi settings:
 
 ```bash
-pi install -l npm:pi-cursor-sdk
+pi install -l npm:@emmaneugene/pi-cursor-sdk
 ```
 
 Pi 0.84.0 loads project-local extensions only after project trust is resolved, so this extension cannot observe that trust event. When a project-local install needs to read or write `.pi/cursor-sdk.json`, start every such run with explicit approval:
@@ -521,7 +523,7 @@ See [Cursor testing lessons](docs/cursor-testing-lessons.md#cursor-sdk-event-cap
 
 If startup has no stored `/login` key or `CURSOR_API_KEY`, model discovery fails, or discovery returns no models, the extension registers a bundled fallback snapshot of the latest reviewed Cursor SDK model catalog and notifies interactive users when possible. Pi CLI `--api-key` remains available to provider turns but is not parsed independently during startup discovery.
 
-The fallback snapshot includes Grok 4.6, Composer 2.5 (`composer-2.5` and `composer-2-5`), Composer 2, Cursor's GPT-5.6 Luna/Sol/Terra models, Claude, Gemini, Grok 4.5, Kimi, and other model IDs exposed by the reviewed `Cursor.models.list()` output. Recommended local/smoke runs use `cursor/grok-4.6`. Pi's separate `openai-codex` catalog is owned by Pi itself; Pi 0.84.0 includes native `gpt-5.6-luna`, `gpt-5.6-sol`, and `gpt-5.6-terra` support. The exact checked-in Cursor snapshot lives in `src/cursor-fallback-models.generated.ts`. A dated maintainer capture documents the assistant-visible [Cursor system prompts and tool guidance](https://github.com/fitchmultz/pi-cursor-sdk/blob/main/docs/evidence/cursor-system-prompts-2026-08-02/README.md) for Grok 4.5, Opus 5, Fable 5, and the GPT-5.6 Sol/Terra/Luna family.
+The fallback snapshot includes Grok 4.6, Composer 2.5 (`composer-2.5` and `composer-2-5`), Composer 2, Cursor's GPT-5.6 Luna/Sol/Terra models, Claude, Gemini, Grok 4.5, Kimi, and other model IDs exposed by the reviewed `Cursor.models.list()` output. Recommended local/smoke runs use `cursor/grok-4.6`. Pi's separate `openai-codex` catalog is owned by Pi itself; Pi 0.84.0 includes native `gpt-5.6-luna`, `gpt-5.6-sol`, and `gpt-5.6-terra` support. The exact checked-in Cursor snapshot lives in `src/cursor-fallback-models.generated.ts`. A dated maintainer capture documents the assistant-visible [Cursor system prompts and tool guidance](https://github.com/emmaneugene/pi-cursor-sdk/blob/main/docs/evidence/cursor-system-prompts-2026-08-02/README.md) for Grok 4.5, Opus 5, Fable 5, and the GPT-5.6 Sol/Terra/Luna family.
 
 Actual Cursor runs still need a key from `/login`, `CURSOR_API_KEY`, or `--api-key`. If you add auth after startup, run `/cursor-refresh-models` to refresh the full live Cursor model catalog without restarting pi.
 
@@ -662,7 +664,7 @@ This usually needs session JSONL to classify. Common cases:
 - **Model text echo:** Assistant `text` blocks contain lines like `Tool call`, `Cursor activity`, or `call cursor-replay-…` without matching `toolCall` blocks — the Cursor model narrated pi prompt transcript format instead of invoking SDK tools. See [Tool calls listed as plain text (#40 triage)](docs/cursor-testing-lessons.md#tool-calls-listed-as-plain-text-40-triage).
 - **Stale replay routing / plan-strip:** Error `toolResult` or error assistant messages contain `Tool grep/cursor/find/ls not found`, or provider debug shows `inactive_trace` after plan-mode execute stripped active tools — tracked in **#52** (distinct from model text echo and #55).
 - **Replay vs execution:** `cursor-replay-*` IDs and neutral **Cursor MCP** activity cards are display-only recorded Cursor results; they do not re-run browser/MCP work. See [Cursor native tool replay](docs/cursor-native-tool-replay.md).
-- **Run failure / discarded tools:** A red toast with scrubbed detail may indicate an SDK failure (#55). Started-but-never-completed Cursor tools surface neutral **Cursor … did not complete** activity cards with a bounded reason when the run failed/aborted, produced no assistant text, or involved external/side-effectful tools. Incomplete fast local discovery starts (`read`, `grep`, `glob`, `ls`) are debug-only after a successful text-producing run so stale SDK start events do not create red post-answer cards; maintainer debug for the same gap remains in **#52** (`PI_CURSOR_SDK_EVENT_DEBUG=1`).
+- **Run failure / discarded tools:** A red toast with scrubbed detail may indicate an SDK failure (#55). Started-but-never-completed Cursor tools surface neutral **Cursor … did not complete** activity cards with a bounded reason when the run failed, was aborted, or produced no assistant text. After a successful text-producing run, missing-completion starts are debug-only for all tools: the installed Cursor SDK emits `tool-call-started` with no completion delta, step, or conversation entry when a permission policy or hook denies a call, and offers no way to distinguish such denials from lost completions, so suppression is the deliberate choice over false error cards. Maintainer debug for the same gap remains in **#52** (`PI_CURSOR_SDK_EVENT_DEBUG=1`).
 - **Hard SDK crash:** pi exited with an uncaught Cursor SDK `ConnectError` or `WriteIterableClosedError` instead of showing a normal run error — capture the stack/session tail as a process-guard regression, not #40 text echo.
 
 Capture `pi --version`, extension version, model, flags, the exact prompt, and a redacted session dir before filing bugs.

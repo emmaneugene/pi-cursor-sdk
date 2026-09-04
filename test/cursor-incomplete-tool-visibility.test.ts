@@ -55,10 +55,13 @@ describe("cursor incomplete tool visibility", () => {
 		});
 	});
 
-	it("keeps fast local stale-start suppression in the incomplete visibility policy", () => {
+	it("suppresses missing-completion starts after successful text-producing runs and keeps failure paths visible", () => {
+		// @cursor/sdk 1.0.30 (beforeShellExecution deny-hook repro): a denied shell
+		// call emits tool-call-started with no completion delta, step, or
+		// conversation entry; denials are indistinguishable from lost completions,
+		// so successful runs suppress for all tools by policy.
 		expect(
 			resolveIncompleteCursorToolVisibility(
-				{ name: "glob", args: { pattern: "src/**/*.ts" } },
 				buildIncompleteCursorToolRunOutcome({
 					assistantTextProduced: true,
 					reason: DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
@@ -67,17 +70,20 @@ describe("cursor incomplete tool visibility", () => {
 		).toBe("debugOnly");
 		expect(
 			resolveIncompleteCursorToolVisibility(
-				{ name: "mcp", args: { toolName: "git" } },
 				buildIncompleteCursorToolRunOutcome({
-					assistantTextProduced: true,
+					assistantTextProduced: false,
 					reason: DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
 				}),
 			),
 		).toBe("emit");
 		expect(
 			resolveIncompleteCursorToolVisibility(
-				{ name: "glob", args: { pattern: "src/**/*.ts" } },
 				buildIncompleteCursorToolRunOutcome({ assistantTextProduced: true, reason: "abort" }),
+			),
+		).toBe("emit");
+		expect(
+			resolveIncompleteCursorToolVisibility(
+				buildIncompleteCursorToolRunOutcome({ assistantTextProduced: true, reason: "sdk-failure" }),
 			),
 		).toBe("emit");
 	});

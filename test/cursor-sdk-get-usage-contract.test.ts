@@ -8,9 +8,9 @@ const require = createRequire(import.meta.url);
 const sdkRoot = resolveInstalledPackageRoot("@cursor/sdk");
 const installedSdkVersion = readInstalledPackageVersion("@cursor/sdk");
 
-describe("installed Cursor SDK 1.0.27 getUsage contract", () => {
+describe("installed Cursor SDK 1.0.30 getUsage contract", () => {
 	it("exposes billed AgentUsage with usage totals and runId-keyed runs", () => {
-		expect(installedSdkVersion).toBe("1.0.27");
+		expect(installedSdkVersion).toBe("1.0.30");
 
 		const agentTypes = readFileSync(join(sdkRoot, "dist/esm/agent.d.ts"), "utf8");
 		expect(agentTypes).toContain("getUsage(options?: GetUsageOptions): Promise<AgentUsage>");
@@ -40,6 +40,6 @@ describe("installed Cursor SDK 1.0.27 getUsage contract", () => {
 
 	it("attaches a no-op error listener before local shell snapshot writes", () => {
 		const localRuntime = readFileSync(join(sdkRoot, "dist/esm/357.js"), "utf8");
-		expect(localRuntime).toContain('function Be(e){e?.on("error",(()=>{}))}function ze(e,t){e&&(Be(e),e.write(t),e.end())}');
+		expect(localRuntime).toContain('function We(e){e?.on("error",(()=>{}))}function He(e,t){e&&(We(e),e.write(t),e.end())}');
 	});
 });

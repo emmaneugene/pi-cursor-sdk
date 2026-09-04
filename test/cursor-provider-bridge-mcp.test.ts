@@ -574,7 +574,7 @@ describe("streamCursor bridge MCP", () => {
 				id: "run-1",
 				agentId: "agent-1",
 				status: "finished",
-				wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "done" }),
+				wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "" }),
 				cancel: vi.fn(),
 				supports: () => true,
 				unsupportedReason: () => undefined,

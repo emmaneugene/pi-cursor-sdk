@@ -1,10 +1,23 @@
 # Changelog
 
+## 0.3.7 - 2026-09-03
+
+First release of the maintained fork published as `@emmaneugene/pi-cursor-sdk`.
+
+### Changed
+
+- Rename the package to `@emmaneugene/pi-cursor-sdk` and point repository, bugs, and homepage metadata at [emmaneugene/pi-cursor-sdk](https://github.com/emmaneugene/pi-cursor-sdk). Upstream remains [fitchmultz/pi-cursor-sdk](https://github.com/fitchmultz/pi-cursor-sdk).
+- Pin the runtime to exact `@cursor/sdk@1.0.30` (from 1.0.27) and revalidate the installed-package ripgrep, stalled-connection, closed-writable, and `getUsage` contracts against that pin. The 1.0.28-1.0.30 public typing changes are a descriptive MCP `outputSchema` field and a cloud `IDLE` agent status; neither changes extension behavior.
+
+### Fixed
+
+- Recreate a pooled local Cursor SDK agent after five minutes without a successful send instead of reusing a dead transport that Cursor reports as an invalid API key. Idle replacement uses `Agent.create`, not `Agent.resume`. (Merged from upstream PR [#227](https://github.com/fitchmultz/pi-cursor-sdk/pull/227); not in the upstream 0.3.6 npm release.)
+- Stop surfacing red `Cursor shell did not complete` / `Cursor edit did not complete` error cards after successful turns. Verified against installed `@cursor/sdk` 1.0.30 with a `beforeShellExecution` deny-hook reproduction: a permission-policy or hook denial emits `tool-call-started` and then nothing on any public SDK surface — no `tool-call-completed` delta, no `toolCall` step, and no conversation entry — while the model's own reply shows it observed the denial. The SDK gives no way to distinguish such denials from genuinely lost completions, so missing-completion starts on successful text-producing runs are now debug-only for all tools (previously only `read`/`grep`/`glob`/`ls`), a deliberate trade-off that prefers silence over false error cards; failed, aborted, and no-text runs keep visible incomplete cards, and maintainer debug artifacts still record every discard (debug display decision `skip-incomplete-successful-run`, previously `skip-incomplete-fast-local`).
+
 ## 0.3.6 - 2026-08-18
 
 ### Fixed
 
-- Recreate a pooled local Cursor SDK agent after five minutes without a successful send instead of reusing a dead transport that Cursor reports as an invalid API key. Idle replacement uses `Agent.create`, not `Agent.resume`.
 - Isolate `smoke:visual` captures from the host: pi runs with `PI_CODING_AGENT_DIR=<out-dir>/pi-agent` (seeded `auth.json`, `quietStartup`, telemetry off), `PI_OFFLINE=1`, and `PI_SKIP_VERSION_CHECK=1`, so host extensions, skills, MCP config, update banners, and package-update notices no longer pollute visual evidence.
 - Start the visual-smoke tmux session in `--cwd` with a non-login shell, eliminating `shell-init: getcwd` noise from a stale tmux-server working directory.
 - Forward `--session-id` to pi only when explicitly provided, so fresh captures no longer show the new-session warning line; the HTML render labels pi-assigned sessions instead of failing.

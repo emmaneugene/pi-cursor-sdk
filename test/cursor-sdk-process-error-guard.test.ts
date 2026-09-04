@@ -367,8 +367,8 @@ describe("Cursor SDK process error guard", () => {
 		expect(controlledExecBundle).toContain('this.name="WriteIterableClosedError"');
 		expect(controlledExecBundle).toContain('"WritableIterable is closed"');
 		expect(controlledExecBundle).toContain('SimpleControlledExecManager');
-		expect(controlledExecBundle).toContain('catch(e){if(e instanceof i.W2)return;');
-		expect(controlledExecBundle).toContain('yield l.write(new s.$Y({message:{case:"throw"');
+		expect(controlledExecBundle).toContain('catch(e){if(e instanceof s.W2)return;');
+		expect(controlledExecBundle).toContain('yield l.write(new i.$Y({message:{case:"throw"');
 	});
 
 	it("contains delayed exact SDK failures after the provider-turn guard is disposed in real Node", () => {
@@ -684,14 +684,14 @@ setTimeout(() => {
 	});
 
 	it("tracks the installed Cursor SDK local-executor stdin write contract", () => {
-		// 1.0.27 attaches a no-op error listener before local shell snapshot writes.
+		// 1.0.30 attaches a no-op error listener before local shell snapshot writes.
 		// Command-hook stdin still uses callback-style write; MCP stdio has its own listener.
 		const shellExecBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/357.js", "utf8");
 		expect(shellExecBundle).toContain("writeCommandHookStdinPayload");
 		expect(shellExecBundle).toContain("stdin.write(e,(e=>{e?n(e):t(void 0)}))");
 		expect(shellExecBundle).toContain("o.stdin.write(`${t.join(\"\\n\")}\\n`),o.stdin.end()");
-		expect(shellExecBundle).toContain('function Be(e){e?.on("error",(()=>{}))}function ze(e,t){e&&(Be(e),e.write(t),e.end())}');
-		const mcpStdioBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/318.js", "utf8");
+		expect(shellExecBundle).toContain('function We(e){e?.on("error",(()=>{}))}function He(e,t){e&&(We(e),e.write(t),e.end())}');
+		const mcpStdioBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/877.js", "utf8");
 		expect(mcpStdioBundle).toContain('stdin?.on("error"');
 	});
 

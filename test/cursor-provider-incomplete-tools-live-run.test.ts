@@ -109,7 +109,12 @@ describe("streamCursor incomplete native replay tools", () => {
 		expect(mockDispose).toHaveBeenCalledTimes(1);
 	});
 
-	it("replays incomplete external Cursor tools as neutral cursor activity cards before final text", async () => {
+	it("suppresses incomplete external Cursor tools after a successful text-producing live run", async () => {
+		// @cursor/sdk 1.0.30: policy/hook-denied tool calls emit tool-call-started
+		// with no completion delta, step, or conversation entry, and denials are
+		// indistinguishable from lost completions. On a successful text-producing
+		// run such starts are suppressed, so no error card is queued and the turn
+		// does not split.
 		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
@@ -135,38 +140,17 @@ describe("streamCursor incomplete native replay tools", () => {
 		});
 		mockCreatedAgent({ send: mockSend });
 
-		const firstEventsPromise = collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
+		const eventsPromise = collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
 		await vi.waitFor(() => expect(mockSend).toHaveBeenCalled());
-		resolveRun({ id: "run-1", status: "finished", result: "done after incomplete MCP" });
-		const firstEvents = await firstEventsPromise;
-		const firstDone = getDoneEvent(firstEvents);
-		const toolCalls = firstDone.message.content.filter(isToolCallBlock);
+		resolveRun({ id: "run-1", status: "finished", result: "done after denied MCP" });
+		const events = await eventsPromise;
+		const done = getDoneEvent(events);
 
-		expect(firstDone.reason).toBe("toolUse");
-		expect(toolCalls).toHaveLength(1);
-		expect(toolCalls[0]?.name).toBe("cursor");
-		expect(toolCalls[0]?.arguments).toMatchObject({
-			activityTitle: "Cursor MCP",
-			activitySummary: "missing completion",
-		});
-		expect(nativeToolDisplayTestUtils.nativeToolResultCount()).toBe(1);
-
-		const replayContext = makeContext();
-		replayContext.messages = [
-			...replayContext.messages,
-			firstDone.message,
-			{
-				role: "toolResult" as const,
-				toolCallId: toolCalls[0]!.id,
-				toolName: "cursor",
-				content: [{ type: "text" as const, text: "Cursor MCP did not complete" }],
-				isError: true,
-				timestamp: 2,
-			},
-		];
-		const finalEvents = await collectEvents(streamCursor(makeModel(), replayContext, { apiKey: "test-key" }));
-		expect(getDoneEvent(finalEvents).reason).toBe("stop");
-		expect(collectTextDeltas(finalEvents)).toBe("done after incomplete MCP");
+		expect(done.reason).toBe("stop");
+		expect(done.message.content.filter(isToolCallBlock)).toHaveLength(0);
+		expect(collectTextDeltas(events)).toBe("done after denied MCP");
+		expect(collectThinkingDeltas(events)).not.toContain("Cursor MCP did not complete");
+		expect(nativeToolDisplayTestUtils.nativeToolResultCount()).toBe(0);
 		expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0);
 	});
 
@@ -249,7 +233,7 @@ describe("streamCursor incomplete native replay tools", () => {
 		expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0);
 	});
 
-	it("suppresses incomplete fast local Cursor glob tools when the run finishes with text", async () => {
+	it("suppresses incomplete Cursor glob tools when the run finishes with text", async () => {
 		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
@@ -288,7 +272,7 @@ describe("streamCursor incomplete native replay tools", () => {
 		expect(nativeToolDisplayTestUtils.nativeToolResultCount()).toBe(0);
 	});
 
-	it("surfaces incomplete fast local Cursor glob tools when the run finishes without text", async () => {
+	it("surfaces incomplete Cursor glob tools when the run finishes without text", async () => {
 		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);

@@ -192,12 +192,14 @@ export class CursorTurnDisplayRouter {
 		});
 	}
 
+	// The action name assumes debugOnly only ever means "successful run with
+	// text"; revisit it if resolveIncompleteCursorToolVisibility grows reasons.
 	recordIncompleteSkip(
 		toolName: string,
 		reason: string,
 	): void {
 		this.recordDisplayDecision({
-			action: "skip-incomplete-fast-local",
+			action: "skip-incomplete-successful-run",
 			toolName,
 			source: "started",
 			reason,

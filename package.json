@@ -2,7 +2,10 @@
   "name": "@emmaneugene/pi-cursor-sdk",
   "version": "0.3.7",
   "description": "pi provider extension backed by @cursor/sdk local and cloud agents",
-  "author": "Mitch Fultz (https://github.com/fitchmultz)",
+  "author": "Emmanuel Oh <emmaneugene@outlook.com> (https://github.com/emmaneugene)",
+  "contributors": [
+    "Mitch Fultz (https://github.com/fitchmultz)"
+  ],
   "license": "MIT",
   "keywords": [
     "pi-package",
@@ -15,12 +18,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fitchmultz/pi-cursor-sdk.git"
+    "url": "git+https://github.com/emmaneugene/pi-cursor-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/fitchmultz/pi-cursor-sdk/issues"
+    "url": "https://github.com/emmaneugene/pi-cursor-sdk/issues"
   },
-  "homepage": "https://github.com/fitchmultz/pi-cursor-sdk#readme",
+  "homepage": "https://github.com/emmaneugene/pi-cursor-sdk#readme",
   "files": [
     "dist",
     "shared",
@@ -160,7 +163,7 @@
     "smoke:platform:all": "npm run smoke:platform:doctor && node scripts/platform-smoke.mjs run --target macos,ubuntu,windows-native"
   },
   "dependencies": {
-    "@cursor/sdk": "1.0.27",
+    "@cursor/sdk": "1.0.30",
     "@hono/node-server": "2.0.12",
     "@modelcontextprotocol/sdk": "1.30.0"
   },

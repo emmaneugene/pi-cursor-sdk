@@ -82,9 +82,18 @@ run_with_timeout() { smoke_run_with_timeout_or_fail "$@"; }
 build_smoke_env_arrays() {
 	smoke_build_cursor_sdk_event_debug_unsets
 	DEBUG_ENV_UNSETS=( "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS[@]}" )
+	# Sealed pi runs use env -i, which drops the parent's TLS trust config. On
+	# hosts behind a TLS-intercepting proxy (corporate MITM CA), Node then
+	# rejects every Cursor connection as "Network request failed". Pass the
+	# parent's extra CA bundle through when set; it adds trust anchors only.
+	CA_PASSTHROUGH_ENV=()
+	if [[ -n "${NODE_EXTRA_CA_CERTS:-}" ]]; then
+		CA_PASSTHROUGH_ENV=( "NODE_EXTRA_CA_CERTS=$NODE_EXTRA_CA_CERTS" )
+	fi
 	TOOL_ENV=( "$ENV_BIN" "${DEBUG_ENV_UNSETS[@]}" "PATH=$SEALED_PATH" )
-	PI_DEFAULT_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" -u PI_CURSOR_SETTING_SOURCES HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 )
-	PI_NONE_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 PI_CURSOR_SETTING_SOURCES=none )
+	# ${arr[@]+...} keeps macOS /bin/bash 3.2 from treating the empty array as unbound under set -u.
+	PI_DEFAULT_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" -u PI_CURSOR_SETTING_SOURCES HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 ${CA_PASSTHROUGH_ENV[@]+"${CA_PASSTHROUGH_ENV[@]}"} )
+	PI_NONE_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 PI_CURSOR_SETTING_SOURCES=none ${CA_PASSTHROUGH_ENV[@]+"${CA_PASSTHROUGH_ENV[@]}"} )
 }
 
 run_in_dir() {

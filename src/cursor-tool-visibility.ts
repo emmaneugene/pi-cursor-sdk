@@ -15,7 +15,6 @@ export interface CursorToolVisibility {
 	incompleteTitle?: string;
 	lifecycleTitle?: string;
 	lifecycleEligible: boolean;
-	fastLocalDiscovery: boolean;
 }
 
 export function getNormalizedCursorToolName(toolCall: unknown): string {
@@ -38,10 +37,5 @@ export function classifyCursorToolVisibility(toolCall: unknown): CursorToolVisib
 		incompleteTitle: replayActivityTitle ?? config?.incompleteTitle,
 		lifecycleTitle: replayActivityTitle ?? config?.lifecycleTitle,
 		lifecycleEligible: config?.lifecycleEligible ?? false,
-		fastLocalDiscovery: config?.fastLocalDiscovery ?? false,
 	};
-}
-
-export function isFastLocalDiscoveryTool(toolCall: unknown): boolean {
-	return classifyCursorToolVisibility(toolCall).fastLocalDiscovery;
 }

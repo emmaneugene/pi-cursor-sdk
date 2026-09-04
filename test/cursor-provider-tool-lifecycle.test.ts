@@ -507,26 +507,12 @@ describe("streamCursor Cursor tool lifecycle", () => {
 
 		const events = await collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
 		const done = getDoneEvent(events);
-		expect(done.reason).toBe("toolUse");
+		// The started-only shell call is suppressed on a successful text-producing
+		// run, so the turn finishes directly with the final text and no card.
+		expect(done.reason).toBe("stop");
+		expect(collectTextDeltas(events)).toBe("Done.");
+		expect(done.message.content.find(isToolCallBlock)).toBeUndefined();
 		expect(collectThinkingDeltas(events)).not.toMatch(lifecycleShellProgressPattern);
-
-		const incompleteToolCall = done.message.content.find(isToolCallBlock);
-		const replayContext = makeContext();
-		replayContext.messages = [
-			...replayContext.messages,
-			done.message,
-			{
-				role: "toolResult" as const,
-				toolCallId: incompleteToolCall!.id,
-				toolName: "cursor",
-				content: [{ type: "text" as const, text: "Cursor shell did not complete" }],
-				isError: true,
-				timestamp: 2,
-			},
-		];
-		const finalEvents = await collectEvents(streamCursor(makeModel(), replayContext, { apiKey: "test-key" }));
-		expect(getDoneEvent(finalEvents).reason).toBe("stop");
-		expect(collectTextDeltas(finalEvents)).toBe("Done.");
 		expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0);
 
 		await delayBeyondLifecycleDefer();

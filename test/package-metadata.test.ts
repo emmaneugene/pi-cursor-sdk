@@ -73,8 +73,8 @@ describe("package metadata cutover baselines", () => {
 	});
 
 	it("pins Cursor SDK exactly", () => {
-		expect(packageJson.dependencies["@cursor/sdk"]).toBe("1.0.27");
-		expect(lockPackageVersion("@cursor/sdk")).toBe("1.0.27");
+		expect(packageJson.dependencies["@cursor/sdk"]).toBe("1.0.30");
+		expect(lockPackageVersion("@cursor/sdk")).toBe("1.0.30");
 	});
 
 	it("keeps lockfile resolved URLs on the public npm registry", () => {
@@ -135,7 +135,7 @@ describe("package metadata cutover baselines", () => {
 		try {
 			const packOutput = npmPack(["pack", "--ignore-scripts", "--pack-destination", tempRoot], process.cwd());
 			const tarballName = packOutput.trim().split(/\r?\n/).at(-1)?.trim();
-			expect(tarballName).toMatch(/^pi-cursor-sdk-.*\.tgz$/);
+			expect(tarballName).toMatch(/^emmaneugene-pi-cursor-sdk-.*\.tgz$/);
 
 			const listing = execFileSync("tar", ["-tzf", tarballName!], { cwd: tempRoot, encoding: "utf8" });
 			expect(listing).toContain("package/package.json");
