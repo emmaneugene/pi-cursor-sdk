@@ -63,6 +63,7 @@ export function buildCursorPiToolBridgeSnapshot(
 
 	for (const tool of allTools) {
 		if (!activeToolNames.has(tool.name)) continue;
+		if (options.excludedToolNames?.has(tool.name)) continue;
 		if (isExcludedFromCursorBridgeExposure(tool.name) && isRegisteredCursorNativeToolName(tool.name)) continue;
 		if (!exposeOverlappingBuiltins && isOverlappingCursorNativePiToolName(tool.name)) continue;
 

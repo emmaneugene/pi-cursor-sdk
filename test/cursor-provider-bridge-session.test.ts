@@ -446,4 +446,51 @@ describe("streamCursor session agent", () => {
 		expect(firstPrompt.text).toContain("Cursor host/MCP");
 		expect(firstPrompt.text).not.toContain("pi__cursor_ask_question");
 	});
+
+	it("applies user-config bridge tool filters through the production turn path", async () => {
+		const tools = [
+			createTestToolInfo("tool_alpha", Type.Object({}), "Alpha tool"),
+			createTestToolInfo("tool_beta", Type.Object({}), "Beta tool"),
+		];
+		registerBridgeForProviderTest({ active: tools.map((tool) => tool.name), tools });
+		const tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-bridge-filter-"));
+		const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
+		const mockDispose = vi.fn().mockResolvedValue(undefined);
+		const mockSend = vi.fn().mockResolvedValue({
+			id: "run-1",
+			agentId: "agent-1",
+			status: "finished",
+			wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished", result: "ok" }),
+			cancel: vi.fn(),
+			supports: () => true,
+			unsupportedReason: () => undefined,
+		});
+		mockedCreate.mockImplementation(async () => asMockSdkAgent({
+			agentId: `agent-${mockedCreate.mock.calls.length + 1}`,
+			send: mockSend,
+			[Symbol.asyncDispose]: mockDispose,
+		}));
+		try {
+			// Denylisting every bridgeable tool skips bridge MCP injection entirely.
+			writeFileSync(join(tmpAgentDir, "cursor-sdk.json"), JSON.stringify({
+				bridge: { excludeTools: ["tool_alpha", "tool_beta"] },
+			}));
+			await collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
+			expect(getCreatedAgentOptions(0).mcpServers).toBeUndefined();
+
+			// Removing the denylist changes the surface signature, so the pool recreates with bridge MCP.
+			rmSync(join(tmpAgentDir, "cursor-sdk.json"));
+			await collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
+			expect(mockedCreate).toHaveBeenCalledTimes(2);
+			expect(getPiToolsMcpUrlFromAgentCreateOptions(getCreatedAgentOptions(1))).toBeTruthy();
+		} finally {
+			if (originalAgentDir === undefined) {
+				delete process.env.PI_CODING_AGENT_DIR;
+			} else {
+				process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+			}
+			rmSync(tmpAgentDir, { recursive: true, force: true });
+		}
+	});
 });

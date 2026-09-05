@@ -28,7 +28,7 @@ import {
 	getEffectiveFastForModelId,
 } from "./cursor-state.js";
 import { resolveEffectiveCursorConfig } from "./cursor-runtime-state.js";
-import type { CursorResolvedSdkConfig } from "./cursor-config.js";
+import { buildCursorBridgeExcludeToolNames, type CursorResolvedSdkConfig } from "./cursor-config.js";
 import { buildCursorModelSelection } from "./model-discovery.js";
 import { getEffectiveCursorSettingSources } from "./cursor-setting-sources.js";
 import {
@@ -265,6 +265,7 @@ async function prepareCursorLocalProviderTurn(
 		const settingSources = getEffectiveCursorSettingSources();
 		const queuedBridgeRequestsBeforeLiveRun: CursorPiBridgeToolRequest[] = [];
 		let liveRunForBridgeQueue: CursorLiveRun | undefined;
+		const bridgeExcludeToolNames = buildCursorBridgeExcludeToolNames(resolvedConfig);
 
 		const sessionAgentAcquireParams = {
 			apiKey: resolvedApiKey,
@@ -275,6 +276,7 @@ async function prepareCursorLocalProviderTurn(
 			localSafety,
 			localResume: resolvedConfig.local.resume.value,
 			useHttp1ForAgent,
+			bridgeExcludeToolNames,
 			debugRecorder: sdkEventDebug,
 			onBridgeToolRequest: (request: CursorPiBridgeToolRequest) => {
 				if (liveRunForBridgeQueue && !liveRunForBridgeQueue.disposed) {

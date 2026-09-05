@@ -29,6 +29,7 @@ import {
 	loadCursorSdkConfigForUpdate,
 	loadCursorSdkUserConfig,
 	mergeCursorSdkConfig,
+	parseCursorSdkConfig,
 	resolveCursorFastDefault,
 	resolveCursorSdkConfig,
 	saveCursorSdkProjectConfig,
@@ -125,6 +126,35 @@ describe("Cursor SDK config resolver", () => {
 			value: false,
 			source: "builtin",
 		});
+	});
+
+	it("parses the bridge excludeTools denylist from user and project JSON config", () => {
+		const parsed = parseCursorSdkConfig({
+			bridge: { excludeTools: ["bash", " bash ", "bash", "", 42] },
+		});
+		expect(parsed?.bridge).toEqual({ excludeTools: ["bash"] });
+
+		// Empty and malformed lists mean unset (no restriction), not zero exposure.
+		expect(parseCursorSdkConfig({ bridge: { excludeTools: [] } })?.bridge).toBeUndefined();
+		expect(parseCursorSdkConfig({ bridge: { excludeTools: [42] } })?.bridge).toBeUndefined();
+		expect(parseCursorSdkConfig({ bridge: { tools: ["find"] } })?.bridge).toBeUndefined();
+		expect(parseCursorSdkConfig({ bridge: "on" })).toEqual({});
+	});
+
+	it("resolves the bridge denylist as trusted project over user with an empty built-in default", () => {
+		const user = { bridge: { excludeTools: ["bash"] } };
+		// Disjoint names prove project replaces, not unions with, the user denylist.
+		const project = { bridge: { excludeTools: ["edit"] } };
+
+		expect(resolveCursorSdkConfig({ env: {}, user }).bridge.excludeTools).toMatchObject({
+			value: ["bash"],
+			source: "user",
+		});
+		expect(resolveCursorSdkConfig({ env: {}, user, project }).bridge.excludeTools).toMatchObject({
+			value: ["edit"],
+			source: "project",
+		});
+		expect(resolveCursorSdkConfig({ env: {} }).bridge.excludeTools).toMatchObject({ value: [], source: "builtin" });
 	});
 
 	it("rejects invalid explicit CLI runtime and cloud-context overrides before lower layers", () => {

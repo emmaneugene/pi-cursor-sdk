@@ -1,13 +1,15 @@
 import { toNamespacedPath } from "node:path";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { computeCursorContextFingerprint, shouldBootstrapCursorContext } from "../src/context.js";
 import { createEventHarness, createExtensionTestContext, makeContext } from "./helpers/pi-harness.js";
+import { createTestToolInfo, registerBridgeForProviderTest } from "./helpers/cursor-provider-harness.js";
 import { __testUtils as cursorSessionScopeTestUtils, registerCursorSessionScope } from "../src/cursor-session-scope.js";
 import { __testUtils as resumeTestUtils } from "../src/cursor-session-agent-resume.js";
 import {
 	acquireSessionCursorAgent,
 	__testUtils as sessionAgentTestUtils,
 } from "../src/cursor-session-agent.js";
+import { __testUtils as cursorPiToolBridgeTestUtils } from "../src/cursor-pi-tool-bridge.js";
 import { registerCursorSessionAgentLifecycle } from "../src/cursor-session-agent-lifecycle.js";
 import { installCursorSessionStoreMock } from "./helpers/cursor-session-store.js";
 import { buildCursorSessionStateRoot } from "../src/cursor-session-store.js";
@@ -19,6 +21,10 @@ describe("cursor-session-agent", () => {
 		resumeTestUtils.reset();
 		await sessionAgentTestUtils.disposeAllSessionCursorAgents();
 		vi.clearAllMocks();
+	});
+
+	afterEach(async () => {
+		await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
 	});
 
 	it("reuses the same SDK agent for the same pi session scope", async () => {
@@ -116,6 +122,42 @@ describe("cursor-session-agent", () => {
 		expect(second.agent).toBe(first.agent);
 		expect(createAgent).toHaveBeenCalledTimes(1);
 		expect(mockDispose).not.toHaveBeenCalled();
+	});
+
+	it("splits the session agent pool when the bridge denylist changes", async () => {
+		const tools = [
+			createTestToolInfo("tool_alpha", undefined, "Alpha tool"),
+			createTestToolInfo("tool_beta", undefined, "Beta tool"),
+		];
+		registerBridgeForProviderTest({ active: tools.map((tool) => tool.name), tools });
+		cursorSessionScopeTestUtils.set("/tmp/project", "/tmp/sessions/test.jsonl");
+		const mockDispose = vi.fn().mockResolvedValue(undefined);
+		let agentCounter = 0;
+		const createAgent = vi.fn().mockImplementation(() => ({
+			agentId: `agent-${++agentCounter}`,
+			[Symbol.asyncDispose]: mockDispose,
+		}));
+		const params = {
+			apiKey: "test-key",
+			agentMode: "agent" as const,
+			cwd: "/tmp/project",
+			modelSelection: { id: "composer-2.5" },
+			createAgent,
+		};
+
+		const first = await acquireSessionCursorAgent(params);
+		const sameFilter = await acquireSessionCursorAgent({ ...params, bridgeExcludeToolNames: new Set<string>() });
+		expect(sameFilter.created).toBe(false);
+		expect(sameFilter.agent).toBe(first.agent);
+
+		const filtered = await acquireSessionCursorAgent({
+			...params,
+			bridgeExcludeToolNames: new Set(["tool_alpha"]),
+		});
+		expect(filtered.created).toBe(true);
+		expect(filtered.agent).not.toBe(first.agent);
+		expect(filtered.bridgeRun?.snapshot.tools.map((tool) => tool.piToolName)).toEqual(["tool_beta"]);
+		expect(createAgent).toHaveBeenCalledTimes(2);
 	});
 
 	it("awaits lease-tracked background sdk run completion for the same pool instance", async () => {

@@ -191,6 +191,73 @@ describe("cursor pi tool bridge flags and snapshots", () => {
 		expect(pi.setActiveTools).not.toHaveBeenCalled();
 	});
 
+	it("hides denylisted pi tools from the snapshot, including denylisted unknown tools", () => {
+		const tools = [
+			createToolInfo("custom_find", "Find files"),
+			createToolInfo("custom_grep", "Search files"),
+			createToolInfo("sem_reindex", "Reindex semantic cache"),
+		];
+		const pi = createBridgePiHarness({
+			active: tools.map((tool) => tool.name),
+			tools,
+		});
+
+		const deniedSnapshot = buildCursorPiToolBridgeSnapshot(pi, {
+			excludedToolNames: new Set(["custom_grep"]),
+		});
+		expect(deniedSnapshot.tools.map((tool) => tool.piToolName)).toEqual(["custom_find", "sem_reindex"]);
+
+		// Denylist names that match nothing change nothing.
+		const unknownSnapshot = buildCursorPiToolBridgeSnapshot(pi, {
+			excludedToolNames: new Set(["not_a_real_tool"]),
+		});
+		expect(unknownSnapshot.tools.map((tool) => tool.piToolName)).toEqual(["custom_find", "custom_grep", "sem_reindex"]);
+
+		// Denylisting every active tool empties the snapshot and the run skips bridge injection.
+		const emptySnapshot = buildCursorPiToolBridgeSnapshot(pi, {
+			excludedToolNames: new Set(["custom_find", "custom_grep", "sem_reindex"]),
+		});
+		expect(emptySnapshot.tools).toEqual([]);
+		expect(pi.setActiveTools).not.toHaveBeenCalled();
+	});
+
+	it("keeps denylisted overlapping builtins hidden even when builtin exposure is opted in", () => {
+		const tools = [
+			createBuiltinToolInfo("grep", Type.Object({}), "Search files"),
+			createBuiltinToolInfo("find", Type.Object({}), "Find files"),
+			createToolInfo("sem_reindex", "Reindex semantic cache"),
+		];
+		const pi = createBridgePiHarness({
+			active: tools.map((tool) => tool.name),
+			tools,
+		});
+
+		const optInSnapshot = buildCursorPiToolBridgeSnapshot(pi, { exposeOverlappingBuiltins: true });
+		expect(optInSnapshot.tools.map((tool) => tool.piToolName)).toEqual(["grep", "find", "sem_reindex"]);
+
+		const deniedSnapshot = buildCursorPiToolBridgeSnapshot(pi, {
+			exposeOverlappingBuiltins: true,
+			excludedToolNames: new Set(["grep"]),
+		});
+		expect(deniedSnapshot.tools.map((tool) => tool.piToolName)).toEqual(["find", "sem_reindex"]);
+	});
+
+	it("changes the bridge surface signature when the denylist changes", () => {
+		const tools = [createToolInfo("tool_alpha", "Alpha"), createToolInfo("tool_beta", "Beta")];
+		const pi = createBridgePiHarness({ active: tools.map((tool) => tool.name), tools });
+
+		const unfiltered = buildCursorPiToolBridgeSurfaceSignature(buildCursorPiToolBridgeSnapshot(pi));
+		const denied = buildCursorPiToolBridgeSurfaceSignature(
+			buildCursorPiToolBridgeSnapshot(pi, { excludedToolNames: new Set(["tool_alpha"]) }),
+		);
+		const sameDenylist = buildCursorPiToolBridgeSurfaceSignature(
+			buildCursorPiToolBridgeSnapshot(pi, { excludedToolNames: new Set(["tool_alpha"]) }),
+		);
+
+		expect(denied).not.toBe(unfiltered);
+		expect(denied).toBe(sameDenylist);
+	});
+
 	it("exposes native replay-registered edit and write when opt-in builtins are enabled", () => {
 		nativeToolDisplayTestUtils.registerNativeToolNameForTests("edit");
 		nativeToolDisplayTestUtils.registerNativeToolNameForTests("write");

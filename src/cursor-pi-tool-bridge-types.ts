@@ -43,6 +43,8 @@ export interface CursorPiToolBridgeSnapshot {
 
 export interface CursorPiToolBridgeSnapshotOptions {
 	exposeOverlappingBuiltins?: boolean;
+	/** Pi tool names hidden from the bridge. */
+	excludedToolNames?: ReadonlySet<string>;
 }
 
 export interface CursorPiBridgeToolRequest {
@@ -73,7 +75,7 @@ export interface CursorPiToolBridgeRun {
 
 export interface CursorPiToolBridge {
 	isEnabled(): boolean;
-	getToolSurfaceSignature(): string;
+	getToolSurfaceSignature(excludedToolNames?: ReadonlySet<string>): string;
 	createRun(options?: CursorPiToolBridgeRunOptions): Promise<CursorPiToolBridgeRun>;
 	disposeAll(reason?: string): Promise<void>;
 }
@@ -81,4 +83,6 @@ export interface CursorPiToolBridge {
 export interface CursorPiToolBridgeRunOptions {
 	onToolRequest?: (request: CursorPiBridgeToolRequest) => void;
 	debugRecorder?: CursorSdkEventDebugRecorder;
+	/** Pi tool names hidden from this run's bridge snapshot. */
+	excludeToolNames?: ReadonlySet<string>;
 }

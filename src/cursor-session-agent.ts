@@ -132,6 +132,7 @@ interface SessionCursorAgentCreateParams {
 	settingSources?: SettingSource[];
 	localSafety?: CursorLocalSafetyOptions;
 	useHttp1ForAgent?: boolean;
+	bridgeExcludeToolNames?: ReadonlySet<string>;
 	onBridgeToolRequest?: (request: CursorPiBridgeToolRequest) => void;
 	debugRecorder?: CursorSdkEventDebugRecorder;
 	localResume?: boolean;
@@ -210,10 +211,10 @@ function buildApiKeyPoolKeyFingerprint(apiKey: string): string {
 	return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
 }
 
-function buildBridgePoolKeySuffix(): string {
+function buildBridgePoolKeySuffix(bridgeExcludeToolNames: ReadonlySet<string> | undefined): string {
 	const registeredBridge = getRegisteredCursorPiToolBridge();
 	if (!registeredBridge) return "bridge:absent";
-	return registeredBridge.getToolSurfaceSignature();
+	return registeredBridge.getToolSurfaceSignature(bridgeExcludeToolNames);
 }
 
 function buildSessionAgentPoolKey(scopeKey: string, params: SessionCursorAgentCreateParams): string {
@@ -229,7 +230,7 @@ function buildSessionAgentPoolKey(scopeKey: string, params: SessionCursorAgentCr
 				? "http1:on"
 				: "http1:off",
 		buildApiKeyPoolKeyFingerprint(params.apiKey),
-		buildBridgePoolKeySuffix(),
+		buildBridgePoolKeySuffix(params.bridgeExcludeToolNames),
 	].join("\0");
 }
 
@@ -456,6 +457,7 @@ async function createSessionAgentEntry(
 			bridgeRun = await registeredBridge.createRun({
 				onToolRequest: params.onBridgeToolRequest,
 				debugRecorder: params.debugRecorder,
+				excludeToolNames: params.bridgeExcludeToolNames,
 			});
 			if (!bridgeRun.enabled || !bridgeRun.mcpServers) {
 				await bridgeRun.dispose();

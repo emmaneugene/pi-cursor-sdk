@@ -755,6 +755,71 @@ describe("Cursor runtime state", () => {
 		expect(report).toContain("PI_CURSOR_TOOL_MANIFEST: disabled");
 	});
 
+	it("formatCursorToolsDebugReport hides denylisted tools from the reported bridge surface", () => {
+		const pi = createPiHarness({
+			activeTools: ["custom_bridge_tool"],
+			initialTools: [createTestToolInfo("custom_bridge_tool", undefined, "Custom bridge tool")],
+		});
+		const unfiltered = formatCursorToolsDebugReport(pi, { PI_CURSOR_PI_TOOL_BRIDGE: "1" });
+		expect(unfiltered).toContain("pi__custom_bridge_tool");
+
+		const denied = formatCursorToolsDebugReport(
+			pi,
+			{ PI_CURSOR_PI_TOOL_BRIDGE: "1" },
+			new Set(["custom_bridge_tool"]),
+		);
+		expect(denied).not.toContain("pi__custom_bridge_tool");
+	});
+
+	it("formatCursorToolsDebugReport honors PI_CURSOR_EXPOSE_BUILTIN_TOOLS", () => {
+		const pi = createPiHarness({
+			activeTools: ["grep"],
+			initialTools: [createTestToolInfo("grep", undefined, "Search files")],
+		});
+		const env = { PI_CURSOR_PI_TOOL_BRIDGE: "1" };
+		expect(formatCursorToolsDebugReport(pi, env)).not.toContain("pi__grep");
+		expect(formatCursorToolsDebugReport(pi, { ...env, PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" })).toContain("pi__grep");
+	});
+
+	it("/cursor-tools applies user-config bridge denylist and falls back when config is unreadable", async () => {
+		const tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-tools-deny-"));
+		const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+		const originalBridgeEnv = process.env.PI_CURSOR_PI_TOOL_BRIDGE;
+		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
+		process.env.PI_CURSOR_PI_TOOL_BRIDGE = "1";
+		try {
+			writeFileSync(join(tmpAgentDir, "cursor-sdk.json"), JSON.stringify({
+				bridge: { excludeTools: ["custom_bridge_tool"] },
+			}));
+			const pi = createPiHarness({
+				activeTools: ["custom_bridge_tool"],
+				initialTools: [createTestToolInfo("custom_bridge_tool", undefined, "Custom bridge tool")],
+			});
+			registerCursorRuntimeControls(pi);
+			const deniedCtx = createExtensionTestContext();
+			await pi.runCommand("cursor-tools", "", { ui: deniedCtx.ui, hasUI: true });
+			expect(deniedCtx.ui.notify).toHaveBeenCalledWith(
+				expect.not.stringContaining("pi__custom_bridge_tool"),
+				"info",
+			);
+
+			// Unreadable config falls back to the unfiltered snapshot instead of breaking the report.
+			writeFileSync(join(tmpAgentDir, "cursor-sdk.json"), "{ not json");
+			const fallbackCtx = createExtensionTestContext();
+			await pi.runCommand("cursor-tools", "", { ui: fallbackCtx.ui, hasUI: true });
+			expect(fallbackCtx.ui.notify).toHaveBeenCalledWith(
+				expect.stringContaining("pi__custom_bridge_tool"),
+				"info",
+			);
+		} finally {
+			if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+			else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+			if (originalBridgeEnv === undefined) delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
+			else process.env.PI_CURSOR_PI_TOOL_BRIDGE = originalBridgeEnv;
+			rmSync(tmpAgentDir, { recursive: true, force: true });
+		}
+	});
+
 	it("logs /cursor-tools to stdout when UI is unavailable", async () => {
 		const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 		try {

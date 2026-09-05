@@ -17,6 +17,7 @@ import {
 import {
 	buildCursorPiToolBridgeSnapshot,
 	CURSOR_PI_TOOL_BRIDGE_ENV,
+	resolveCursorPiToolBridgeBuiltinsEnabled,
 	resolveCursorPiToolBridgeEnabled,
 } from "./cursor-pi-tool-bridge-snapshot.js";
 import {
@@ -31,6 +32,7 @@ import { getCursorSessionScopeKey } from "./cursor-session-scope.js";
 import { refreshSessionCursorAgentConfig } from "./cursor-session-agent.js";
 import { getCursorModelMetadata } from "./model-discovery.js";
 import {
+	buildCursorBridgeExcludeToolNames,
 	cursorFastDefaultsFromConfig,
 	getCursorSdkUserConfigPath,
 	loadCursorSdkUserConfig,
@@ -47,6 +49,7 @@ import {
 	registerCursorCloudRuntimeControls,
 	resetCursorRuntimeStateForTests,
 	resolveCursorStatusRuntime,
+	resolveEffectiveCursorConfigForContext,
 	restoreCursorCliState,
 	restoreSessionCursorRuntimeState,
 	type CursorRuntimeStateExtensionApi,
@@ -379,6 +382,7 @@ function formatEffectiveCursorSettingSourcesLabel(raw: string | undefined = proc
 export function formatCursorToolsDebugReport(
 	pi: Pick<ExtensionAPI, "getActiveTools" | "getAllTools">,
 	env: Record<string, string | undefined> = process.env,
+	excludedToolNames?: ReadonlySet<string>,
 ): string {
 	const bridgeEnabled = resolveCursorPiToolBridgeEnabled(env);
 	const manifestEnabled = resolveCursorToolManifestEnabled(env);
@@ -392,7 +396,10 @@ export function formatCursorToolsDebugReport(
 	let bridgeSnapshot;
 	if (bridgeEnabled) {
 		try {
-			bridgeSnapshot = buildCursorPiToolBridgeSnapshot(pi);
+			bridgeSnapshot = buildCursorPiToolBridgeSnapshot(pi, {
+				exposeOverlappingBuiltins: resolveCursorPiToolBridgeBuiltinsEnabled(env),
+				excludedToolNames,
+			});
 		} catch {
 			lines.push("Pi bridge snapshot: unavailable (extension tool APIs required).");
 		}
@@ -404,9 +411,15 @@ export function formatCursorToolsDebugReport(
 
 function emitCursorToolsDebugReport(
 	pi: Pick<ExtensionAPI, "getActiveTools" | "getAllTools">,
-	ctx: Pick<ExtensionContext, "hasUI" | "ui">,
+	ctx: Pick<ExtensionContext, "cwd" | "hasUI" | "ui">,
 ): void {
-	const report = formatCursorToolsDebugReport(pi);
+	let excludedToolNames: ReadonlySet<string> | undefined;
+	try {
+		excludedToolNames = buildCursorBridgeExcludeToolNames(resolveEffectiveCursorConfigForContext(ctx));
+	} catch {
+		// Config load failure must not break the debug report; fall back to the unfiltered snapshot.
+	}
+	const report = formatCursorToolsDebugReport(pi, process.env, excludedToolNames);
 	if (ctx.hasUI) {
 		ctx.ui.notify(report, "info");
 		return;

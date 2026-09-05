@@ -74,6 +74,10 @@ export interface CursorSdkConfig {
 		resume?: boolean;
 		useHttp1ForAgent?: boolean;
 	};
+	bridge?: {
+		/** Pi tool names hidden from the pi tool bridge; unset/empty exposes all non-excluded active tools. */
+		excludeTools?: string[];
+	};
 }
 
 export interface CursorSafetyCap<T> {
@@ -113,6 +117,9 @@ export interface CursorResolvedSdkConfig {
 		force: CursorResolvedSetting<boolean>;
 		resume: CursorResolvedSetting<boolean>;
 		useHttp1ForAgent: CursorResolvedSetting<boolean>;
+	};
+	bridge: {
+		excludeTools: CursorResolvedSetting<string[]>;
 	};
 }
 
@@ -207,6 +214,11 @@ function isAllowedEnvName(value: unknown): value is string {
 	return typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) && !value.startsWith("CURSOR_");
 }
 
+function parseToolNames(value: unknown): string[] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	const parsed = [...new Set(value.map((name) => (typeof name === "string" ? name.trim() : "")).filter((name) => name.length > 0))];
+	return parsed.length > 0 ? parsed : undefined;
+}
 function parseEnvNames(value: unknown): string[] | undefined {
 	const names = Array.isArray(value)
 		? value
@@ -283,6 +295,12 @@ export function parseCursorSdkConfig(value: unknown): CursorSdkConfig | undefine
 		const sandboxOptions = asRecord(local.sandboxOptions);
 		if (typeof sandboxOptions?.enabled === "boolean") parsedLocal.sandboxOptions = { enabled: sandboxOptions.enabled };
 		if (Object.keys(parsedLocal).length > 0) config.local = parsedLocal;
+	}
+
+	const bridge = asRecord(record.bridge);
+	if (bridge) {
+		const excludeTools = parseToolNames(bridge.excludeTools);
+		if (excludeTools) config.bridge = { excludeTools };
 	}
 
 	return config;
@@ -533,6 +551,7 @@ const CLOUD_ORDER: CursorFieldSource[] = ["cli", "environment", "session", "user
 const LOCAL_ORDER: CursorFieldSource[] = ["cli", "environment", "project", "user", "builtin"];
 const LOCAL_FORCE_ORDER: CursorFieldSource[] = ["cli", "environment", "builtin"];
 const HTTP1_ORDER: CursorFieldSource[] = ["session", "environment", "user", "builtin"];
+const BRIDGE_ORDER: CursorFieldSource[] = ["project", "user", "builtin"];
 
 function buildFieldLayers<T>(order: CursorFieldSource[], values: CursorFieldValues<T>): Array<CursorResolvedSetting<T> | undefined> {
 	return order.map((source) => (source === "builtin" ? resolved("builtin", values.builtin as T) : valueFrom(source, values[source])));
@@ -785,7 +804,20 @@ export function resolveCursorSdkConfig(options: ResolveCursorSdkConfigOptions = 
 				builtin: false,
 			}),
 		},
+		bridge: {
+			excludeTools: resolveOrdinaryField(BRIDGE_ORDER, {
+				project: project?.bridge?.excludeTools,
+				user: user?.bridge?.excludeTools,
+				builtin: [],
+			}),
+		},
 	};
+}
+
+/** Builds the bridge snapshot exclusion set from resolved `bridge` config; unset/empty exposes everything. */
+export function buildCursorBridgeExcludeToolNames(resolvedConfig: CursorResolvedSdkConfig): ReadonlySet<string> {
+	const names = resolvedConfig.bridge.excludeTools.value;
+	return names.length > 0 ? new Set(names) : new Set();
 }
 
 export function resolveCursorFastDefault(options: {
