@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.3.7 - 2026-09-03
+## 0.3.7 - 2026-09-05
 
 First release of the maintained fork published as `@emmaneugene/pi-cursor-sdk`.
+
+### Added
+
+- Bridge tool denylist: set `bridge.excludeTools` in `~/.pi/agent/cursor-sdk.json` or trusted `.pi/cursor-sdk.json` to hide pi tools from the pi tool bridge. Denylisted active pi tools are hidden from local Cursor agents; unset exposes everything else, and an explicitly empty list parses to unset so it falls through to lower-precedence config. Overlapping built-in pi tools stay hidden unless `PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1`; trusted project config wins over user config. A change to the resulting exposed surface splits the local agent pool so the next turn creates a Cursor agent with the narrowed bridge snapshot.
 
 ### Changed
 

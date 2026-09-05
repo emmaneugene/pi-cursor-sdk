@@ -38,6 +38,10 @@ npm run smoke:cloud
 
 Per-target commands exist for diagnosis and iteration. They are not additional release-gate commands because requiring each per-target command plus `all` doubles Cursor token use.
 
+## Fork status (emmaneugene/pi-cursor-sdk)
+
+As of 2026-09-05, this fork has **not adopted** the 3-OS platform gate. `smoke:platform:all` requires the Crabbox runner plus macOS SSH, Ubuntu Docker, and Parallels Windows targets that are not set up in this fork's environment. Until the gate is adopted, fork releases ship with: the full unit/typecheck suite, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual` PNG evidence. Crabbox + doctor remains the intended future gate; this note is a status record, not a permanent waiver.
+
 No partial adoption exists. The release evidence must include macOS, Ubuntu, and Windows native passing through `smoke:platform:all`.
 
 ## Non-negotiable constraints
