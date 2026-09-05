@@ -2,6 +2,9 @@
   "name": "@emmaneugene/pi-cursor-sdk",
   "version": "0.3.7",
   "description": "pi provider extension backed by @cursor/sdk local and cloud agents",
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "Emmanuel Oh <emmaneugene@outlook.com> (https://github.com/emmaneugene)",
   "contributors": [
     "Mitch Fultz (https://github.com/fitchmultz)"
