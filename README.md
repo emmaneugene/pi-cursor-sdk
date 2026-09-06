@@ -545,6 +545,83 @@ Actual Cursor runs still need a key from `/login`, `CURSOR_API_KEY`, or `--api-k
 - **Output token limits are conservative.** Cursor SDK model metadata does not currently expose output token limits directly.
 - **Local token usage uses Cursor SDK data when safely attributable.** For local turns with in-time SDK usage, pi records the latest per-turn raw `turn-ended` `inputTokens`, `outputTokens`, `cacheReadTokens`, and `cacheWriteTokens`; that raw local shape keeps full-prompt `inputTokens` with cache as a partition (published SDK `toTokenUsage` totals differ), so pi maps disjoint components (`input = inputTokens - cacheRead - cacheWrite`, plus cache fields) and sets `totalTokens = inputTokens + outputTokens` for occupancy/compaction. If the local SDK reports no usage in time, the extension falls back to local `input/output` activity estimates while setting `totalTokens` to the current replayable context estimate so the footer/compaction percentage does not collapse after split tool turns. Later usage for that live run is ignored rather than risk applying stale usage to the wrong pi turn. Raw cloud usage remains display-only until its field semantics are independently captured. Cursor SDK cost is not exposed, so pi cost remains zero/absent.
 
+## Environment variable reference
+
+All `PI_CURSOR_*` overrides in one list. They are otherwise documented where each feature is explained; this section is the index. Boolean flags accept `1`, `true`, `on`, `yes`, `enabled` for on and `0`, `false`, `off`, `none`, `no`, `disabled` for off (case-insensitive); invalid boolean tokens fall back to each flag's default. Non-boolean variables use the parsing and error behavior stated in their row. For timeout pairs, a valid positive `_MS` value wins; an invalid or non-positive `_MS` value is ignored, allowing a valid `_SECONDS` value to apply. Many settings also have CLI flags, `/cursor-*` session commands, or `cursor-sdk.json` keys with their own precedence; see the linked sections.
+
+### Authentication and model catalog
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CURSOR_API_KEY` | Unset | Authenticates Cursor SDK requests. The stored `/login` credential is preferred; the env var is the fallback. See [Configure your Cursor SDK API key](#configure-your-cursor-sdk-api-key). |
+| `PI_CURSOR_SDK_MODEL_CACHE_TTL_MS` | `86400000` (24h) | Fresh-cache lifetime for the discovered model catalog. Parsing uses a leading non-negative base-10 integer (`12.9` and `12junk` become `12`); negative values or values without a numeric prefix fall back to 24h. `0` disables fresh-cache hits but keeps the stale-cache fallback after a discovery failure. See [Model catalog cache](#model-catalog-cache). |
+| `PI_CURSOR_SDK_DISABLE_MODEL_CACHE` | Off | Skips model-list cache reads and writes; discovery uses the live catalog when possible. |
+
+### Local runtime and agent behavior
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PI_CURSOR_RUNTIME` | `local` | Selects the `local` or `cloud` SDK runtime. An invalid non-empty value fails closed. See [Cursor SDK mode](#cursor-sdk-mode). |
+| `PI_CURSOR_LOCAL_FORCE` | Off | Passes `{ local: { force: true } }` to the next local `Agent.send()`; the override is consumed once. |
+| `PI_CURSOR_LOCAL_RESUME` | On | Allows reuse of a matching persisted local agent. `PI_CURSOR_LOCAL_RESUME=0` opts out. |
+| `PI_CURSOR_SANDBOX` | Off | Passes local sandbox enablement into Cursor SDK agent options. Only enabled values are sent. |
+| `PI_CURSOR_AUTO_REVIEW` | Off | Passes `autoReview: true` into Cursor SDK agent options. Only enabled values are sent. |
+| `PI_CURSOR_HTTP_1_1` | Off | Forces Cursor SDK local-agent streams to HTTP/1.1/SSE for VPN/proxy environments. Session `/cursor-http` commands win over env; project config is ignored. See the `PI_CURSOR_HTTP_1_1` notes under [Cursor provider tool contract](#cursor-provider-tool-contract). |
+| `PI_CURSOR_SETTING_SOURCES` | `all` | Cursor SDK setting sources. `all`, `1`, `true`, and `on` select all sources; `none`, `0`, `false`, `off`, `omit`, and `disabled` disable ambient sources. Other comma-separated names such as `project,user,plugins` narrow loading and are forwarded without validation. See [Limits](#limits) and [Cursor tool surfaces in pi](docs/cursor-tool-surfaces.md). |
+| `PI_CURSOR_PRESERVE_PI_AGENTS_MD` | Off | Keeps pi `AGENTS.md`/`CLAUDE.md` context injection even when Cursor setting sources load the same rules. |
+| `CURSOR_RIPGREP_PATH` | Bundled SDK `rg` when available | Ripgrep executable for the local SDK agent. Only an absolute path is honored; the extension sets the bundled default itself at turn prepare. |
+
+### Pi tool bridge and tool surfaces
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PI_CURSOR_PI_TOOL_BRIDGE` | On | Master switch for exposing active pi tools to local Cursor agents through the loopback MCP bridge. `0` rolls back to Cursor SDK tools/settings/MCP only. |
+| `PI_CURSOR_EXPOSE_BUILTIN_TOOLS` | Off | Also exposes overlapping pi built-ins (`read`, `bash`, `write`, `edit`, `grep`, `find`, `ls`) that Cursor already implements natively. |
+| `PI_CURSOR_ASK_QUESTION` | On | Registers `cursor_ask_question` (surfaced as `pi__cursor_ask_question`) so Cursor can ask the user instead of guessing. Still requires a Cursor model with the bridge enabled. |
+| `PI_CURSOR_TOOL_MANIFEST` | On | Injects the compact callable-surface guidance block on bootstrap sends. |
+| `PI_CURSOR_MCP_TOOL_TIMEOUT_MS` / `PI_CURSOR_MCP_TOOL_TIMEOUT_SECONDS` | `3600000` (1h) | Overrides SDK MCP `callTool` timeout for bridged pi tools and configured Cursor MCP servers. Clamped to 60s–~24.8d. |
+| `PI_CURSOR_MCP_CONNECT_TIMEOUT_MS` / `PI_CURSOR_MCP_CONNECT_TIMEOUT_SECONDS` | `10000` (10s) | Overrides known MCP initialize/listTools timeouts on first send so dead servers fail fast. Clamped to 1s–60s. Unknown MCP protocol stacks keep the SDK default. |
+| `PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS` | Effective MCP tool timeout | Local fail-closed deadline for a stranded bridged `CallTool` awaiting its pi result. Lower it to fail sooner. |
+| `PI_CURSOR_PI_TOOL_BRIDGE_DEBUG` | Off | Emits scrubbed single-line JSONL bridge diagnostics to stderr. Do not share logs where tool names are sensitive. |
+| `PI_CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE` | Unset | Appends the same JSONL bridge diagnostics to the given file path, independent of the stderr flag. |
+
+See [Cursor provider tool contract](#cursor-provider-tool-contract) for the narrative version of this table.
+
+### Display and replay
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PI_CURSOR_NATIVE_TOOL_DISPLAY` | TTY/mode-dependent | Requests native rendering of Cursor tool cards. `tui`, `json`, and `rpc` default on; any other explicit mode defaults off. When no mode is supplied, the default follows `stdout.isTTY`. See [Cursor native tool replay](docs/cursor-native-tool-replay.md). |
+| `PI_CURSOR_REGISTER_NATIVE_TOOLS` | Follows native-display request; always off in `print` mode | Registers Cursor-native replay tools. Setting it to true does not override `PI_CURSOR_NATIVE_TOOL_DISPLAY=0`; setting it to false disables registration everywhere. |
+| `PI_CURSOR_TASK_PRESENTATION` | `subagent-meta` | Task activity titles and transcript headers: exact `task`, `subagent`, or `subagent-meta`. |
+
+### Cloud runtime
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PI_CURSOR_CLOUD_ACK` | Off | First-use acknowledgement. Without it, cloud preflight fails with `cloud_ack_required`. See [Cloud runtime and acknowledgement](#cloud-runtime-and-acknowledgement). |
+| `PI_CURSOR_CLOUD_REPO` | Unset | HTTPS repository URL for the cloud agent. Must have no userinfo, query, or fragment. |
+| `PI_CURSOR_CLOUD_BRANCH` | Unset | Starting ref (branch, `refs/heads/<branch>`, or 40-hex SHA). Requires an explicit repo. |
+| `PI_CURSOR_CLOUD_CONTEXT` | `fresh` | Prior pi context handling: `never`, `fresh`, or `bootstrap`. Invalid values fail closed; `never` fails preflight when the session has prior context. |
+| `PI_CURSOR_CLOUD_ENV_TYPE` / `PI_CURSOR_CLOUD_ENV_NAME` | Unset | Cursor-managed environment selection. Types are exact lowercase `cloud`, `pool`, or `machine`, plus an optional name. An invalid type, or a name without a type, fails cloud preflight. A named `cloud` environment combined with a repo fails closed. |
+| `PI_CURSOR_CLOUD_AUTO_CREATE_PR` | Off | Requests that Cursor Cloud create a pull request. |
+| `PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST` | Off | Requests that Cursor Cloud not add the user as reviewer. |
+| `PI_CURSOR_CLOUD_DIRECT_PUSH` | Off | Sets cloud `workOnCurrentBranch: true`. |
+| `PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE` | Off | Skips local Git inspection and accepts unverifiable, dirty, or unpushed state. |
+| `PI_CURSOR_CLOUD_ENV` / `PI_CURSOR_CLOUD_ENV_FROM_FILES` | Unset / off | Requested local-env forwarding. `PI_CURSOR_CLOUD_ENV` is a comma-separated list of shell-style names; `CURSOR_*` names are forbidden and invalid entries are removed, while an all-invalid non-empty list is a configuration error. Any surviving request, or an enabled `PI_CURSOR_CLOUD_ENV_FROM_FILES`, currently fails preflight (`env_forwarding_not_implemented`); use Cursor-native environment setup instead. |
+
+### Maintainer debug capture
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PI_CURSOR_SDK_EVENT_DEBUG` | Off | Captures provider/SDK event artifacts (deltas, steps, replay/drain/bridge decisions) as files only, so the TUI stays normal. See [Maintainer Cursor SDK event capture](#maintainer-cursor-sdk-event-capture) and [Cursor testing lessons](docs/cursor-testing-lessons.md). |
+| `PI_CURSOR_SDK_EVENT_DEBUG_DIR` | `.debug/cursor-sdk-events` under cwd | Base directory for debug session artifacts. |
+| `PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR` | Unset | Pins one turn's artifacts to an exact directory, bypassing session grouping. |
+| `PI_CURSOR_SDK_EVENT_DEBUG_SESSION_DIR` | Unset | Pins the session's turn grouping and manifest to an exact directory. |
+| `PI_CURSOR_SDK_EVENT_DEBUG_STDERR` | Off | Also prints the debug summary (and discarded incomplete-tool records) to stderr. |
+
+Not listed: `PI_CURSOR_BRIDGE_TOOL_CALL_ID` is an internal cancellation marker injected by the bridge on some platforms, not a user setting. `CURSOR_TREE_SITTER_VENDOR_DIR` is SDK-internal (absolute-path override for vendored tree-sitter natives; unset resolves the `@cursor/sdk-<platform>-<arch>` platform package). `*_SMOKE_*` and `PLATFORM_*` names belong to maintainer smoke scripts, not the extension runtime.
+
 ## Troubleshooting
 
 ### I can see Cursor models, but runs fail
