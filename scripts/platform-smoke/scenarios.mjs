@@ -60,7 +60,7 @@ Steps:
 8. run shell and preserve the failure: {{shellFailure}}
 9. stop using tools and answer exactly:
 NATIVE_MATRIX_OK package=<name> grep=<yes/no> find=<yes/no> list=<yes/no> shell=<yes/no> shell_fail=<yes/no> write=<yes/no> edit=<yes/no>`,
-		finalMarker: "NATIVE_MATRIX_OK package=pi-cursor-sdk",
+		finalMarker: "NATIVE_MATRIX_OK package=@emmaneugene/pi-cursor-sdk",
 		requiredCards: [
 			"read", "grep", "find", "shell-success", "write", "edit-diff", "shell-failure", "footer-status",
 		],

@@ -4,7 +4,8 @@
 import { LOCAL_RESUME_SUITE_NAMES } from "./scripts/platform-smoke/local-resume-suites.mjs";
 
 export default {
-	packageName: "pi-cursor-sdk",
+	packageName: "@emmaneugene/pi-cursor-sdk",
+	packageSlug: "pi-cursor-sdk",
 	cursorModel: "cursor/grok-4.6",
 	artifactRoot: ".artifacts/platform-smoke",
 	artifactRetention: {

@@ -1,6 +1,6 @@
 # Cursor dogfood checklist
 
-Short maintainer checklist for **minimal-surface** validation after prompt, bridge, replay, or manifest changes. This is the fast path from pi-cursor-composer dogfood sessions—not a substitute for the required [platform smoke gate](./platform-smoke.md).
+Short maintainer checklist for **minimal-surface** validation after prompt, bridge, replay, or manifest changes. This is the fast path from pi-cursor-composer dogfood sessions. It complements the current fork release evidence bar; the cross-platform matrix in [platform smoke](./platform-smoke.md) is deferred under issue #2.
 
 ## Minimal environment
 
@@ -55,11 +55,11 @@ After a Cursor **edit** tool call, confirm the activity card:
 - `details.diffString` present on the replay record
 - Collapsed diff preview with colored add/remove lines in the TUI
 
-Canonical visual evidence: `npm run smoke:visual` (see [Cursor native tool visual audit](./cursor-native-tool-visual-audit.md)).
+Canonical visual evidence: `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'` (see [Cursor native tool visual audit](./cursor-native-tool-visual-audit.md)).
 
 ## Related docs
 
 - [Cursor tool surfaces in pi](./cursor-tool-surfaces.md) — three namespaces and discoverability
-- [Platform smoke gate](./platform-smoke.md) — required cross-platform release gate
-- [Cursor live smoke checklist](./cursor-live-smoke-checklist.md) — inner-loop/manual debug checks
+- [Deferred platform smoke matrix](./platform-smoke.md) — future cross-platform release gate tracked in issue #2
+- [Cursor live smoke checklist](./cursor-live-smoke-checklist.md) — live release evidence and focused checks
 - [Cursor testing lessons](./cursor-testing-lessons.md) — auth, JSONL scans, plan-mode traps

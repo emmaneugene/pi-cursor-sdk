@@ -1,12 +1,12 @@
 # Cursor Native Tool Visual Audit Workflow
 
-> **Platform Smoke (new):** The required cross-platform release gate includes a deterministic visual card matrix across all targets. See [docs/platform-smoke.md](./platform-smoke.md) for the required cards, assertion contract, and platform-matrix budget.
+> **Release visual evidence:** `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'` is the current fork visual check. The deterministic cross-platform card matrix remains deferred under [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2); see [docs/platform-smoke.md](./platform-smoke.md) for the retained future contract.
 
 This workflow is the canonical repo path for verifying Cursor SDK tool replay the way a human sees it in pi's interactive TUI, without stealing macOS focus.
 
 Use it before accepting replay-card commits or PRs, and for every Cursor provider/runtime release where TUI card/color behavior could regress. Text logs and JSONL are necessary, but they are not enough when the claim is visual parity: always keep PNGs for the exact prompt, and keep before/after PNGs when reviewing a rendering change.
 
-Current validation baseline: Pi 0.84.0 or later, exact `@cursor/sdk@1.0.27`, and local validation packages `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, and `@earendil-works/pi-tui` at exact 0.84.0. Optional published Pi core peer dependencies use `"*"` ranges per current Pi package guidance.
+Current validation baseline: Pi 0.84.0 or later, exact `@cursor/sdk@1.0.30`, and local validation packages `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, and `@earendil-works/pi-tui` at exact 0.84.0. Optional published Pi core peer dependencies use `"*"` ranges per current Pi package guidance.
 
 ## Cursor SDK 1.0.17 / pi 0.79.0 cutover visual record
 
@@ -14,9 +14,9 @@ Record the required cutover validation here or in the final release handoff. The
 
 | Field | Required value / evidence |
 | --- | --- |
-| Command/session used | `npm run smoke:visual -- --ext "$PWD" --cwd "$PWD" --mode plan --out-dir <fresh /tmp dir> --label <matrix label> --prompt <matrix prompt>` with default native-replay isolation |
-| Baseline versions | `pi --version` = 0.79.0; `npm ls` = `@cursor/sdk@1.0.17` and local `@earendil-works/*@0.79.0` |
-| Card categories checked | Claim only categories proven by both PNG and JSONL. Required cutover categories are read, grep/search, find/glob, shell success, write, edit/diff, and true read failure. Direct `ls`/list is tracked as excluded from the current one-prompt platform matrix because composer-2-5 does not route it through native `ls` reliably; source-enumeration coverage is gated through find/glob. Neutral Cursor plan/todo/task/mode activity is optional/opportunistic and only counts when JSONL contains a completed Cursor workflow event. |
+| Command/session used | `npm run smoke:visual -- --ext "$PWD" --cwd "$PWD" --mode plan --out-dir <fresh /tmp dir> --label release-check --prompt <bounded prompt>` with default native-replay isolation |
+| Baseline versions | `pi --version` = 0.84.0; `npm ls` = `@cursor/sdk@1.0.30` and local `@earendil-works/*@0.84.0` |
+| Card categories checked | Claim only categories proven by both PNG and JSONL. Required cutover categories are read, grep/search, find/glob, shell success, write, edit/diff, and true read failure. Direct `ls`/list is tracked as optional because composer-2-5 does not route it through native `ls` reliably; source-enumeration coverage is gated through find/glob. Neutral Cursor plan/todo/task/mode activity is optional/opportunistic and only counts when JSONL contains a completed Cursor workflow event. |
 | Observed status/card colors | Confirm native-looking cards use native pi styling; neutral Cursor activity is not red; true errors are distinct; diff previews show red/green; plan status is readable |
 | Screenshot/ANSI evidence location | External path only, for example `/tmp/pi-cursor-sdk-1016-visual.*/read-package.{ansi,txt,html,png,jsonl.path}` |
 | Debug artifact location | External `.debug/cursor-sdk-events/...` or temp artifact directory path only; do not commit raw artifacts |
@@ -29,7 +29,7 @@ Required prompt matrix for this cutover:
 | `read-package` | `Use only your file read tool. Read ./package.json and answer with only the package name. Do not use shell, grep, glob, find, or list tools.` | `toolCall.name=read`, `toolResult.toolName=read`, `isError=false` | Native-looking read card; collapsed label/path readable |
 | `grep-readme` | `Use only your grep/search tool to search ./README.md for the literal string "pi-cursor-sdk". Do not use shell, read, glob, find, ls, or list tools. Report only the first matching file path.` | `toolCall.name=grep`, `toolResult.toolName=grep`, `isError=false` | Native-looking grep/search card; match preview readable |
 | `find-readme` | `Use only your glob/file-search/find tool to find README.md from the repository root. Do not use shell, read, grep, ls, or list tools. Report matched paths exactly.` | `toolCall.name=find`, `toolResult.toolName=find`, `isError=false` | Native-looking find/glob card; matched path readable |
-| `list-src` | Excluded from current required platform matrix. Track manually when Cursor reliably routes this prompt through native `ls`. | `toolCall.name=ls`, `toolResult.toolName=ls`, `isError=false` when exercised | Native-looking list card; directory/path readable |
+| `list-src` | Optional. Track manually when Cursor reliably routes this prompt through native `ls`. | `toolCall.name=ls`, `toolResult.toolName=ls`, `isError=false` when exercised | Native-looking list card; directory/path readable |
 | `shell-success` | `Use only your shell/terminal tool to run printf 'cursor visual smoke\\n'. Do not use read, grep, glob, find, ls, edit, or write. Report the output.` | `toolCall.name=bash`, `toolResult.toolName=bash`, `isError=false` | Shell success card is not red/error-styled; stdout readable |
 | `write-file` | `Use your normal file write tool to create .debug/visual-smoke/cursor-mode.txt with exactly two lines: alpha and beta. Do not use shell.` | `toolCall.name=write`, `toolResult.toolName=write`, `isError=false` | Native-looking write card; path/content preview readable |
 | `edit-file` | `Use your normal file edit/str-replace tool to change beta to gamma in .debug/visual-smoke/cursor-mode.txt. Do not use shell.` | `toolCall.name=edit`, `toolResult.toolName=edit`, `isError=false` | Native-looking edit card; diff preview shows red/green added/removed lines |
@@ -63,7 +63,7 @@ The canonical workflow is now offscreen and browser-rendered:
 5. Save PNG screenshots with `agent_browser` when the harness is available, or Playwright directly when running outside that harness.
 6. Inspect the session JSONL for exact persisted `toolCall` / `toolResult` data.
 
-This is the best default focused visual-debug path because it exercises the real pi TUI, captures card class/color/label/order/truncation issues before users see them, avoids desktop focus stealing, and leaves reviewable artifacts. Use visible Terminal/Ghostty screenshots only for terminal-specific or pixel-level bugs that cannot be judged through browser-rendered ANSI. The cross-platform release gate remains [Platform Smoke](./platform-smoke.md).
+This is the best default focused visual-debug path because it exercises the real pi TUI, captures card class/color/label/order/truncation issues before users see them, avoids desktop focus stealing, and leaves reviewable artifacts. Use visible Terminal/Ghostty screenshots only for terminal-specific or pixel-level bugs that cannot be judged through browser-rendered ANSI. The cross-platform matrix is retained as a future gate under [Platform Smoke](./platform-smoke.md) and issue #2.
 
 ## Tool stack
 

@@ -1,20 +1,20 @@
 # Cursor Live Smoke Checklist
 
-> **Platform Smoke:** The required cross-platform release gate is `npm run smoke:platform:all`; it runs doctor first. See [docs/platform-smoke.md](./platform-smoke.md) for the full contract. The manual checks below remain useful inner-loop/debug tools but are not the required release gate.
+> **Release evidence:** This checklist is part of the current fork release evidence bar. The Crabbox-backed cross-platform matrix is deferred under [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2). See [docs/platform-smoke.md](./platform-smoke.md) for the retained future matrix.
 
 ## Purpose
 
-Use this manual checklist during development and debugging of Cursor provider/runtime changes. Unit tests and mocks are necessary, but they are not enough for this extension. See [Cursor testing lessons](./cursor-testing-lessons.md) for auth/isolated-harness pitfalls and the plan-mode replay regression that motivated recent hardening. For release readiness, run the platform gate in [docs/platform-smoke.md](./platform-smoke.md); this checklist is inner-loop evidence only.
+Use this checklist for live provider/runtime evidence. Unit tests and mocks are necessary, but they are not enough for this extension. See [Cursor testing lessons](./cursor-testing-lessons.md) for auth/isolated-harness pitfalls and the plan-mode replay regression that motivated recent hardening. For release readiness, run the current fork evidence bar: a live print-mode Cursor run and `npm run smoke:visual`.
 
 ## Inner-loop rule
 
 - Build first: `npm run build` after any `src/` edit — the pi manifest loads compiled `dist/`, so unbuilt runs validate stale code. (the steering/local-resume/provider-debug launchers rebuild automatically even when run directly with `node scripts/...`; `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; direct `pi -e .` invocations do not build.)
 - Run from a clean working tree except for the intended branch diff.
-- Use the local extension under test: `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6`.
+- Use the local extension under test: `pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6`. `-ne` keeps a host `pi install` of this package from colliding with `-e .`.
 - Use a temporary `--session-dir` for every run.
 - Do not paste or commit Cursor API keys, raw session contents with secrets, endpoint URLs, or local private paths.
-- If an inner-loop check fails, stop and fix or use [docs/platform-smoke.md](./platform-smoke.md) as the release-blocking source of truth. Do not treat this checklist as a narrower replacement for the platform gate.
-- Do not narrow the smoke scope to the apparent code diff. Treat provider reality, TUI behavior, bridge behavior, replay behavior, diagnostics safety, abort/cancel cleanup, usage accounting, packaging, and cleanup as in scope for every Cursor provider/runtime release.
+- If a live check fails, stop and fix it. Do not treat the deferred platform matrix as a current release blocker.
+- Match focused live checks to the changed surface. Provider reality, TUI behavior, bridge behavior, replay behavior, diagnostics safety, abort/cancel cleanup, usage accounting, packaging, and cleanup each need targeted evidence when the change touches them.
 - A check is passed only when the visible TUI/output, stderr diagnostics, and persisted JSONL agree with the expected behavior.
 
 ## Prerequisites
@@ -24,7 +24,7 @@ export SMOKE_DIR="/tmp/pi-cursor-sdk-live-smoke-$(date +%Y%m%dT%H%M%S)"
 mkdir -p "$SMOKE_DIR"
 pi --version
 npm ls @cursor/sdk @earendil-works/pi-coding-agent @earendil-works/pi-ai @earendil-works/pi-tui
-pi --approve -e . --list-models cursor
+pi -ne --approve -e . --list-models cursor
 ```
 
 Live pi runs resolve provider auth from **`~/.pi/agent/auth.json`**, not only shell env. Isolated smoke copies that file into a clean temporary `HOME`. Ensure `auth.json` includes a `cursor` provider entry, or export `CURSOR_API_KEY` as a fallback.
@@ -64,12 +64,12 @@ node scripts/validate-smoke-jsonl.mjs --replay-errors-only "$SMOKE_DIR/session-s
 
 The replay scan flags only error `toolResult` / error assistant messages with `Tool grep/cursor/find/ls not found`, not successful reads of docs that mention those strings. See [Cursor testing lessons](./cursor-testing-lessons.md#what-counts-as-a-replay-failure).
 
-`npm run smoke:live` is a helper only; it polls the section 3 TUI for answer/footer evidence and then cleans up the tmux session, but it does not replace the canonical rendered-PNG visual review in section 4. Run the relevant helper `--self-test` (`smoke:live`, `smoke:visual`, `smoke:steering`, or `smoke:isolated`) when changing sealed PATH or env wrappers. Release readiness requires the platform smoke gate. Run focused manual checks below when debugging detailed visual TUI behavior, bridge, standalone native replay, abort/cancel, packaging, cleanup, or any touched runtime surface before rerunning the platform gate.
+`npm run smoke:live` polls the section 3 TUI for answer/footer evidence and then cleans up the tmux session. It does not replace the canonical rendered-PNG visual review in section 4. Run the relevant helper `--self-test` (`smoke:live`, `smoke:visual`, `smoke:steering`, or `smoke:isolated`) when changing sealed PATH or env wrappers. Release readiness requires both a live print-mode run and the visual smoke evidence. Run focused manual checks below when debugging detailed visual TUI behavior, bridge, standalone native replay, abort/cancel, packaging, cleanup, or any touched runtime surface.
 
 Pass criteria:
 
 - `pi --version` reports Pi 0.84.0 for this cutover baseline.
-- `npm ls` shows `@cursor/sdk@1.0.27` and local `@earendil-works/*@0.84.0` packages.
+- `npm ls` shows `@cursor/sdk@1.0.30` and local `@earendil-works/*@0.84.0` packages.
 - `cursor/grok-4.6` appears in the model list.
 - No Cursor key or auth token is printed.
 - If neither `~/.pi/agent/auth.json` cursor auth nor `CURSOR_API_KEY` is available, stop and report the live smoke as blocked.
@@ -78,7 +78,7 @@ Pass criteria:
 
 ```bash
 PI_CURSOR_SETTING_SOURCES=none \
-pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
+pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/basic" \
   --no-tools \
   -p 'Live smoke. Reply exactly: PI_CURSOR_SMOKE_OK' \
@@ -96,7 +96,7 @@ Pass criteria:
 ## 2. Default setting-source startup noise check
 
 ```bash
-pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
+pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/default-settings" \
   --no-tools \
   -p 'Default settings smoke. Include PRODUCT=42 in the final answer.' \
@@ -118,14 +118,14 @@ Run a real interactive session under tmux:
 ```bash
 SESSION="pi-cursor-sdk-smoke-$(date +%s)"
 tmux new-session -d -s "$SESSION" -x 120 -y 40 -- zsh -lc \
-  "cd '$PWD' && PI_CURSOR_SETTING_SOURCES=none pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 --session-dir '$SMOKE_DIR/tui' --session-id cursor-sdk-1016-tui --no-tools 'TUI smoke. Compute 19 + 23. Reply only with SUM=<number>.'"
+  "cd '$PWD' && PI_CURSOR_SETTING_SOURCES=none pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 --session-dir '$SMOKE_DIR/tui' --session-id cursor-sdk-1016-tui --no-tools 'TUI smoke. Compute 19 + 23. Reply only with SUM=<number>.'"
 ```
 
 Observe with `tmux capture-pane -pt "$SESSION"` or attach manually.
 
 Pass criteria:
 
-- Footer shows `(cursor) composer-2-5`. With `--cursor-no-fast`, Cursor fast mode is off and the Cursor extension status should show `cursor · fast:off`; ignore unrelated status text from other extensions.
+- Footer shows `(cursor) grok-4.6`. With `--cursor-no-fast`, Cursor fast mode is off and the Cursor extension status should show `cursor · fast:off`; ignore unrelated status text from other extensions.
 - The run uses Pi 0.84.0 `--session-id` successfully.
 - Assistant answer appears correctly.
 - `/session` shows one user and one assistant message for the simple run.
@@ -134,7 +134,7 @@ Pass criteria:
 
 ## 4. Focused visual card/color rendering check
 
-This is the canonical inner-loop visual debug path for Cursor provider/runtime changes. It requires offscreen TUI visual inspection, not only JSONL or code review. Use Pi 0.84.0, `@cursor/sdk@1.0.27`, a fresh temporary session dir, Cursor SDK `plan` mode, native replay enabled, and the checked-in visual runner. The runner resolves `pi` by directly walking the parent `PATH`, uses `process.execPath` for Node, and prepends that Node directory for both prereq checks and tmux launches so `#!/usr/bin/env node` shims use the validated Node. The default matrix is native replay only: native replay registration is forced on, settings sources are `none`, the pi bridge is off, overlapping built-in pi tools are not exposed, and inherited Cursor SDK event-debug artifact env is cleared. With `--event-debug`, debug capture writes to a deterministic directory under `VISUAL_DIR`.
+This is the canonical visual evidence path for Cursor provider/runtime changes. It requires offscreen TUI visual inspection, not only JSONL or code review. Use Pi 0.84.0, `@cursor/sdk@1.0.30`, a fresh temporary session dir, Cursor SDK `plan` mode, native replay enabled, and the checked-in visual runner. The runner resolves `pi` by directly walking the parent `PATH`, uses `process.execPath` for Node, and prepends that Node directory for both prereq checks and tmux launches so `#!/usr/bin/env node` shims use the validated Node. The default matrix is native replay only: native replay registration is forced on, settings sources are `none`, the pi bridge is off, overlapping built-in pi tools are not exposed, and inherited Cursor SDK event-debug artifact env is cleared. With `--event-debug`, debug capture writes to a deterministic directory under `VISUAL_DIR`.
 
 ```bash
 VISUAL_DIR="$(mktemp -d /tmp/pi-cursor-sdk-1016-visual.XXXXXX)"
@@ -191,7 +191,7 @@ Pass criteria:
 
 - PNG screenshots exist for every claimed card category, not only text/JSONL logs.
 - JSONL paths exist for every claimed card category.
-- Required cutover categories have matching PNG + JSONL proof from the default native replay matrix: read, grep/search, find/glob, list, shell success, write, edit/diff, and true read failure.
+- Required categories have matching PNG + JSONL proof from the default native replay matrix: read, grep/search, find/glob, shell success, write, edit/diff, and true read failure. The list category remains optional because Cursor does not reliably route it through native `ls`.
 - Native-looking read/search/find/list/shell/write/edit cards use intended pi card styling.
 - Shell success is not red/error-styled; stdout is readable.
 - Edit/diff previews show red/green added/removed colors and readable paths.
@@ -205,7 +205,7 @@ Pass criteria:
 
 ```bash
 PI_CURSOR_SETTING_SOURCES=none \
-pi --approve -e . --cursor-no-fast --cursor-mode plan --model cursor/grok-4.6 \
+pi -ne --approve -e . --cursor-no-fast --cursor-mode plan --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/cursor-mode-plan" \
   --session-id cursor-sdk-1016-plan \
   --no-tools \
@@ -227,7 +227,7 @@ Pass criteria:
 PI_CURSOR_SETTING_SOURCES=none \
 PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1 \
 PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1 \
-pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
+pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/bridge" \
   -p 'Bridge smoke. Do exactly two tool calls before answering: first call pi__read on ./package.json; second call pi__read on ./definitely-missing-pi-cursor-sdk-smoke-file.txt. Then answer: OK_NAME=<package name>; MISSING_RESULT=<error or success>. Do not use shell.' \
   > "$SMOKE_DIR/bridge.stdout.txt" \
@@ -236,7 +236,7 @@ pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
 
 Pass criteria:
 
-- stdout includes `OK_NAME=pi-cursor-sdk`.
+- stdout includes `OK_NAME=@emmaneugene/pi-cursor-sdk`.
 - Diagnostics include `run_created`, `tools_exposed`, two `request_queued`, two `request_resolved`, and `run_disposed`.
 - The missing-file request has `isError: true`.
 - Persisted JSONL contains real pi tool calls named `read`, matching `toolResult` messages, and final assistant output.
@@ -248,7 +248,7 @@ Pass criteria:
 PI_CURSOR_SETTING_SOURCES=none \
 PI_CURSOR_PI_TOOL_BRIDGE=0 \
 PI_CURSOR_NATIVE_TOOL_DISPLAY=1 \
-pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
+pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/native-replay" \
   -p 'Native replay smoke. Use your Cursor file-reading capability to read ./README.md, then answer README_SEEN=yes if it contains pi-cursor-sdk.' \
   > "$SMOKE_DIR/native-replay.stdout.txt" \
@@ -314,7 +314,7 @@ Pass criteria:
 
 ## 9. Long-running bridge and abort/cancel
 
-Use this focused check when debugging abort cleanup. The platform smoke gate is the release-blocking source of truth for every Cursor provider/runtime release.
+Use this focused check when debugging abort cleanup. The current fork release evidence bar is documented at the top of this checklist; the platform matrix is deferred under issue #2.
 
 Use a harmless long-running command and interrupt it after the bridge request is queued:
 
@@ -322,7 +322,7 @@ Use a harmless long-running command and interrupt it after the bridge request is
 PI_CURSOR_SETTING_SOURCES=none \
 PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1 \
 PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1 \
-pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
+pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/abort" \
   -p 'Abort smoke. Call pi__bash with command: sleep 30 && echo SHOULD_NOT_PRINT. Do not answer until the tool completes.'
 ```
@@ -383,7 +383,7 @@ Pass criteria:
 
 ## Coverage gaps this checklist makes explicit
 
-Everything in this section is in scope when using this checklist for Cursor provider/runtime debugging. Release readiness still comes from the platform smoke gate:
+Everything in this section is in scope when using this checklist for Cursor provider/runtime debugging. The current fork release evidence bar is the full unit/typecheck suite, package dry run, a live print-mode run, and visual smoke. Add focused checks below when a change touches one of these surfaces:
 
 - Long-running bridged tool abort/cancel cleanup.
 - Native replay cards beyond read, especially shell/edit/write cards, when those renderers change.
@@ -393,4 +393,4 @@ Everything in this section is in scope when using this checklist for Cursor prov
 - Ambient Cursor setting-source behavior when startup filtering or local Cursor settings handling changes.
 - Model discovery aliases/context variants when model-discovery code or Cursor SDK versions change.
 
-If any surface has no adequate platform or focused live check, add that coverage before release instead of assuming mocks cover reality.
+If any changed surface has no adequate focused live check, add that coverage before release instead of assuming mocks cover reality.

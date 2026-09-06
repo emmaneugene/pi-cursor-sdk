@@ -44,13 +44,18 @@ function makeRunId() {
 	return `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function targetSlug(config, targetName) {
+	const packageSlug = config.packageSlug ?? String(config.packageName ?? "pi-cursor-sdk").replace(/^@/, "").replaceAll("/", "-");
+	return `${packageSlug}-${targetName}`;
+}
+
 export function createLeaseCleanupResult(config, targetName, leaseId, stopResult, runId = makeRunId()) {
 	const suiteName = "lease-cleanup";
 	const suiteDir = createSuiteDir(config.artifactRoot, runId, targetName, suiteName);
 	writeFileSync(resolve(suiteDir, "target.json"), JSON.stringify({
 		targetName,
 		platform: platformFor(targetName),
-		slug: `${config.packageName ?? "pi-cursor-sdk"}-${targetName}`,
+		slug: targetSlug(config, targetName),
 		runId,
 		writtenAt: new Date().toISOString(),
 	}, null, 2));
@@ -88,7 +93,7 @@ export async function runTargetSuite(config, targetName, suiteName, leaseSession
 	const runId = leaseSession?.runId ?? makeRunId();
 	const suiteDir = createSuiteDir(config.artifactRoot, runId, targetName, suiteName);
 	const platform = platformFor(targetName);
-	const slug = `${config.packageName ?? "pi-cursor-sdk"}-${targetName}`;
+	const slug = targetSlug(config, targetName);
 
 	console.log(`\n── [${targetName}] ${suiteName} ──`);
 	console.log(`  runId: ${runId}`);
@@ -133,7 +138,7 @@ export async function runTargetSuite(config, targetName, suiteName, leaseSession
  * This is the release-gate path; per-suite runs remain available for diagnosis.
  */
 export async function runTargetSuites(config, targetName, suiteNames) {
-	const slug = `${config.packageName ?? "pi-cursor-sdk"}-${targetName}`;
+	const slug = targetSlug(config, targetName);
 	const runId = makeRunId();
 	console.log(`  targetRunId: ${runId}`);
 	console.log(`  warmup ${targetName}...`);
@@ -369,6 +374,10 @@ function posixSection(name, command) {
 /**
  * Build a shell command that runs the full platform-build pipeline and packed-install contract.
  */
+function quotePowerShellArgument(value) {
+	return `'${String(value).replaceAll("'", "''")}'`;
+}
+
 export function buildPlatformBuildCommand(targetName, packageName = "pi-cursor-sdk", nodeValidationMajor = 24) {
 	const platform = platformFor(targetName);
 	const lines = [];
@@ -471,7 +480,7 @@ export function buildPlatformBuildCommand(targetName, packageName = "pi-cursor-s
 		lines.push("fi");
 		lines.push('echo "PLATFORM_BUILD_OK"');
 	} else {
-		lines.push(`powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\platform-smoke\\platform-build-windows.ps1 -PackageName ${packageName} -NodeValidationMajor ${nodeValidationMajor}`);
+		lines.push(`powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\platform-smoke\\platform-build-windows.ps1 -PackageName ${quotePowerShellArgument(packageName)} -NodeValidationMajor ${nodeValidationMajor}`);
 	}
 	return lines.join("\n");
 }
@@ -666,7 +675,7 @@ function buildLiveSuiteCommand(config, targetName, suiteName, prepDir) {
 	const packageName = config.packageName ?? "pi-cursor-sdk";
 	const prepArgs = prepDir ? ` --prep-dir ${platformFor(targetName) === "powershell" ? prepDir : shellQuote(prepDir)}` : "";
 	if (platformFor(targetName) === "powershell") {
-		return `powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "node scripts/platform-smoke/live-suite-runner.mjs --suite ${suiteName} --target ${targetName} --model ${model} --package-name ${packageName}${prepArgs}"`;
+		return `powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "node scripts/platform-smoke/live-suite-runner.mjs --suite ${suiteName} --target ${targetName} --model ${model} --package-name ${quotePowerShellArgument(packageName)}${prepArgs}"`;
 	}
 	return `node scripts/platform-smoke/live-suite-runner.mjs --suite ${shellQuote(suiteName)} --target ${shellQuote(targetName)} --model ${shellQuote(model)} --package-name ${shellQuote(packageName)}${prepArgs}`;
 }

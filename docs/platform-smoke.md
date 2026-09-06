@@ -1,6 +1,6 @@
-# Platform Smoke Gate
+# Deferred Platform Smoke Matrix
 
-Status: current release gate for Cursor provider/runtime changes. The Crabbox runner, packed-install platform-build suite, and real live PTY/ConPTY suite runner are implemented for macOS, Ubuntu, and Windows native targets with one-lease-per-target orchestration.
+Status: deferred for this fork. The Crabbox runner, packed-install platform-build suite, and real live PTY/ConPTY suite runner remain available for macOS, Ubuntu, and Windows native targets with one-lease-per-target orchestration. Issue [#2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) tracks reintroducing this matrix as a release gate.
 
 Detailed detector, registry, command-rendering, implementation-history, replacement, and portability reference: [Platform Smoke Implementation Reference](./platform-smoke-implementation.md).
 
@@ -12,33 +12,28 @@ Crabbox best-practice baseline applied from `~/Projects/crabbox`: Crabbox owns l
 
 ## Decision
 
-Crabbox is the required platform smoke runner for `pi-cursor-sdk` releases that touch Cursor provider/runtime behavior.
-
-Inner-loop checks remain useful, but they are not release gates:
+This fork does not use the Crabbox platform matrix as a current release gate. The current release evidence bar is:
 
 ```bash
-npm run verify
+npm test
+npm run typecheck
 npm pack --dry-run
+# one live print-mode Cursor run with cursor/grok-4.6:slow
+npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'
 ```
 
-The required local release gate is exactly:
+The retained matrix command is a future gate candidate:
 
 ```bash
 npm run smoke:platform:all
 ```
 
-`smoke:platform:all` runs `smoke:platform:doctor` first and only starts the target matrix after doctor passes. Maintainers may still run `npm run smoke:platform:doctor` by itself for setup diagnosis.
+That command runs `smoke:platform:doctor` first and starts the target matrix only after doctor passes. Use it for future infrastructure work and diagnosis. Issue [#2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) defines the conditions for making it mandatory again.
+
+Per-target commands remain available for diagnosis and iteration. They are not current release requirements.
 
 
-Per-target commands exist for diagnosis and iteration. They are not additional release-gate commands because requiring each per-target command plus `all` doubles Cursor token use.
-
-## Fork status (emmaneugene/pi-cursor-sdk)
-
-As of 2026-09-05, this fork has **not adopted** the 3-OS platform gate. `smoke:platform:all` requires the Crabbox runner plus macOS SSH, Ubuntu Docker, and Parallels Windows targets that are not set up in this fork's environment. Until the gate is adopted, fork releases ship with: the full unit/typecheck suite, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual` PNG evidence. Crabbox + doctor remains the intended future gate; this note is a status record, not a permanent waiver.
-
-No partial adoption exists. The release evidence must include macOS, Ubuntu, and Windows native passing through `smoke:platform:all`.
-
-## Non-negotiable constraints
+## Future matrix constraints
 
 - No GitHub Actions dependency.
 - No remote provider dependency in the platform gate.
@@ -65,7 +60,7 @@ version: 0.26.0 or newer
 binary: Homebrew `crabbox` on PATH (`/opt/homebrew/bin/crabbox` on Apple Silicon Homebrew installs)
 ```
 
-Use the Homebrew Crabbox binary on PATH for normal release gates. `PLATFORM_SMOKE_CRABBOX=/path/to/crabbox` is only an explicit override for testing a non-default binary. `smoke:platform:doctor` verifies the configured binary and fails when it is older than the configured minimum version.
+Use the Homebrew Crabbox binary on PATH for future matrix runs. `PLATFORM_SMOKE_CRABBOX=/path/to/crabbox` is only an explicit override for testing a non-default binary. `smoke:platform:doctor` verifies the configured binary and fails when it is older than the configured minimum version.
 
 Required Crabbox providers:
 
@@ -104,7 +99,7 @@ Rendering is host-side. Targets capture the real ANSI stream; the macOS host ren
 
 ## Target session model
 
-Each target opens one Crabbox target session, syncs once, runs all suites for that target under one coherent target run id, collects artifacts, and stops/releases the target. The release-gate entrypoint runs required targets sequentially to prevent shared host, VM/container, and Cursor API contention; each target runs its own suites in order and fails fast within that target. Platform smoke disables Crabbox git-seed sync (`CRABBOX_SYNC_GIT_SEED=false`) so every run tests the current local checkout and uncommitted smoke-runner changes rather than a remote Git seed.
+Each target opens one Crabbox target session, syncs once, runs all suites for that target under one coherent target run id, collects artifacts, and stops/releases the target. The future matrix entrypoint runs required targets sequentially to prevent shared host, VM/container, and Cursor API contention; each target runs its own suites in order and fails fast within that target. Platform smoke disables Crabbox git-seed sync (`CRABBOX_SYNC_GIT_SEED=false`) so every run tests the current local checkout and uncommitted smoke-runner changes rather than a remote Git seed.
 
 ```text
 start target session
@@ -133,7 +128,7 @@ start target session
 end target session
 ```
 
-The target session fails fast. The release-gate path handles one target at a time: it warms one Crabbox lease, performs one fresh sync, runs suites in order, and stops that target after the first failure before starting the next target. Total wall time is therefore additive across required targets; this avoids nondeterministic worker loss and live-run stalls from competing VM/container load and concurrent Cursor API calls. Per-suite commands remain available for diagnosis, but they are intentionally not the normal release path because repeated warmup/sync/install cycles make releases too slow.
+The target session fails fast. The future matrix path handles one target at a time: it warms one Crabbox lease, performs one fresh sync, runs suites in order, and stops that target after the first failure before starting the next target. Total wall time is therefore additive across required targets; this avoids nondeterministic worker loss and live-run stalls from competing VM/container load and concurrent Cursor API calls. Per-suite commands remain available for diagnosis, but they are intentionally not the normal matrix path because repeated warmup/sync/install cycles make releases too slow.
 
 Runtime budget is part of the contract:
 
@@ -256,7 +251,8 @@ Required config fields:
 import { LOCAL_RESUME_SUITE_NAMES } from "./scripts/platform-smoke/local-resume-suites.mjs";
 
 export default {
-  packageName: "pi-cursor-sdk",
+  packageName: "@emmaneugene/pi-cursor-sdk",
+  packageSlug: "pi-cursor-sdk",
   cursorModel: "cursor/grok-4.6",
   artifactRoot: ".artifacts/platform-smoke",
   artifactRetention: {
@@ -288,7 +284,7 @@ export default {
 };
 ```
 
-`ubuntuContainerBaseImage` is the Ubuntu 24.04 Node 24 base with the current glibc baseline for native test dependencies. The runner builds the local `ubuntuContainerImage` wrapper with only `USER root` changed before warmup because Crabbox 0.36.0 must install SSH/Git/rsync/curl during bootstrap and `cimg/node` defaults to an unprivileged user. An explicit `PLATFORM_SMOKE_UBUNTU_IMAGE` bypasses that build and must already support Crabbox bootstrap. `nodeValidationMajor: 24` is the release-smoke validation baseline. It does not change the package engine by itself. A separate compatibility lane can test Node 22.19 later; this required gate validates Node 24 on every target.
+`ubuntuContainerBaseImage` is the Ubuntu 24.04 Node 24 base with the current glibc baseline for native test dependencies. The runner builds the local `ubuntuContainerImage` wrapper with only `USER root` changed before warmup because Crabbox 0.36.0 must install SSH/Git/rsync/curl during bootstrap and `cimg/node` defaults to an unprivileged user. An explicit `PLATFORM_SMOKE_UBUNTU_IMAGE` bypasses that build and must already support Crabbox bootstrap. `nodeValidationMajor: 24` is the release-smoke validation baseline. It does not change the package engine by itself. A separate compatibility lane can test Node 22.19 later; this future matrix validates Node 24 on every target.
 
 `windowsParallels` records this repo's default shared Windows template contract. Environment overrides may point at a temporary candidate template during infrastructure work, but release runs should use the shared `pi-extension-windows-template` / `crabbox-ready` baseline unless this document is updated.
 
@@ -415,7 +411,7 @@ tar --version
 
 ## Doctor command
 
-`npm run smoke:platform:doctor` runs before any token-spending suite. The canonical `npm run smoke:platform:all` script enforces doctor first before it starts macOS, Ubuntu, or Windows suites.
+`npm run smoke:platform:doctor` runs before any token-spending suite when maintainers exercise this deferred matrix. The retained `npm run smoke:platform:all` script enforces doctor first before it starts macOS, Ubuntu, or Windows suites.
 
 Doctor checks:
 
@@ -485,7 +481,7 @@ Purpose:
 - fail before spending Cursor tokens;
 - produce the packed extension used by later suites.
 
-The host `smoke:platform:all` entrypoint enforces doctor first before running targets. Required artifacts include `node-version.txt`, `npm-version.txt`, stdout/stderr for `npm ci`, `npm run check:platform-smoke`, `npm test`, `npm run typecheck`, `npm pack`, packed npm install, `pi install --approve`, and `pi list --approve`, plus `packed-tarball.txt`, `summary.json`, `artifact-manifest.json`, `assertions.json`, and `failures.md` on failed assertions.
+When this deferred matrix is exercised, the host `smoke:platform:all` entrypoint enforces doctor first before running targets. Required artifacts include `node-version.txt`, `npm-version.txt`, stdout/stderr for `npm ci`, `npm run check:platform-smoke`, `npm test`, `npm run typecheck`, `npm pack`, packed npm install, `pi install --approve`, and `pi list --approve`, plus `packed-tarball.txt`, `summary.json`, `artifact-manifest.json`, `assertions.json`, and `failures.md` on failed assertions.
 
 ### `cursor-local-resume-restart`
 
@@ -767,7 +763,7 @@ Maximum per target: `37` Cursor invocations.
 
 Maximum full gate: `111` Cursor invocations.
 
-The merge gate is `npm run smoke:platform:all`; that script runs doctor first and then the matrix to preserve this budget. No suite adds a new Cursor invocation without updating this plan and the scenario source of truth (`scripts/platform-smoke/scenarios.mjs`, plus `scripts/platform-smoke/local-resume-suites.mjs` for local-resume lanes).
+When reintroduced, the matrix gate will be `npm run smoke:platform:all`; that script runs doctor first and then the matrix to preserve this budget. No suite adds a new Cursor invocation without updating this plan and the scenario source of truth (`scripts/platform-smoke/scenarios.mjs`, plus `scripts/platform-smoke/local-resume-suites.mjs` for local-resume lanes).
 
 ## Artifact contract
 
@@ -949,12 +945,12 @@ The runner must binary-safe scan every bounded regular artifact file, including 
 
 Bridge diagnostics may include safe tool names and correlation IDs only.
 
-## Release bar
+## Future release bar
 
-A local provider/runtime release is ready only after this exact command passes on the maintainer machine:
+When issue #2 closes, a local provider/runtime release will also require this exact command to pass on the maintainer machine:
 
 ```bash
 npm run smoke:platform:all
 ```
 
-`smoke:platform:all` runs doctor first and then all required local targets and suites in one full gate execution.
+Until then, use the current fork release evidence bar documented in `AGENTS.md`, `README.md`, and `docs/cursor-live-smoke-checklist.md`.

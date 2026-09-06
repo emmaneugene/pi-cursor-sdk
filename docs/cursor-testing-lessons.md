@@ -1,12 +1,12 @@
 # Cursor Testing Lessons
 
-> **Platform Smoke:** The required cross-platform release gate is `npm run smoke:platform:all`. See [the platform smoke runbook](./platform-smoke.md). For portable guidance, see the [implementation reference](./platform-smoke-implementation.md#portability-to-other-pi-extensions) and the repo-local `docs/pi-extension-platform-testing.md` from a Crabbox checkout. The live smoke checklist remains useful for inner-loop development but is not the release gate.
+> **Release evidence:** The current fork release evidence bar includes unit tests, typechecks, package dry run, a live print-mode Cursor run, and visual smoke. The Crabbox-backed cross-platform matrix is deferred under [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2). See [the deferred platform smoke runbook](./platform-smoke.md) for the retained implementation.
 
 ## Purpose
 
 This document records maintainer testing lessons for `pi-cursor-sdk`. It complements unit tests and the [Cursor live smoke checklist](./cursor-live-smoke-checklist.md). Use it when adding regression coverage, debugging false-green releases, or building isolated smoke harnesses.
 
-For a **minimal one-session dogfood pass** (baseline env, one native + one bridge call, JSONL ID patterns, bootstrap manifest, edit diff card), use the [Cursor dogfood checklist](./cursor-dogfood-checklist.md) as inner-loop evidence before running the platform smoke gate.
+For a **minimal one-session dogfood pass** (baseline env, one native + one bridge call, JSONL ID patterns, bootstrap manifest, edit diff card), use the [Cursor dogfood checklist](./cursor-dogfood-checklist.md) as focused evidence before the full release evidence bar.
 
 ## Core lesson: integration-shaped bugs beat unit mocks
 
@@ -203,17 +203,25 @@ Pass criteria:
 
 ## Local validation ladder
 
-Run local checks first, then the platform smoke gate before claiming release-ready for provider/runtime changes:
+Run the current fork release evidence checks before claiming release-ready for provider/runtime changes:
 
 ```bash
 npm test
 npm run typecheck
 npm pack --dry-run
-SKIP_LIVE=1 npm run smoke:isolated
-npm run smoke:isolated            # inner-loop helper; requires auth.json or CURSOR_API_KEY
-npm run smoke:live                # inner-loop partial tmux checklist subset
-npm run smoke:platform:doctor
-npm run smoke:platform:all
+
+# Live print-mode evidence. Keep the key in the environment, never in this file.
+# -ne keeps a host `pi install` of this package from colliding with -e .
+SMOKE_DIR="$(mktemp -d /tmp/pi-cursor-sdk-release.XXXXXX)"
+PI_CURSOR_SETTING_SOURCES=none \
+pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6:slow \
+  --session-dir "$SMOKE_DIR/session" --no-tools \
+  -p 'Reply exactly: LIVE_PRINT_OK'
+
+npm run smoke:visual -- \
+  --label release-check \
+  --prompt 'Read ./package.json and reply with its package name.'
+rm -rf "$SMOKE_DIR"
 ```
 
 After changing `scripts/validate-smoke-jsonl.mjs` or replay scan expectations, also run:
@@ -222,15 +230,16 @@ After changing `scripts/validate-smoke-jsonl.mjs` or replay scan expectations, a
 npm test -- test/validate-smoke-jsonl.test.ts
 ```
 
-Then use the [Cursor live smoke checklist](./cursor-live-smoke-checklist.md) only for focused inner-loop surfaces the scripts do not cover (bridge MCP, abort/cancel, full TUI observation, packaging review, cleanup) before rerunning the platform smoke gate.
+Then use the [Cursor live smoke checklist](./cursor-live-smoke-checklist.md) for focused surfaces the scripts do not cover (bridge MCP, abort/cancel, full TUI observation, packaging review, cleanup).
 
 ## What belongs in CI vs platform/manual smoke
 
 - **CI / default `npm test`:** mocked provider tests, extension lifecycle tests, JSONL validator tests, script syntax/help checks. No live Cursor calls.
-- **Local platform release gate:** `npm run smoke:platform:all` (runs doctor first). Requires real Cursor auth and cross-platform Crabbox setup.
-- **Focused manual smoke:** `npm run smoke:isolated`, `npm run smoke:live`, and selected live-checklist sections for inner-loop debugging of behavior mocks cannot reproduce.
+- **Current fork release evidence:** full unit tests, typechecks, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'`.
+- **Deferred platform matrix:** `npm run smoke:platform:all`, tracked in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2).
+- **Focused manual smoke:** `npm run smoke:isolated`, `npm run smoke:live`, and selected live-checklist sections for behavior mocks cannot reproduce.
 
-If platform smoke auth or target setup is unavailable, report the release as **blocked**, not skipped-ready.
+If Cursor auth is unavailable, report the release as **blocked**, not skipped-ready. Missing deferred platform infrastructure does not block the current fork evidence bar.
 
 ## Cursor SDK event capture probe
 
@@ -255,7 +264,7 @@ The script writes timestamped artifacts under `--out` (default `/tmp/pi-cursor-s
 
 Stdout prints artifact paths and summary counts only. Raw payloads stay on disk and may contain local paths, project text, tool args/results, or secrets — do not commit or share them.
 
-Hard repo rule: Cursor SDK behavior claims must come from the installed `@cursor/sdk` package and/or https://cursor.com/docs/sdk/typescript, not from memory or ad-hoc probes alone. Current cutover validation targets exact `@cursor/sdk@1.0.27` and Pi 0.84.0 local packages.
+Hard repo rule: Cursor SDK behavior claims must come from the installed `@cursor/sdk` package and/or https://cursor.com/docs/sdk/typescript, not from memory or ad-hoc probes alone. Current cutover validation targets exact `@cursor/sdk@1.0.30` and Pi 0.84.0 local packages.
 
 ## Pi provider SDK event capture
 
@@ -306,7 +315,7 @@ Artifacts under `--out` (default `.debug/cursor-sdk-events/<timestamp>/` under `
 During any normal pi session you can also opt in with:
 
 ```bash
-PI_CURSOR_SDK_EVENT_DEBUG=1 pi --approve -e . --model cursor/grok-4.6
+PI_CURSOR_SDK_EVENT_DEBUG=1 pi -ne --approve -e . --model cursor/grok-4.6
 ```
 
 Multi-turn sessions group automatically by pi session file:

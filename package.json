@@ -1,6 +1,6 @@
 {
   "name": "@emmaneugene/pi-cursor-sdk",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "description": "pi provider extension backed by @cursor/sdk local agents",
   "publishConfig": {
     "access": "public"

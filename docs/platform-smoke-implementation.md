@@ -1,6 +1,6 @@
 # Platform Smoke Implementation Reference
 
-Back to the canonical [Platform Smoke Gate runbook](./platform-smoke.md) for release commands, required targets and suites, artifacts, assertions, security, and the release bar.
+Back to the [deferred Platform Smoke Matrix runbook](./platform-smoke.md) for the retained future release commands, targets, suites, artifacts, assertions, and security contract. Reintroduction is tracked in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2).
 
 This document records detailed detector, registry, command-rendering, implementation-history, replacement, and portability material. The phase plan is retained as implementation history, not as active release instructions.
 
@@ -165,16 +165,17 @@ Exit criteria:
 
 ### Phase 9: docs and legacy cleanup
 
-Update:
+When reintroducing the matrix, update:
 
+- `AGENTS.md`
 - `README.md`
 - `docs/cursor-live-smoke-checklist.md`
 - `docs/cursor-testing-lessons.md`
 - `docs/cursor-native-tool-visual-audit.md`
 
-They must state:
+They must then state:
 
-- required release gate is `npm run smoke:platform:all`;
+- the release gate is `npm run smoke:platform:all`;
 - legacy smoke scripts are inner-loop/debug helpers;
 - `tmux` visual smoke is not the canonical cross-platform gate.
 

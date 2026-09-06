@@ -117,7 +117,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - Typecheck tests/helpers: `npm run typecheck:tests`
 - Package-readiness check: `npm pack --dry-run`
 - Watch tests while developing: `npm run test:watch`
-- Local development run, requires a Cursor key: `CURSOR_API_KEY="your-key" pi --approve -e . --model cursor/grok-4.6`
+- Local development run, requires a Cursor key: `CURSOR_API_KEY="your-key" pi -ne --approve -e . --model cursor/grok-4.6`. `-ne` keeps a host `pi install` of this package from colliding with `-e .`.
 - List Cursor models, requires pi and usually a Cursor key: `pi --list-models cursor`
 - Capture provider/SDK event artifacts for one prompt, requires a Cursor key: `CURSOR_API_KEY="your-key" npm run debug:provider-events -- --prompt "hello"`
 
@@ -163,7 +163,7 @@ When plans, reviews, investigations, or generated smoke/debug artifacts are no l
 - Ambient Cursor settings/rules loading is enabled by default through `PI_CURSOR_SETTING_SOURCES=all`; keep SDK startup log filtering intact so settings/skills output does not corrupt pi's TUI. Users can narrow or disable Cursor setting sources explicitly when desired.
 - Live `pi`/Cursor smoke tests may call external services and require Cursor auth in `~/.pi/agent/auth.json` and/or `CURSOR_API_KEY`; run them for Cursor provider/runtime changes. If auth is unavailable, report live smoke as release-blocked instead of skipped-ready. See `docs/cursor-testing-lessons.md` for isolated harness auth seeding.
 - For live runtime evidence, use `cursor/grok-4.6:slow` as much as needed.
-- For Cursor provider/runtime changes, the canonical local runtime release and pre-commit gate is `npm run smoke:platform:all`; see `docs/platform-smoke.md`. That script runs doctor before the macOS/Ubuntu/Windows local-runtime matrix. **Fork status (2026-09-05): this gate is not yet adopted by emmaneugene/pi-cursor-sdk; see the fork note in `docs/platform-smoke.md` for the evidence bar in force.** The platform gate uses packed installs across macOS, Ubuntu, and Windows native with PTY/ConPTY capture, host-rendered xterm/PNG visual evidence, JSONL assertions, bridge diagnostics, usage/cache checks, abort cleanup, artifact manifests, and redaction scans. Use `docs/cursor-live-smoke-checklist.md`, `npm run smoke:visual`, `npm run smoke:live`, or direct `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6` runs only for inner-loop debugging and focused visual/card audits before the full platform gate. Do not mark release-ready with optional/deferred/mostly-passing platform smoke items outstanding.
+- For Cursor provider/runtime changes, the current fork release evidence bar is `npm test`, `npm run typecheck`, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'`; see `docs/cursor-live-smoke-checklist.md`. The three-OS Crabbox platform matrix is deferred in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) until the required macOS, Ubuntu, and Windows infrastructure exists. Do not treat `npm run smoke:platform:all` as a release blocker while that issue remains open.
 
 ## PR review workflow (maintainer)
 
@@ -180,15 +180,15 @@ Before publishing any npm/GitHub release or tagging release-ready status:
 
 - Run a thermo-nuclear/deep maintainability review on the exact release diff, including docs, tests, package metadata, generated artifacts, and PR/issue closure notes.
 - Remediate every finding, including polish. Repeat the review/fix loop until the reviewer reports no remaining findings.
-- This release review gate is in addition to the platform smoke gate; it does not replace `npm run smoke:platform:all`.
+- This release review gate is in addition to the current fork release evidence bar; it does not replace the live print-mode and visual smoke checks.
 
 ## Pre-commit live smoke (maintainer)
 
 Before **every commit** that touches Cursor provider/runtime, prompt/session send policy, agents-context dedup, bridge, replay, or related extension wiring:
 
-- Run the canonical local platform gate: `npm run smoke:platform:all` (see `docs/platform-smoke.md`; it runs doctor first).
-- Use `npm run smoke:live` (`scripts/tmux-live-smoke.sh`), `npm run smoke:visual` (`scripts/visual-tui-smoke.mjs`), `npm run smoke:isolated`, or direct `pi -e . --cursor-no-fast --model cursor/grok-4.6` only as inner-loop/debug helpers when narrowing a specific failure before the platform gate. For card/color claims, capture ANSI from the offscreen TUI, render it through the canonical browser/xterm path, save PNG evidence, and inspect JSONL.
-- If Cursor auth (`~/.pi/agent/auth.json` or `CURSOR_API_KEY`) or required Crabbox/platform resources are unavailable, **do not commit**—report blocked, not skipped-ready.
+- Run the current fork release evidence checks: `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'` plus a live print-mode Cursor run. The deferred three-OS platform matrix is tracked in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2).
+- Use `npm run smoke:live` (`scripts/tmux-live-smoke.sh`), `npm run smoke:isolated`, or direct `pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6` as optional focused helpers when narrowing a specific failure. For card/color claims, use the required `smoke:visual` command above, capture ANSI from the offscreen TUI, render it through the canonical browser/xterm path, save PNG evidence, and inspect JSONL.
+- If Cursor auth (`~/.pi/agent/auth.json` or `CURSOR_API_KEY`) is unavailable, **do not commit**—report live smoke as blocked, not skipped-ready. Missing deferred Crabbox/platform resources is tracked in issue #2 and does not block the current fork gate.
 - Unit tests (`npm test`, `npm run typecheck`) are necessary but not sufficient for these commits.
 
 ## Progress updates and handoff

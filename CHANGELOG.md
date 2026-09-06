@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-09-06
+
+Breaking: Cursor Cloud support is removed. Cursor SDK runs are local-only.
 
 ### Fixed
 
 - Pin `CURSOR_TREE_SITTER_VENDOR_DIR` from the installed `@cursor/sdk-<platform>-<arch>` package before local `Agent.create`. The SDK locates that vendor directory by walking from `process.argv[1]` and `process.execPath`, so a default `pi` launch never sees the package under `~/.pi/agent/npm` and disables shell command analysis.
 - Point the same SDK locator at that platform package during local `Agent.create` / `Agent.resume` so `cursorsandbox` is found when sandbox is requested. The SDK has no path env var for this helper; without the host-entry, `Agent.create` throws that sandboxing is not supported.
+- Isolate `cursor-provider-local-resume` tests from ambient `~/.pi/agent/cursor-sdk.json` and leaked `Agent.resume` mocks so local-resume assertions do not depend on the maintainer machine.
 
 ### Changed
 
 - Remove Cursor Cloud runtime support, including remote `bc-*` agents, cloud commands and configuration, lifecycle/reporting, and cloud smoke scripts. All Cursor SDK runs are now local. The footer now uses `cursor · fast:...` instead of `cursor:local · fast:...`.
 - Rename `src/cursor-ripgrep-path.ts` to `src/cursor-sdk-platform-package.ts`. The module now owns ripgrep, tree-sitter vendor, and `cursorsandbox` resolution.
+- Defer the Crabbox three-OS platform matrix as a release gate. Current fork evidence is unit tests, typechecks, package dry run, one live print-mode Cursor run, and visual smoke. Issue [#2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) tracks reintroduction. The retained matrix now uses the published scoped package name `@emmaneugene/pi-cursor-sdk`. Documented print-mode runs use `pi -ne` so a host `pi install` of this package does not collide with `-e .`.
 
 ## 0.3.7 - 2026-09-05
 

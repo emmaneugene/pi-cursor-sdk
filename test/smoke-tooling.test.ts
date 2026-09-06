@@ -96,13 +96,13 @@ try {
 		expect(readFileSync("package.json", "utf8")).toContain('"test": "vitest run"');
 	});
 
-	it("runs and documents required platform targets sequentially to avoid shared host and API contention", () => {
+	it("runs and documents future platform targets sequentially to avoid shared host and API contention", () => {
 		const platformSmoke = readFileSync("scripts/platform-smoke.mjs", "utf8");
 		expect(platformSmoke).toContain("for (const targetName of targets)");
 		expect(platformSmoke).not.toContain("Promise.all(targetRuns)");
 		expect(platformSmoke).toContain("Run one or more comma-separated targets sequentially");
 		const docs = readFileSync("docs/platform-smoke.md", "utf8");
-		expect(docs).toContain("release-gate entrypoint runs required targets sequentially");
+		expect(docs).toContain("future matrix entrypoint runs required targets sequentially");
 		expect(docs).toContain("Total wall time is therefore additive across required targets");
 	});
 

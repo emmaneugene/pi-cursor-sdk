@@ -94,10 +94,10 @@ For development from this repository:
 
 ```bash
 npm install   # runs prepare, which compiles src/ into dist/ (the manifest entry pi loads)
-pi --approve -e . --model cursor/grok-4.6
+pi -ne --approve -e . --model cursor/grok-4.6
 ```
 
-After editing `src/`, run `npm run build` before the next `pi -e .` run, or pi loads the previous build.
+`-ne` keeps a host `pi install` of this package from colliding with `-e .`. After editing `src/`, run `npm run build` before the next `pi -e .` run, or pi loads the previous build.
 
 ## Configure your Cursor SDK API key
 
@@ -414,11 +414,19 @@ On bootstrap sends, a compact **callable tool surfaces** block is injected into 
 
 `PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1` is off by default and emits typed, allowlisted, scrubbed single-line JSONL records to `process.stderr`. These records are operational diagnostics, not anonymous telemetry: they intentionally include tool names, safe correlation IDs, bridge run state, exposed pi↔MCP name pairs, queued requests, result resolution, rejection, cancellation, and pending counts. They must not include endpoint URLs, endpoint path components, endpoint tokens, raw args/results, stdout/stderr payloads, file contents, Cursor settings output, API keys, bearer tokens, cookies, session credentials, or secrets. Do not enable or share bridge debug logs where tool names themselves are sensitive.
 
-### Maintainer platform smoke release gate
+### Maintainer release evidence
 
-For Cursor provider/runtime changes, the canonical release and pre-commit gate is the platform smoke gate in [Platform smoke](docs/platform-smoke.md): run `npm run smoke:platform:all`, which runs doctor before the target matrix. The platform gate validates macOS, Ubuntu, and Windows native through Crabbox using packed installs, a required HTTP/1.1/SSE provider-turn lane, PTY/ConPTY ANSI capture, host-rendered xterm/PNG evidence, JSONL assertions, bridge diagnostics, usage/cache checks, abort cleanup, artifact manifests, and redaction scans. After each platform run, `.artifacts/platform-smoke/latest.json` points to the latest useful evidence paths. Do not mark a release ready with optional, deferred, mostly-passing, or unobserved platform smoke checks outstanding.
+For Cursor provider/runtime changes, the current fork release evidence bar is:
 
-The older live smoke helpers remain useful for inner-loop debugging and focused visual audits, not as the release gate. Use [Cursor live smoke checklist](docs/cursor-live-smoke-checklist.md), `npm run smoke:visual`, `npm run smoke:live`, or direct `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6` runs when iterating on a specific TUI/card/runtime issue before the full platform gate. `npm run smoke:visual` captures an offscreen PTY rendered through browser/xterm and saved as PNG screenshots with Playwright, or with `agent_browser` from the generated HTML when available. Its default matrix is native replay only: native replay registration is forced on, Cursor setting sources are disabled, the pi bridge is off, overlapping built-in pi tools are not exposed, and inherited Cursor SDK event-debug artifact env is cleared; `--event-debug` writes to a deterministic debug directory under the visual output directory. The visible TUI/output, rendered screenshots, scrubbed diagnostics, and persisted JSONL must agree. See [Cursor testing lessons](docs/cursor-testing-lessons.md) for auth.json seeding, isolated `/tmp` harness layout, JSONL replay-error scans, and other regression traps.
+- `npm test`
+- `npm run typecheck`
+- `npm pack --dry-run`
+- one live print-mode Cursor run with `cursor/grok-4.6:slow`
+- `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'`
+
+The visual smoke captures an offscreen PTY, renders it through browser/xterm, and saves PNG screenshots with Playwright or `agent_browser`. Its default matrix is native replay only: native replay registration is forced on, Cursor setting sources are disabled, the pi bridge is off, overlapping built-in pi tools are not exposed, and inherited Cursor SDK event-debug artifact env is cleared. The visible TUI/output, rendered screenshots, scrubbed diagnostics, and persisted JSONL must agree. See [Cursor live smoke checklist](docs/cursor-live-smoke-checklist.md) and [Cursor testing lessons](docs/cursor-testing-lessons.md).
+
+The Crabbox-backed macOS, Ubuntu, and Windows native platform matrix is deferred. Issue [#2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) tracks the infrastructure and evidence needed to reintroduce it as a release gate.
 
 ### Maintainer Cursor SDK event capture
 
@@ -546,7 +554,7 @@ pi list
 Then reinstall if needed:
 
 ```bash
-pi install npm:pi-cursor-sdk
+pi install npm:@emmaneugene/pi-cursor-sdk
 ```
 
 ### `pi --list-models` shows `thinking=no`
@@ -677,7 +685,7 @@ Local development run:
 
 ```bash
 npm install
-CURSOR_API_KEY="your-key" pi --approve -e . --model cursor/grok-4.6
+CURSOR_API_KEY="your-key" pi -ne --approve -e . --model cursor/grok-4.6
 ```
 
 After editing `src/`, run `npm run build` before the next `pi -e .` run, or pi loads the previous build.

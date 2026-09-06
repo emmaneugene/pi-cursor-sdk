@@ -1,5 +1,8 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Type } from "typebox";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	asMockCursorRun,
 	asMockSdkAgent,
@@ -25,7 +28,20 @@ import { computeCursorContextFingerprint } from "../src/context.js";
 import { buildCursorModelSelection } from "../src/model-discovery.js";
 
 describe("streamCursor local resume", () => {
-	beforeEach(resetCursorProviderTestState);
+	let testAgentDir: string;
+
+	beforeEach(async () => {
+		testAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-local-resume-"));
+		vi.stubEnv("PI_CODING_AGENT_DIR", testAgentDir);
+		await resetCursorProviderTestState();
+		mockedResume.mockReset();
+		mockedResume.mockResolvedValue(asMockSdkAgent({ send: vi.fn() }));
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		rmSync(testAgentDir, { recursive: true, force: true });
+	});
 
 	function seedResumeHandle(
 		scopeKey: string,
