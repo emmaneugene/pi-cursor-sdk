@@ -205,7 +205,7 @@ function isCanonicalCreateRequireImport(node: ts.StringLiteralLike): boolean {
 
 function collectUnsafeHostPeerLoads(
 	paths: string[] = runtimeModuleFiles(),
-	nativeModuleLoaderPath: string = join(process.cwd(), "src", "cursor-ripgrep-path.ts"),
+	nativeModuleLoaderPath: string = join(process.cwd(), "src", "cursor-sdk-platform-package.ts"),
 ): string[] {
 	const sourcePaths = new Set(paths);
 	const modules = new Map<string, RuntimeModuleInfo>();
@@ -296,9 +296,9 @@ function collectUnsafeHostPeerLoads(
 				&& !isAmbientModuleName(node)
 			) {
 				const message = !isCanonicalNativeModule
-					? `native module loader ${node.text} outside src/cursor-ripgrep-path.ts`
+					? `native module loader ${node.text} outside src/cursor-sdk-platform-package.ts`
 					: !isCanonicalCreateRequireImport(node)
-						? 'src/cursor-ripgrep-path.ts must use import { createRequire } from "node:module"'
+						? 'src/cursor-sdk-platform-package.ts must use import { createRequire } from "node:module"'
 						: undefined;
 				if (message) {
 					info.nativeLoaderOffenses.push({
@@ -492,7 +492,7 @@ describe("Cursor SDK lazy runtime imports", () => {
 		const sharedDir = join(tmpAgentDir, "shared");
 		mkdirSync(srcDir);
 		mkdirSync(sharedDir);
-		const entryPath = join(srcDir, "cursor-ripgrep-path.ts");
+		const entryPath = join(srcDir, "cursor-sdk-platform-package.ts");
 		writeFileSync(entryPath, [
 			'import { createRequire } from "node:module";',
 			'const require = createRequire(import.meta.url);',
@@ -508,7 +508,7 @@ describe("Cursor SDK lazy runtime imports", () => {
 
 	it("rejects aliases of the canonical native loader", () => {
 		tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-native-require-alias-"));
-		const entryPath = join(tmpAgentDir, "cursor-ripgrep-path.ts");
+		const entryPath = join(tmpAgentDir, "cursor-sdk-platform-package.ts");
 		writeFileSync(entryPath, [
 			'import { createRequire } from "node:module";',
 			'const require = createRequire(import.meta.url);',
@@ -522,7 +522,7 @@ describe("Cursor SDK lazy runtime imports", () => {
 
 	it("allows canonical loader names in erased type queries", () => {
 		tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-native-loader-types-"));
-		const entryPath = join(tmpAgentDir, "cursor-ripgrep-path.ts");
+		const entryPath = join(tmpAgentDir, "cursor-sdk-platform-package.ts");
 		writeFileSync(entryPath, [
 			'import { createRequire } from "node:module";',
 			'const require = createRequire(import.meta.url);',
@@ -536,7 +536,7 @@ describe("Cursor SDK lazy runtime imports", () => {
 
 	it("rejects noncanonical imports in the canonical native loader", () => {
 		tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-native-import-attributes-"));
-		const entryPath = join(tmpAgentDir, "cursor-ripgrep-path.ts");
+		const entryPath = join(tmpAgentDir, "cursor-sdk-platform-package.ts");
 		writeFileSync(entryPath, [
 			'import { createRequire } from "node:module" with {};',
 			'const require = createRequire(import.meta.url);',
@@ -614,8 +614,8 @@ describe("Cursor SDK lazy runtime imports", () => {
 		writeFileSync(join(srcDir, "empty-export.ts"), 'export {} from "@mariozechner/pi-empty-ts-export";\n');
 
 		const findings = collectUnsafeHostPeerLoads(runtimeModuleFiles(srcDir, sharedDir)).join("\n");
-		expect(findings).toContain("native module loader node:module outside src/cursor-ripgrep-path.ts");
-		expect(findings).toContain("native module loader module outside src/cursor-ripgrep-path.ts");
+		expect(findings).toContain("native module loader node:module outside src/cursor-sdk-platform-package.ts");
+		expect(findings).toContain("native module loader module outside src/cursor-sdk-platform-package.ts");
 		expect(findings).toContain("runtime import-equals ../shared/import-equals-helper.mjs");
 		expect(findings).toContain("native host-peer specifier @earendil-works/pi-default-create-require");
 		expect(findings).toContain("native host-peer specifier @mariozechner/pi-indirect-require");

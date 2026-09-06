@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Pin `CURSOR_TREE_SITTER_VENDOR_DIR` from the installed `@cursor/sdk-<platform>-<arch>` package before local `Agent.create`. The SDK locates that vendor directory by walking from `process.argv[1]` and `process.execPath`, so a default `pi` launch never sees the package under `~/.pi/agent/npm` and disables shell command analysis.
+- Point the same SDK locator at that platform package during local `Agent.create` / `Agent.resume` so `cursorsandbox` is found when sandbox is requested. The SDK has no path env var for this helper; without the host-entry, `Agent.create` throws that sandboxing is not supported.
+
+### Changed
+
+- Rename `src/cursor-ripgrep-path.ts` to `src/cursor-sdk-platform-package.ts`. The module now owns ripgrep, tree-sitter vendor, and `cursorsandbox` resolution.
+
 ## 0.3.7 - 2026-09-05
 
 First release of the maintained fork published as `@emmaneugene/pi-cursor-sdk`.

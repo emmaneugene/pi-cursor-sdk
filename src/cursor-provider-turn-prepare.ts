@@ -2,7 +2,7 @@ import type { Context, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import type { AgentModeOption, ModelSelection, SDKAgent } from "@cursor/sdk";
 import { configureCursorSdkHttp1 } from "./cursor-http1.js";
 import { installCursorMcpToolTimeoutOverride } from "./cursor-mcp-timeout-override.js";
-import { ensureCursorRipgrepPath } from "./cursor-ripgrep-path.js";
+import { ensureCursorRipgrepPath, ensureCursorTreeSitterVendorDir } from "./cursor-sdk-platform-package.js";
 import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "./cursor-sdk-output-filter.js";
 import {
 	acquireSessionCursorAgent,
@@ -249,6 +249,7 @@ async function prepareCursorLocalProviderTurn(
 
 	try {
 		ensureCursorRipgrepPath();
+		ensureCursorTreeSitterVendorDir();
 		const localSafety = {
 			autoReview: resolvedConfig.local.autoReview.value,
 			sandboxEnabled: resolvedConfig.local.sandboxEnabled.value,

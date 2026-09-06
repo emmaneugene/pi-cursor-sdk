@@ -14,6 +14,7 @@ import {
 } from "./cursor-session-agent-resume.js";
 import type { CursorSdkEventDebugRecorder } from "./cursor-sdk-event-debug.js";
 import { loadCursorSdk, type CursorSdkModule } from "./cursor-sdk-runtime.js";
+import { runWithCursorSdkPlatformPackageVisible } from "./cursor-sdk-platform-package.js";
 import {
 	cursorSessionStoreIdentitiesEqual,
 	openCursorSessionStore,
@@ -501,20 +502,23 @@ async function createSessionAgentEntry(
 		let agent: SDKAgent | undefined;
 		let effectiveSendState = sendState;
 		let resumed = false;
-		if (resumeHandle && resumeAttemptAllowed && resumeAgent) {
-			try {
-				agent = await resumeAgent(resumeHandle.agentId, buildAgentOptions());
-				effectiveSendState = { ...resumeHandle.sendState };
-				resumed = true;
-			} catch {
-				if (persistentStore) resumeNotice = LOCAL_RESUME_FALLBACK_NOTICE;
-				if (!cursorSessionStoreIdentitiesEqual(sessionStore.identity, identities.sessionStore)) {
-					await sessionStore.dispose().catch(() => undefined);
-					sessionStore = await openCursorSessionStore(params.cwd, identities.sessionStore);
+		await runWithCursorSdkPlatformPackageVisible(async () => {
+			if (resumeHandle && resumeAttemptAllowed && resumeAgent) {
+				try {
+					agent = await resumeAgent(resumeHandle.agentId, buildAgentOptions());
+					effectiveSendState = { ...resumeHandle.sendState };
+					resumed = true;
+				} catch {
+					if (persistentStore) resumeNotice = LOCAL_RESUME_FALLBACK_NOTICE;
+					const currentStore = sessionStore;
+					if (currentStore && !cursorSessionStoreIdentitiesEqual(currentStore.identity, identities.sessionStore)) {
+						await currentStore.dispose().catch(() => undefined);
+						sessionStore = await openCursorSessionStore(params.cwd, identities.sessionStore);
+					}
 				}
 			}
-		}
-		agent ??= await createAgent(buildAgentOptions());
+			agent ??= await createAgent(buildAgentOptions());
+		});
 		if (!agent) throw new Error("Cursor SDK agent creation returned no agent");
 		if (!sessionStore) throw new Error("Cursor SDK session store was not opened");
 

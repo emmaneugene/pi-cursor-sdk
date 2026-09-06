@@ -564,12 +564,13 @@ All `PI_CURSOR_*` overrides in one list. They are otherwise documented where eac
 | `PI_CURSOR_RUNTIME` | `local` | Selects the `local` or `cloud` SDK runtime. An invalid non-empty value fails closed. See [Cursor SDK mode](#cursor-sdk-mode). |
 | `PI_CURSOR_LOCAL_FORCE` | Off | Passes `{ local: { force: true } }` to the next local `Agent.send()`; the override is consumed once. |
 | `PI_CURSOR_LOCAL_RESUME` | On | Allows reuse of a matching persisted local agent. `PI_CURSOR_LOCAL_RESUME=0` opts out. |
-| `PI_CURSOR_SANDBOX` | Off | Passes local sandbox enablement into Cursor SDK agent options. Only enabled values are sent. |
+| `PI_CURSOR_SANDBOX` | Off | Passes local sandbox enablement into Cursor SDK agent options. Only enabled values are sent. The SDK runs `cursorsandbox` from the platform package; the extension points the SDK locator at that package during local `Agent.create` / `Agent.resume`. |
 | `PI_CURSOR_AUTO_REVIEW` | Off | Passes `autoReview: true` into Cursor SDK agent options. Only enabled values are sent. |
 | `PI_CURSOR_HTTP_1_1` | Off | Forces Cursor SDK local-agent streams to HTTP/1.1/SSE for VPN/proxy environments. Session `/cursor-http` commands win over env; project config is ignored. See the `PI_CURSOR_HTTP_1_1` notes under [Cursor provider tool contract](#cursor-provider-tool-contract). |
 | `PI_CURSOR_SETTING_SOURCES` | `all` | Cursor SDK setting sources. `all`, `1`, `true`, and `on` select all sources; `none`, `0`, `false`, `off`, `omit`, and `disabled` disable ambient sources. Other comma-separated names such as `project,user,plugins` narrow loading and are forwarded without validation. See [Limits](#limits) and [Cursor tool surfaces in pi](docs/cursor-tool-surfaces.md). |
 | `PI_CURSOR_PRESERVE_PI_AGENTS_MD` | Off | Keeps pi `AGENTS.md`/`CLAUDE.md` context injection even when Cursor setting sources load the same rules. |
 | `CURSOR_RIPGREP_PATH` | Bundled SDK `rg` when available | Ripgrep executable for the local SDK agent. Only an absolute path is honored; the extension sets the bundled default itself at turn prepare. |
+| `CURSOR_TREE_SITTER_VENDOR_DIR` | Bundled SDK `vendor/` when available | Vendored tree-sitter natives for the local SDK agent. Only an absolute path is honored; the extension sets the bundled default itself at turn prepare. |
 
 ### Pi tool bridge and tool surfaces
 
@@ -620,7 +621,7 @@ See [Cursor provider tool contract](#cursor-provider-tool-contract) for the narr
 | `PI_CURSOR_SDK_EVENT_DEBUG_SESSION_DIR` | Unset | Pins the session's turn grouping and manifest to an exact directory. |
 | `PI_CURSOR_SDK_EVENT_DEBUG_STDERR` | Off | Also prints the debug summary (and discarded incomplete-tool records) to stderr. |
 
-Not listed: `PI_CURSOR_BRIDGE_TOOL_CALL_ID` is an internal cancellation marker injected by the bridge on some platforms, not a user setting. `CURSOR_TREE_SITTER_VENDOR_DIR` is SDK-internal (absolute-path override for vendored tree-sitter natives; unset resolves the `@cursor/sdk-<platform>-<arch>` platform package). `*_SMOKE_*` and `PLATFORM_*` names belong to maintainer smoke scripts, not the extension runtime.
+Not listed: `PI_CURSOR_BRIDGE_TOOL_CALL_ID` is an internal cancellation marker injected by the bridge on some platforms, not a user setting. `*_SMOKE_*` and `PLATFORM_*` names belong to maintainer smoke scripts, not the extension runtime.
 
 ## Troubleshooting
 

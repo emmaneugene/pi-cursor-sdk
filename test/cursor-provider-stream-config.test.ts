@@ -62,11 +62,14 @@ describe("streamCursor prompt and model config", () => {
 		});
 	});
 
-	it("sets absolute CURSOR_RIPGREP_PATH before local Agent.create", async () => {
+	it("sets absolute CURSOR_RIPGREP_PATH and CURSOR_TREE_SITTER_VENDOR_DIR before local Agent.create", async () => {
 		delete process.env.CURSOR_RIPGREP_PATH;
+		delete process.env.CURSOR_TREE_SITTER_VENDOR_DIR;
 		let pathAtCreate: string | undefined;
+		let vendorAtCreate: string | undefined;
 		mockedCreate.mockImplementation(async () => {
 			pathAtCreate = process.env.CURSOR_RIPGREP_PATH;
+			vendorAtCreate = process.env.CURSOR_TREE_SITTER_VENDOR_DIR;
 			return asMockSdkAgent({
 				send: vi.fn().mockResolvedValue({
 					id: "run-1",
@@ -86,6 +89,10 @@ describe("streamCursor prompt and model config", () => {
 		expect(pathAtCreate).toBeTruthy();
 		expect(isAbsolute(pathAtCreate!)).toBe(true);
 		expect(pathAtCreate!.replaceAll("\\", "/")).toContain(`@cursor/sdk-${process.platform}-${process.arch}`);
+		expect(vendorAtCreate).toBeTruthy();
+		expect(isAbsolute(vendorAtCreate!)).toBe(true);
+		expect(vendorAtCreate!.replaceAll("\\", "/")).toContain(`@cursor/sdk-${process.platform}-${process.arch}`);
+		expect(vendorAtCreate!.replaceAll("\\", "/")).toMatch(/\/vendor$/);
 	});
 
 	it("passes enabled local safety controls from env into Agent.create", async () => {
