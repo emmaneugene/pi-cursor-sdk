@@ -90,54 +90,6 @@ describe("extension registration and discovery", () => {
 			expect.objectContaining({ type: "string", default: "" }),
 		);
 		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-runtime",
-			expect.objectContaining({ type: "string", default: "" }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-repo",
-			expect.objectContaining({ type: "string", default: "" }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-branch",
-			expect.objectContaining({ type: "string", default: "" }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-context",
-			expect.objectContaining({ type: "string", default: "" }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-direct-push",
-			expect.objectContaining({ type: "boolean", default: false }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-auto-create-pr",
-			expect.objectContaining({ type: "boolean", default: false }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-skip-reviewer-request",
-			expect.objectContaining({ type: "boolean", default: false }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-allow-local-state",
-			expect.objectContaining({ type: "boolean", default: false }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-env",
-			expect.objectContaining({ type: "string", default: "" }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-env-from-files",
-			expect.objectContaining({ type: "boolean", default: false }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-env-type",
-			expect.objectContaining({ type: "string", default: "" }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-cloud-env-name",
-			expect.objectContaining({ type: "string", default: "" }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
 			"cursor-auto-review",
 			expect.objectContaining({ type: "boolean", default: false }),
 		);
@@ -162,20 +114,12 @@ describe("extension registration and discovery", () => {
 			expect.objectContaining({ description: expect.stringContaining("Set Cursor SDK conversation mode") }),
 		);
 		expect(pi.registerCommand).toHaveBeenCalledWith(
-			"cursor-runtime",
-			expect.objectContaining({ description: expect.stringContaining("Set Cursor runtime") }),
-		);
-		expect(pi.registerCommand).toHaveBeenCalledWith(
 			"cursor-tools",
 			expect.objectContaining({ description: expect.stringContaining("Show live Cursor tool surfaces") }),
 		);
 		expect(pi.registerCommand).toHaveBeenCalledWith(
 			"cursor-http",
 			expect.objectContaining({ description: expect.stringContaining("Toggle Cursor SDK HTTP/1.1") }),
-		);
-		expect(pi.registerCommand).toHaveBeenCalledWith(
-			"cursor-cloud",
-			expect.objectContaining({ description: expect.stringContaining("recorded Cursor cloud agents") }),
 		);
 		expect(pi.registerCommand).toHaveBeenCalledWith(
 			"cursor-local-resume-cleanup",

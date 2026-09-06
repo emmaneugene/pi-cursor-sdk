@@ -40,7 +40,6 @@ describe("smoke CLI and package contracts", () => {
 		const sdkEventsHelp = run(process.execPath, ["scripts/debug-sdk-events.mjs", "--help"]);
 		const providerEventsHelp = run(process.execPath, ["scripts/debug-provider-events.mjs", "--help"]);
 		const platformLiveHelp = run(process.execPath, ["scripts/platform-smoke/live-suite-runner.mjs", "--help"]);
-		const cloudHelp = run(process.execPath, ["scripts/cloud-runtime-smoke.mjs", "--help"]);
 		const localResumeHelp = run(process.execPath, ["scripts/local-resume-smoke.mjs", "--help"]);
 
 		if (process.platform !== "win32") {
@@ -66,12 +65,6 @@ describe("smoke CLI and package contracts", () => {
 		expect(providerEventsHelp.stdout).toContain("Capture raw Cursor SDK onDelta/onStep payloads through pi's provider path");
 		expect(platformLiveHelp.status).toBe(0);
 		expect(platformLiveHelp.stdout).toContain("--prep-dir");
-		expect(cloudHelp.status).toBe(0);
-		expect(cloudHelp.stdout).toContain("--context-matrix");
-		expect(cloudHelp.stdout).toContain("private throwaway GitHub repository");
-		expect(cloudHelp.stdout).toContain("direct push");
-		expect(cloudHelp.stdout).toContain("lifecycle delete");
-		expect(cloudHelp.stdout).toContain("2  invalid command-line usage");
 		expect(localResumeHelp.status).toBe(0);
 		expect(localResumeHelp.stdout).toContain("smoke:local-resume");
 		expect(localResumeHelp.stdout).toContain("--safety");
@@ -119,7 +112,6 @@ describe("smoke CLI and package contracts", () => {
 
 	it("waits for final RPC settlement instead of a low-level run end", () => {
 		for (const path of [
-			"scripts/cloud-runtime-smoke.mjs",
 			"scripts/debug-provider-events.mjs",
 			"scripts/lib/local-resume-smoke-harness.mjs",
 			"scripts/steering-rpc-smoke.mjs",
@@ -129,73 +121,6 @@ describe("smoke CLI and package contracts", () => {
 			expect(source).not.toContain("agent_end");
 		}
 	});
-
-	it("keeps the required paid cloud matrix CLI contract and helper surface", () => {
-		const entrypointSource = readFileSync("scripts/cloud-runtime-smoke.mjs", "utf8");
-		const runnerSource = readFileSync("scripts/lib/cloud-smoke-pi-runner.mjs", "utf8");
-		const source = `${entrypointSource}\n${runnerSource}`;
-		const help = run(process.execPath, ["scripts/cloud-runtime-smoke.mjs", "--help"]);
-		expect(help.status).toBe(0);
-		expect(help.stdout).toContain("npm run smoke:cloud");
-		expect(help.stdout).toContain("--context-matrix");
-		expect(help.stdout).toContain("CURSOR_API_KEY");
-		expect(source).toContain('"--session-dir"');
-		expect(source).toContain('"--session-id"');
-		expect(source).not.toContain('"--no-session"');
-		for (const anchor of [
-			"runCancelLane",
-			"runBranchAndLifecycleLane",
-			"runDirectPushLane",
-			"runMissingBranchLane",
-			"accountConditionalLane",
-			"coordinateCloudSmokeReleaseGate",
-			"installCloudSmokeSignalHandlers",
-			"cloudSmokeShutdown",
-			"deleteThrowawayRepository",
-			"cursor-cloud-smoke-matrix-latest.json",
-			"buildCloudSmokeEvidenceProvenance",
-			"projectCloudSmokeMatrixEvidence",
-			"listCloudSmokePackageSourcePaths",
-		]) expect(source, anchor).toContain(anchor);
-		// Helper modules are loaded by the entrypoint; CLI and child-transport contracts stay source-shape only.
-		expect(source).toContain('from "./lib/cloud-smoke-cleanup-evidence.mjs"');
-		expect(source).toContain('from "./lib/cloud-smoke-artifacts.mjs"');
-		expect(source).toContain('from "./lib/cloud-smoke-pi-runner.mjs"');
-		expect(source).toContain('from "./lib/cloud-smoke-github.mjs"');
-		expect(source).toContain('from "./lib/cloud-smoke-shutdown.mjs"');
-		for (const shutdownAnchor of [
-			"timeoutTermination = terminateChild(child)",
-			"stopCloudSmokeTrackedChild(",
-			"() => terminateChild(child, { graceMs: 15_000 })",
-			"createCloudSmokeTerminalFailureState(rejectPending)",
-			"installCloudSmokeChildErrorHandlers(",
-			"const routeRpcError = installCloudSmokeChildErrorHandlers(",
-			"throwIfFailed: terminalState.throwIfFailed",
-			"process.exitCode = 1",
-		]) expect(source, shutdownAnchor).toContain(shutdownAnchor);
-		expect(source).toContain('child.stdin.write(`${JSON.stringify({ id, type, ...extra })}\\n`);');
-		expect(source).toContain("routeRpcError(error);");
-		expect(source).toContain("installCloudSmokeSignalHandlers(cloudSmokeShutdown, process, () => { process.exitCode = 1; })");
-		expect(source).not.toContain("removeSignalHandlers");
-		expect(source.match(/await checkpointCloudSmokeShutdown\(cloudSmokeShutdown\)/g)).toHaveLength(3);
-		const stageIndex = source.indexOf("const temporary = stageEvidenceSummary(summary)");
-		const preCommitCheckpointIndex = source.indexOf("await checkpointCloudSmokeShutdown(cloudSmokeShutdown)", stageIndex);
-		const commitIndex = source.indexOf("commitEvidenceSummary(temporary)", preCommitCheckpointIndex);
-		const postCoordinatorCheckpointIndex = source.indexOf("await checkpointCloudSmokeShutdown(cloudSmokeShutdown)", commitIndex);
-		const artifactRemovalIndex = source.indexOf("rmSync(artifactRoot", postCoordinatorCheckpointIndex);
-		const finalCheckpointIndex = source.indexOf("await checkpointCloudSmokeShutdown(cloudSmokeShutdown)", artifactRemovalIndex);
-		const failureIndex = source.indexOf("if (failure) throw failure", finalCheckpointIndex);
-		const successMarkerIndex = source.indexOf("console.log(contextMatrix ?", failureIndex);
-		expect(stageIndex).toBeGreaterThan(0);
-		expect(preCommitCheckpointIndex).toBeGreaterThan(stageIndex);
-		expect(commitIndex).toBeGreaterThan(preCommitCheckpointIndex);
-		expect(postCoordinatorCheckpointIndex).toBeGreaterThan(commitIndex);
-		expect(artifactRemovalIndex).toBeGreaterThan(postCoordinatorCheckpointIndex);
-		expect(finalCheckpointIndex).toBeGreaterThan(artifactRemovalIndex);
-		expect(failureIndex).toBeGreaterThan(finalCheckpointIndex);
-		expect(successMarkerIndex).toBeGreaterThan(failureIndex);
-	});
-
 	it("rejects paid smoke typos and repeated or conflicting lanes before auth or runs", () => {
 		const env: NodeJS.ProcessEnv = {
 			...process.env,
@@ -215,14 +140,6 @@ describe("smoke CLI and package contracts", () => {
 				args: ["scripts/local-resume-smoke.mjs", "--safety", "--tree"],
 				expected: "only one smoke lane may be selected",
 			},
-			{
-				args: ["scripts/cloud-runtime-smoke.mjs", "--context-matix"],
-				expected: "unknown argument(s): --context-matix",
-			},
-			{
-				args: ["scripts/cloud-runtime-smoke.mjs", "--context-matrix", "--context-matrix"],
-				expected: "only one smoke lane may be selected",
-			},
 		];
 		for (const testCase of cases) {
 			const result = run(process.execPath, testCase.args, env);
@@ -234,10 +151,10 @@ describe("smoke CLI and package contracts", () => {
 		}
 	});
 
-	it("scrubs API keys from offline cloud and local-resume CLI validation errors", () => {
+	it("scrubs API keys from offline local-resume CLI validation errors", () => {
 		const apiKey = "cursor-offline-smoke-secret-12345";
 		const env = { ...process.env, CURSOR_API_KEY: apiKey };
-		for (const script of ["scripts/cloud-runtime-smoke.mjs", "scripts/local-resume-smoke.mjs"]) {
+		for (const script of ["scripts/local-resume-smoke.mjs"]) {
 			const result = run(process.execPath, [script, `--${apiKey}`], env);
 			expect(result.status, script).toBe(2);
 			expect(result.stderr).toContain("usage error");
@@ -361,10 +278,6 @@ if (!windows.includes("for($i=0;$i -lt 10") || !windows.includes("$w=$e.Replace(
 		expect(paths.has("shared/cursor-sensitive-text.mjs")).toBe(true);
 		expect(paths.has("shared/cursor-sensitive-text.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/local-resume-smoke-harness.mjs")).toBe(true);
-		expect(paths.has("scripts/lib/cloud-smoke-cleanup-evidence.mjs")).toBe(true);
-		expect(paths.has("scripts/lib/cloud-smoke-cleanup-evidence.d.mts")).toBe(true);
-		expect(paths.has("scripts/lib/cloud-smoke-github.mjs")).toBe(true);
-		expect(paths.has("scripts/lib/cloud-smoke-github.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/cursor-smoke-env.mjs")).toBe(true);
 		expect(paths.has("scripts/lib/cursor-smoke-env.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/cursor-smoke-shell.sh")).toBe(true);

@@ -38,7 +38,7 @@ describe("cursor-session-scope cwd", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "pi-cursor-session-trust-"));
 		try {
 			mkdirSync(join(cwd, ".pi"));
-			writeFileSync(join(cwd, ".pi", "cursor-sdk.json"), '{"runtime":"cloud"}\n');
+			writeFileSync(join(cwd, ".pi", "cursor-sdk.json"), "{}\n");
 			const pi = createEventHarness();
 			registerCursorSessionScope(pi);
 

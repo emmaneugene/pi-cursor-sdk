@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Remove Cursor Cloud runtime support, including remote `bc-*` agents, cloud commands and configuration, lifecycle/reporting, and cloud smoke scripts. All Cursor SDK runs are now local. The footer now uses `cursor · fast:...` instead of `cursor:local · fast:...`.
 - Rename `src/cursor-ripgrep-path.ts` to `src/cursor-sdk-platform-package.ts`. The module now owns ripgrep, tree-sitter vendor, and `cursorsandbox` resolution.
 
 ## 0.3.7 - 2026-09-05

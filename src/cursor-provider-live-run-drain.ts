@@ -196,7 +196,6 @@ function emitCursorNativeToolUseTurn(
 		}
 	}
 	applyCursorUsage(partial, model, context, cursorLiveRuns.takeTurnInputTokens(run, toolResultInputTokens), {
-		runtime: "local",
 		turn: cursorLiveRuns.takeSdkTurnUsage(run),
 	});
 	partial.stopReason = "toolUse";
@@ -244,7 +243,6 @@ function emitCursorBridgeToolUseTurn(
 		if (block.type === "toolCall") stream.push({ type: "toolcall_end", contentIndex, toolCall: block, partial });
 	}
 	applyCursorUsage(partial, model, context, cursorLiveRuns.takeTurnInputTokens(run, toolResultInputTokens), {
-		runtime: "local",
 		turn: cursorLiveRuns.takeSdkTurnUsage(run),
 	});
 	partial.stopReason = "toolUse";
@@ -380,7 +378,6 @@ export async function drainCursorLiveRunTurn(
 					await emitTextDeltas(stream, partial, splitTextIntoReplayDeltas(finalText));
 				}
 				applyCursorUsage(partial, model, context, cursorLiveRuns.takeTurnInputTokens(run, toolResultInputTokens), {
-					runtime: "local",
 					turn: cursorLiveRuns.takeSdkTurnUsage(run),
 					billed: run.billedTurnUsage,
 				});

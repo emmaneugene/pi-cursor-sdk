@@ -54,11 +54,9 @@ PI_CURSOR_TOOL_MANIFEST=0 pi --model cursor/grok-4.6
 
 Current defaults:
 
-- Local runtime is the default.
-- The pi bridge uses loopback MCP and is the sole implemented Pi-tool transport for local Cursor agents.
+- All Cursor SDK agents run locally.
+- The pi bridge uses loopback MCP and is the implemented Pi-tool transport for Cursor agents.
 - SDK `local.customTools` remains deferred and needs SDK cancellation/deadline support before it can replace the loopback MCP bridge; no transport config is exposed.
-- Explicit cloud runtime selection requires first-use acknowledgement (`/cursor-runtime cloud`, `/cursor-runtime cloud --save-user`, `--cursor-cloud-ack`, or `PI_CURSOR_CLOUD_ACK=1`) plus preflight. Project config may save a cloud runtime default but not the acknowledgement. Cloud runs use fresh context by default and do **not** get local pi tools through loopback MCP or `local.customTools`; cloud Pi-tool access would require a separate secure remote bridge and a new product decision.
-- Inline cloud MCP is not exposed in the initial cloud runtime because live probes showed first-run/replacement/resume behavior was not deterministic enough.
 
 ## Cursor settings vs pi toggles
 

@@ -61,17 +61,4 @@ describe("Cursor provider HTTP/1.1 transport", () => {
 			store: expect.any(Object),
 		});
 	});
-
-	it("does not configure the local transport for cloud agents", async () => {
-		process.env.PI_CURSOR_RUNTIME = "cloud";
-		process.env.PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE = "1";
-		process.env.PI_CURSOR_CLOUD_ACK = "1";
-		const cloudAgentId = "bc-00000000-0000-0000-0000-000000000001";
-		mockSuccessfulAgent(cloudAgentId);
-
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
-
-		expect(mockedConfigureCursor).not.toHaveBeenCalled();
-		expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ cloud: {} }));
-	});
 });

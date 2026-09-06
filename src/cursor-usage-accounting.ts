@@ -7,7 +7,6 @@ import {
 	type CursorPromptOptions,
 } from "./context.js";
 import { asRecord, getNumber } from "./cursor-record-utils.js";
-import type { CursorRuntime } from "./cursor-config.js";
 
 export interface CursorUsagePromptOptions extends CursorPromptOptions {
 	maxInputTokens: number;
@@ -110,7 +109,6 @@ export function isCursorSdkUsageSafeForPiMessage(turnUsage: CursorSdkTurnUsage, 
 }
 
 export interface CursorSdkUsageApplyOptions {
-	runtime: CursorRuntime;
 	turn?: CursorSdkTurnUsage;
 	billed?: CursorSdkTurnUsage;
 }
@@ -209,7 +207,7 @@ export function applyCursorUsage(
 	sdkUsage?: CursorSdkUsageApplyOptions,
 ): void {
 	const billed = sdkUsage?.billed;
-	const localTurn = sdkUsage?.runtime === "local" ? sdkUsage.turn : undefined;
+	const localTurn = sdkUsage?.turn;
 	if (billed && isCursorSdkUsagePartitionSafe(billed, model)) {
 		applyCursorSdkUsage(partial, billed);
 		applyResolvedCursorOccupancy(partial, model, context, localTurn);

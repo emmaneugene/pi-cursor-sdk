@@ -309,26 +309,23 @@ describe("streamCursor debug artifacts", () => {
 			}
 		});
 
-		it("keeps a returned cloud run owned when post-send debug writes throw", async () => {
+		it("keeps a returned run owned when post-send debug writes throw", async () => {
 			const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-provider-debug-throw-"));
 			const previousDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
 			const previousRunDir = process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
 			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
 			process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = artifactDir;
-			process.env.PI_CURSOR_RUNTIME = "cloud";
-			process.env.PI_CURSOR_CLOUD_ACK = "1";
-			process.env.PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE = "1";
-			const wait = vi.fn().mockResolvedValue({ id: "run-cloud-debug", status: "finished", result: "done" });
+			const wait = vi.fn().mockResolvedValue({ id: "run-debug", status: "finished", result: "done" });
 			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 404 }));
 			const recordRunMetaSpy = vi.spyOn(CursorSdkEventDebugSink.prototype, "recordRunMeta").mockImplementation(() => {
 				throw new Error("debug disk full");
 			});
 			try {
 				mockCreatedAgent({
-					agentId: "bc-00000000-0000-0000-0000-000000000001",
+					agentId: "agent-debug",
 					send: vi.fn().mockResolvedValue(asMockCursorRun({
-						id: "run-cloud-debug",
-						agentId: "bc-00000000-0000-0000-0000-000000000001",
+						id: "run-debug",
+						agentId: "agent-debug",
 						status: "finished",
 						wait,
 					})),
@@ -345,9 +342,6 @@ describe("streamCursor debug artifacts", () => {
 				else process.env.PI_CURSOR_SDK_EVENT_DEBUG = previousDebug;
 				if (previousRunDir === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
 				else process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = previousRunDir;
-				delete process.env.PI_CURSOR_RUNTIME;
-				delete process.env.PI_CURSOR_CLOUD_ACK;
-				delete process.env.PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE;
 				rmSync(artifactDir, { recursive: true, force: true });
 			}
 		});

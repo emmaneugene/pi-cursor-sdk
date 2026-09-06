@@ -61,7 +61,6 @@ describe("cursor usage accounting", () => {
 		const partial = makeAssistantMessage([{ type: "text", text: "Hello back." }]);
 
 		applyCursorUsage(partial, model, context, 7, {
-			runtime: "local",
 			turn: { inputTokens: 25_432, outputTokens: 612, cacheReadTokens: 24_000, cacheWriteTokens: 123 },
 		});
 
@@ -92,7 +91,7 @@ describe("cursor usage accounting", () => {
 		};
 
 		expect(isCursorSdkUsageSafeForPiMessage(turn, model)).toBe(true);
-		applyCursorUsage(partial, model, context, 7, { runtime: "local", turn });
+		applyCursorUsage(partial, model, context, 7, { turn });
 		expect(partial.usage).toMatchObject({
 			input: 46_965 - 42_036 - 4_927,
 			output: 3,
@@ -133,7 +132,7 @@ describe("cursor usage accounting", () => {
 		expect(isCursorSdkUsageSafeForPiMessage({ ...overWindowUsage, inputTokens: -1 }, model)).toBe(false);
 		expect(isCursorSdkUsageSafeForPiMessage({ ...overWindowUsage, inputTokens: Number.NaN }, model)).toBe(false);
 
-		applyCursorUsage(partial, model, context, 7, { runtime: "local", turn: overWindowUsage });
+		applyCursorUsage(partial, model, context, 7, { turn: overWindowUsage });
 
 		expect(partial.usage.input).toBe(7);
 		expect(partial.usage.totalTokens).toBeLessThan(model.contextWindow);
@@ -163,7 +162,7 @@ describe("cursor usage accounting", () => {
 
 		expect(isCursorSdkUsageSafeForPiMessage(poisonedSdkUsage, model)).toBe(false);
 
-		applyCursorUsage(partial, model, context, 7, { runtime: "local", turn: poisonedSdkUsage });
+		applyCursorUsage(partial, model, context, 7, { turn: poisonedSdkUsage });
 
 		expect(partial.usage.cacheRead).toBe(0);
 		expect(partial.usage.cacheWrite).toBe(0);
@@ -225,7 +224,6 @@ describe("cursor usage accounting", () => {
 		const partial = makeAssistantMessage([{ type: "text", text: "Hello back." }]);
 
 		applyCursorUsage(partial, model, context, 7, {
-			runtime: "local",
 			turn: { inputTokens: 25, outputTokens: 6, cacheReadTokens: 24, cacheWriteTokens: 1 },
 		});
 
@@ -280,7 +278,7 @@ describe("cursor usage accounting", () => {
 		expect(partial.usage.totalTokens).toBeGreaterThanOrEqual(50_150);
 	});
 
-	it("never uses billed spend as occupancy, including in-window cloud billed rows", () => {
+	it("never uses billed spend as occupancy", () => {
 		const model = makeModel();
 		const context: Context = {
 			systemPrompt: "Be helpful.",
@@ -288,7 +286,7 @@ describe("cursor usage accounting", () => {
 		};
 		const partial = makeAssistantMessage([{ type: "text", text: "Hello back." }]);
 		const billed = { inputTokens: 25, outputTokens: 6, cacheReadTokens: 24, cacheWriteTokens: 1 };
-		applyCursorUsage(partial, model, context, 7, { runtime: "cloud", billed });
+		applyCursorUsage(partial, model, context, 7, { billed });
 		expect(partial.usage.input).toBe(0);
 		expect(partial.usage.output).toBe(6);
 		expect(partial.usage.cacheRead).toBe(24);
@@ -318,7 +316,6 @@ describe("cursor usage accounting", () => {
 		};
 		const partial = makeAssistantMessage([{ type: "text", text: "Hi." }]);
 		applyCursorUsage(partial, model, context, 7, {
-			runtime: "local",
 			turn: { inputTokens: 50_100, outputTokens: 50, cacheReadTokens: 40_000, cacheWriteTokens: 100 },
 			billed: { inputTokens: 80, outputTokens: 12, cacheReadTokens: 60, cacheWriteTokens: 1 },
 		});
@@ -341,7 +338,6 @@ describe("cursor usage accounting", () => {
 		};
 		const partial = makeAssistantMessage([{ type: "text", text: "Hi." }]);
 		applyCursorUsage(partial, model, context, 7, {
-			runtime: "local",
 			turn: { inputTokens: 12_000, outputTokens: 40, cacheReadTokens: 11_000, cacheWriteTokens: 20 },
 		});
 		expect(partial.usage.totalTokens).toBe(12_040);
@@ -355,7 +351,6 @@ describe("cursor usage accounting", () => {
 		};
 		const partial = makeAssistantMessage([{ type: "text", text: "Hello back." }]);
 		applyCursorUsage(partial, model, context, 7, {
-			runtime: "local",
 			turn: { inputTokens: 25, outputTokens: 6, cacheReadTokens: 24, cacheWriteTokens: 1 },
 			billed: { inputTokens: 200_000, outputTokens: 80, cacheReadTokens: 150_000, cacheWriteTokens: 10 },
 		});

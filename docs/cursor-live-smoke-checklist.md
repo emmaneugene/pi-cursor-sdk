@@ -1,14 +1,14 @@
 # Cursor Live Smoke Checklist
 
-> **Platform Smoke:** The required local cross-platform release gate is `npm run smoke:platform:all`; it runs doctor first. Cloud-runtime changes also require `npm run smoke:cloud`. See [docs/platform-smoke.md](./platform-smoke.md) for the full contract. The manual checks below remain useful inner-loop/debug tools but are not the required release gate.
+> **Platform Smoke:** The required cross-platform release gate is `npm run smoke:platform:all`; it runs doctor first. See [docs/platform-smoke.md](./platform-smoke.md) for the full contract. The manual checks below remain useful inner-loop/debug tools but are not the required release gate.
 
 ## Purpose
 
-Use this manual checklist during development and debugging of Cursor provider/runtime changes. Unit tests and mocks are necessary, but they are not enough for this extension. See [Cursor testing lessons](./cursor-testing-lessons.md) for auth/isolated-harness pitfalls and the plan-mode replay regression that motivated recent hardening. For release readiness, run the local platform gate in [docs/platform-smoke.md](./platform-smoke.md), plus `npm run smoke:cloud` for cloud-runtime changes; this checklist is inner-loop evidence only.
+Use this manual checklist during development and debugging of Cursor provider/runtime changes. Unit tests and mocks are necessary, but they are not enough for this extension. See [Cursor testing lessons](./cursor-testing-lessons.md) for auth/isolated-harness pitfalls and the plan-mode replay regression that motivated recent hardening. For release readiness, run the platform gate in [docs/platform-smoke.md](./platform-smoke.md); this checklist is inner-loop evidence only.
 
 ## Inner-loop rule
 
-- Build first: `npm run build` after any `src/` edit — the pi manifest loads compiled `dist/`, so unbuilt runs validate stale code. (the cloud/steering/local-resume/provider-debug launchers rebuild automatically even when run directly with `node scripts/...`; `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; direct `pi -e .` invocations do not build.)
+- Build first: `npm run build` after any `src/` edit — the pi manifest loads compiled `dist/`, so unbuilt runs validate stale code. (the steering/local-resume/provider-debug launchers rebuild automatically even when run directly with `node scripts/...`; `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; direct `pi -e .` invocations do not build.)
 - Run from a clean working tree except for the intended branch diff.
 - Use the local extension under test: `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6`.
 - Use a temporary `--session-dir` for every run.
@@ -125,7 +125,7 @@ Observe with `tmux capture-pane -pt "$SESSION"` or attach manually.
 
 Pass criteria:
 
-- Footer shows `(cursor) composer-2-5`. With `--cursor-no-fast`, Cursor fast mode is off and the Cursor extension status should show `cursor:local · fast:off`; ignore unrelated status text from other extensions.
+- Footer shows `(cursor) composer-2-5`. With `--cursor-no-fast`, Cursor fast mode is off and the Cursor extension status should show `cursor · fast:off`; ignore unrelated status text from other extensions.
 - The run uses Pi 0.84.0 `--session-id` successfully.
 - Assistant answer appears correctly.
 - `/session` shows one user and one assistant message for the simple run.

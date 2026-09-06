@@ -42,16 +42,14 @@ import {
 } from "./cursor-config.js";
 import {
 	consumeCursorLocalForceOverride,
-	CURSOR_RUNTIME_ENTRY_TYPE,
 	formatCursorStatus,
 	getCursorCliConfig,
 	getCursorSessionConfig,
-	registerCursorCloudRuntimeControls,
+	registerCursorLocalRuntimeFlags,
 	resetCursorRuntimeStateForTests,
 	resolveCursorStatusRuntime,
 	resolveEffectiveCursorConfigForContext,
 	restoreCursorCliState,
-	restoreSessionCursorRuntimeState,
 	type CursorRuntimeStateExtensionApi,
 } from "./cursor-runtime-state.js";
 
@@ -178,7 +176,6 @@ function restoreSessionCursorMode(branch: readonly SessionEntry[]): void {
 
 function restoreSessionCursorPreferences(ctx: { sessionManager: Pick<ExtensionContext["sessionManager"], "getBranch"> }): void {
 	const branch = ctx.sessionManager.getBranch();
-	restoreSessionCursorRuntimeState(branch);
 	restoreSessionFastPreferences(branch);
 	restoreSessionCursorMode(branch);
 	restoreSessionCursorHttp1(branch);
@@ -266,14 +263,13 @@ function updateCursorStatus(ctx: CursorStatusContext & Pick<ExtensionContext, "m
 	const modeResolution = resolveCursorAgentMode();
 	const mode = modeResolution.kind === "invalid" ? "invalid" : modeResolution.mode;
 	if (resolution.kind === "invalid") {
-		ctx.ui.setStatus("cursor", formatCursorStatus("invalid", undefined, mode));
+		ctx.ui.setStatus("cursor", formatCursorStatus(undefined, "invalid"));
 		return;
 	}
-	const runtime = resolution.runtime.value;
-	const fast = runtime === "cloud" ? undefined : metadata?.supportsFast ? getEffectiveFast(model.id) : undefined;
+	const fast = metadata?.supportsFast ? getEffectiveFast(model.id) : undefined;
 	ctx.ui.setStatus(
 		"cursor",
-		formatCursorStatus(runtime, fast, mode, resolution.useHttp1ForAgent.value),
+		formatCursorStatus(fast, mode, resolution.useHttp1ForAgent.value),
 	);
 }
 
@@ -432,7 +428,7 @@ export function getEffectiveFastForModelId(modelId: string): boolean | undefined
 }
 
 export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtensionApi): void {
-	registerCursorCloudRuntimeControls(pi, { refreshStatus: updateCursorStatus });
+	registerCursorLocalRuntimeFlags(pi);
 
 	pi.registerFlag("cursor-fast", {
 		description: "Force Cursor fast mode for this run when the selected Cursor model supports it",
@@ -673,7 +669,6 @@ export const __testUtils = {
 	FAST_ENTRY_TYPE,
 	MODE_ENTRY_TYPE,
 	CURSOR_HTTP1_ENTRY_TYPE,
-	RUNTIME_ENTRY_TYPE: CURSOR_RUNTIME_ENTRY_TYPE,
 	DEFAULT_CURSOR_AGENT_MODE,
 	getConfigPath,
 	loadGlobalFastPreferences,

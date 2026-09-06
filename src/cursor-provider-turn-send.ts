@@ -1,9 +1,5 @@
 import type { SendOptions } from "@cursor/sdk";
 import { countCursorAgentMessages } from "./cursor-agent-message-web-tools.js";
-import {
-	createCursorCloudLifecyclePersistenceError,
-	recordCursorCloudLifecycleSafely,
-} from "./cursor-cloud-lifecycle.js";
 import { CursorLiveRunAbortError } from "./cursor-live-run-coordinator.js";
 import { cursorLiveRuns } from "./cursor-provider-live-run-drain.js";
 import { consumeCursorLocalForceOverride } from "./cursor-runtime-state.js";
@@ -22,25 +18,6 @@ export interface SendCursorProviderTurnParams {
 	sdkEventDebug: CursorSdkEventDebugSink | undefined;
 	sdkProcessErrorGuard: ReturnType<typeof installCursorSdkProcessErrorGuard>;
 	throwIfAborted: () => void;
-	resolvedApiKey?: string;
-}
-
-const CLOUD_LEDGER_CANCEL_TIMEOUT_MS = 5000;
-
-async function requestBoundedCloudRunCancellation(run: Awaited<ReturnType<CursorProviderTurnPrepareResult["agent"]["send"]>>): Promise<boolean> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	const timeout = new Promise<false>((resolve) => {
-		timer = setTimeout(() => resolve(false), CLOUD_LEDGER_CANCEL_TIMEOUT_MS);
-		timer.unref?.();
-	});
-	try {
-		return await Promise.race([
-			Promise.resolve().then(() => run.cancel()).then(() => true, () => false),
-			timeout,
-		]);
-	} finally {
-		if (timer) clearTimeout(timer);
-	}
 }
 
 function recordDebug(action: () => void): void {
@@ -52,7 +29,7 @@ function recordDebug(action: () => void): void {
 }
 
 export async function sendCursorProviderTurn(sendParams: SendCursorProviderTurnParams): Promise<CursorProviderTurnSendResult> {
-	const { params, prepared, sdkEventDebug, sdkProcessErrorGuard, throwIfAborted, resolvedApiKey } = sendParams;
+	const { params, prepared, sdkEventDebug, sdkProcessErrorGuard, throwIfAborted } = sendParams;
 	const { options } = params;
 	const { agent, cwd, payload, meta, runtime } = prepared;
 	const { turnCoordinator, liveRun } = runtime;
@@ -75,12 +52,10 @@ export async function sendCursorProviderTurn(sendParams: SendCursorProviderTurnP
 		abortRegistration?.signal.addEventListener("abort", abortListener, { once: true });
 		throwIfAborted();
 		let cursorAgentMessageOffset: number | undefined;
-		if (prepared.runtimeTarget === "local") {
-			try {
-				cursorAgentMessageOffset = await countCursorAgentMessages(agent.agentId, cwd, prepared.sessionAgentLease.store);
-			} catch (error) {
-				recordDebug(() => sdkEventDebug?.recordError("cursor_agent_message_count", error));
-			}
+		try {
+			cursorAgentMessageOffset = await countCursorAgentMessages(agent.agentId, cwd, prepared.sessionAgentLease.store);
+		} catch (error) {
+			recordDebug(() => sdkEventDebug?.recordError("cursor_agent_message_count", error));
 		}
 		throwIfAborted();
 		recordDebug(() => sdkEventDebug?.recordSendMeta({
@@ -111,20 +86,14 @@ export async function sendCursorProviderTurn(sendParams: SendCursorProviderTurnP
 			},
 		};
 		throwIfAborted();
-		if (prepared.runtimeTarget === "local" && consumeCursorLocalForceOverride(prepared.localForce)) {
+		if (consumeCursorLocalForceOverride(prepared.localForce)) {
 			sendOptions.local = { force: true };
 		}
 		const runPromise = agent.send(payload, sendOptions);
 		// Record at send initiation (promise created), including later reject/cancel paths.
-		if (prepared.runtimeTarget === "local") {
-			recordCursorSessionAgentLineage(agent.agentId);
-		}
+		recordCursorSessionAgentLineage(agent.agentId);
 		const run = await runPromise;
 		sdkRun = run;
-		if (prepared.runtimeTarget === "cloud" && !recordCursorCloudLifecycleSafely({ agentId: run.agentId, runId: run.id }, resolvedApiKey)) {
-			const cancellationConfirmed = await requestBoundedCloudRunCancellation(run);
-			throw createCursorCloudLifecyclePersistenceError(run.agentId, "run", cancellationConfirmed, resolvedApiKey);
-		}
 		recordDebug(() => sdkEventDebug?.recordRunMeta({
 			runId: run.id,
 			requestId: run.requestId,

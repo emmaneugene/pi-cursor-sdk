@@ -21,7 +21,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-run-final-text.ts` owns final assistant text selection for run outcomes and live-run drain.
 - `src/cursor-provider-errors.ts` owns scrubbed Cursor SDK run failure detail, abort reason formatting, and provider error sanitization.
 - `src/cursor-provider-lazy.ts` owns the `streamSimple` wrapper that defers Cursor provider execution to invocation and converts provider runtime failures into stream errors; the provider module stays in Pi's static extension graph so host peers resolve through Pi's loader.
-- `src/cursor-session-scope.ts` owns pi session cwd, session file/id/name/generation scope keys, and `session_start` / `session_info_changed` registration for session-agent pooling, cloud agent names, and debug grouping.
+- `src/cursor-session-scope.ts` owns pi session cwd, session file/id/name/generation scope keys, and `session_start` / `session_info_changed` registration for session-agent pooling and debug grouping.
 - `src/cursor-session-store.ts` owns per-session Cursor SDK SQLite store identity derivation, open/disposal, temporary fileless stores, and guarded removal.
 - `src/cursor-http1.ts` owns branch-scoped local HTTP/1.1 session state, global-preference override tracking, and extension-owned SDK configuration/null reset.
 - `src/cursor-sdk-platform-package.ts` owns bundled Cursor SDK platform-package resolution for ripgrep, the tree-sitter vendor directory, and `cursorsandbox`, plus the local-agent argv[1] host-entry so the SDK locator can see that package.
@@ -48,13 +48,11 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-edit-diff.ts` owns canonical edit diff fallback resolution for replay/display paths.
 - `src/cursor-record-utils.ts` owns shared record/string-key parsing and neutral unknown-value stringification helpers used across bridge and transcript layers.
 - `src/cursor-partial-content-emitter.ts` owns shared thinking/text block emission for live-run drain and turn coordinator paths.
-- `shared/cursor-cloud-lifecycle-constants.mjs` owns the canonical Cursor Cloud agent ID pattern, lifecycle entry type, and journal prefix; `src/cursor-cloud-lifecycle.ts` and `scripts/cloud-runtime-smoke.mjs` consume it for provider runtime and maintainer scripts.
 - `shared/cursor-sensitive-text.mjs` owns canonical secret scrubbing; `src/cursor-sensitive-text.ts` and maintainer scripts import it directly.
 - `shared/cursor-setting-sources.mjs` owns canonical `PI_CURSOR_SETTING_SOURCES` parsing/serialization; `src/cursor-setting-sources.ts` and maintainer scripts import it directly.
 - `src/cursor-usage-accounting.ts` owns pi usage mapping from local turn-ended and billed `Agent.getUsage()` spend, plus post-compaction occupancy floors.
 - `src/cursor-sdk-billed-usage.ts` owns `Agent.getUsage()` fetch, local usage-UUID watermarks, and billed turn selection.
 - `scripts/lib/cursor-smoke-env.mjs`, `scripts/lib/cursor-smoke-shell.sh`, and `scripts/lib/cursor-visual-render.mjs` own maintainer smoke PATH/env isolation and browser-rendered visual artifacts; smoke runners should consume these helpers instead of duplicating debug env names, sealed Node PATH logic, or xterm/Playwright rendering.
-- `scripts/lib/cloud-smoke-github.mjs` owns throwaway GitHub repository identity, provisioning, and deletion proof; `scripts/lib/cloud-smoke-cleanup-evidence.mjs` owns Cloud agent cleanup, retained evidence/provenance, and release-gate resource coordination; `scripts/lib/cloud-smoke-shutdown.mjs` owns signal-safe detached-child shutdown; `scripts/lib/cloud-smoke-pi-runner.mjs` owns print/RPC child transport; `scripts/lib/cloud-smoke-artifacts.mjs` owns metadata and lifecycle artifact readers. `scripts/cloud-runtime-smoke.mjs` keeps concrete lane orchestration.
 - `scripts/platform-smoke/artifact-bundle-contract.mjs` owns the canonical platform artifact bundle path/size/shape contract; `scripts/platform-smoke/artifact-fs-safety.mjs` owns no-follow traversal, bounded reads, extraction preflight, and spill writes; `scripts/platform-smoke/artifact-anchored-extract.mjs` plus `artifact-openat-extract.c` own descriptor-relative POSIX extraction/rollback and fail-closed Windows-controller handling; `scripts/platform-smoke/artifact-secrets.mjs` owns bundle secret-scan/redaction; `scripts/platform-smoke/wrapped-line-match.mjs` owns terminal-wrap-aware line matching. Platform smoke scripts should consume these instead of duplicating fs-safety or redaction logic.
 - `src/cursor-tool-presentation-registry.ts` is the canonical typed registry for Cursor tool names, labels, visibility, lifecycle, replay metadata (legacy wrapper names, wrapper labels, side-effect policy, call-summary policy), web remapping, alias normalization, and bridge exclusions for internal replay wrappers only (`cursor`, `cursor_*`); sibling modules derive from it.
 - `src/cursor-transcript-tool-specs.ts` owns per-tool transcript formatters and pi display builders keyed by normalized tool name; its display implementation keys must match registry entries exactly (`CURSOR_TOOL_DISPLAY_SPEC_KEYS`).
@@ -82,13 +80,10 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-tool-result-display-readers.ts` owns canonical result readers shared by transcript/replay paths, including MCP-like content display normalization.
 - `src/cursor-tool-transcript.ts` owns the raw `unknown toolCall -> transcript/display` façade; `src/cursor-transcript-tool-specs.ts`, `src/cursor-transcript-utils.ts`, and `src/cursor-transcript-tool-formatters.ts` implement spec dispatch and formatting.
 - `src/cursor-mcp-timeout-override.ts` owns Cursor SDK MCP timeout overrides: 3600s default for `callTool`, 10s default for verified initialize/listTools paths on first send, and SDK-default behavior for unknown MCP protocol stacks.
-- `src/cursor-config.ts` owns Cursor SDK config loading, parsing, source precedence, safety-cap resolution, cloud environment selection, and legacy fast-default config persistence.
-- `src/cursor-cloud-options.ts` owns cloud SDK option mapping and fail-closed preflight.
-- `src/cursor-cloud-local-state.ts` owns canonical cloud starting-ref normalization, hermetic Git probes, remote identity/refspec validation, and reasoned local-state inspection.
-- `src/cursor-cloud-lifecycle.ts` owns session-branch cloud lifecycle ledger entries and explicit `/cursor-cloud` list/archive/delete command behavior.
-- `src/cursor-durable-fs.ts` owns the canonical no-follow regular-file open (`openExistingRegularFileNoFollow`) and read-write fsync (`fsyncExistingRegularFile`) helpers used to durably fsync session/journal files without following an attacker-replaced symlink; `src/cursor-cloud-lifecycle.ts` and `src/cursor-session-agent-cleanup.ts` consume it instead of duplicating the identity-check logic.
+- `src/cursor-config.ts` owns Cursor SDK config loading, parsing, source precedence, safety-cap resolution, and legacy fast-default config persistence.
+- `src/cursor-durable-fs.ts` owns the canonical no-follow regular-file open (`openExistingRegularFileNoFollow`) and read-write fsync (`fsyncExistingRegularFile`) helpers used to durably fsync session files without following an attacker-replaced symlink; `src/cursor-session-agent-cleanup.ts` consumes it instead of duplicating the identity-check logic.
 - `src/cursor-state.ts` owns Cursor fast/mode controls, `/cursor-http` session/user persistence, `/cursor-tools`, local config refresh/cleanup wiring, and stable state re-exports.
-- `src/cursor-runtime-state.ts` owns effective Cursor config/runtime resolution, cloud/local runtime flags, runtime status helpers, cloud acknowledgement, and `/cursor-runtime` / `/cursor-cloud` wiring.
+- `src/cursor-runtime-state.ts` owns effective Cursor runtime status helpers.
 - `src/context.ts`, `src/context-window-cache.ts`, and `src/bundled-context-windows.ts` handle prompt conversion and context-window caches.
 - `src/cursor-bridge-contract.ts` owns pi bridge MCP description helpers and the exported full bridge contract text (bootstrap/manifest carry the user-facing contract; MCP descriptions use a one-line pointer).
 - `src/cursor-tool-manifest.ts` owns bootstrap callable-surface manifest text (`PI_CURSOR_TOOL_MANIFEST`, default on).
@@ -108,14 +103,14 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - CODE IS TRUTH: claims about behavior must be backed by current source code, installed dependency code/types, contract tests, or captured command output. If evidence is missing, say `unknown`; do not infer, soften, or fill gaps with assumptions.
 - Before every commit and before every push, run a thermo-nuclear/deep maintainability review on the exact diff being committed or pushed. Remediate every material finding and repeat the review until there are no remaining material findings. Do not commit or push without this review evidence.
 - Keep pi-native abstractions first: context is a model variant, thinking uses pi thinking metadata, and Cursor-only `fast` is extension state/status.
-- Preserve the default pi footer; use extension status only for Cursor-only state such as `cursor:local · fast:on`, `cursor:local · fast:off`, and `cursor:cloud · fast:n/a`.
+- Preserve the default pi footer; use extension status only for Cursor-only state such as `cursor · fast:on`, `cursor · fast:off`, and `cursor · fast:n/a`.
 - Stop discovery once package scripts, README, config files, tests, and the relevant `src/` modules explain the task. Do not broad-search `node_modules` unless debugging a dependency API.
 - Ask the user before changing public UX, published package metadata, dependency families, or behavior that requires a migration. Otherwise proceed and verify locally.
 
 ## Setup and commands
 
 - Install dependencies: `npm install` (runs `prepare`, which compiles `src/` into `dist/` — the manifest entry pi loads)
-- Build after editing `src/`: `npm run build` — required before any direct `pi -e .` run, or pi loads the previous build. The cloud/steering/local-resume/provider-debug launchers rebuild automatically (even when run directly with `node scripts/...`), `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts, and `smoke:platform*` builds inside its packed installs; only direct `pi -e .` runs need a manual build.
+- Build after editing `src/`: `npm run build` — required before any direct `pi -e .` run, or pi loads the previous build. The steering/local-resume/provider-debug launchers rebuild automatically (even when run directly with `node scripts/...`), `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts, and `smoke:platform*` builds inside its packed installs; only direct `pi -e .` runs need a manual build.
 - Run tests: `npm test`
 - Typecheck (src + tests): `npm run typecheck`
 - Typecheck src only: `npm run typecheck:src`
@@ -167,9 +162,8 @@ When plans, reviews, investigations, or generated smoke/debug artifacts are no l
 - `PI_CURSOR_SDK_EVENT_DEBUG=1` and `npm run debug:provider-events` write raw local artifacts that may include prompts, tool args/results, local paths, or secrets; keep them under gitignored `.debug/`, do not print or commit them, and keep run-scoped debug state explicit rather than process-global.
 - Ambient Cursor settings/rules loading is enabled by default through `PI_CURSOR_SETTING_SOURCES=all`; keep SDK startup log filtering intact so settings/skills output does not corrupt pi's TUI. Users can narrow or disable Cursor setting sources explicitly when desired.
 - Live `pi`/Cursor smoke tests may call external services and require Cursor auth in `~/.pi/agent/auth.json` and/or `CURSOR_API_KEY`; run them for Cursor provider/runtime changes. If auth is unavailable, report live smoke as release-blocked instead of skipped-ready. See `docs/cursor-testing-lessons.md` for isolated harness auth seeding.
-- For live runtime evidence, use `cursor/grok-4.6:slow` as much as needed. If Cursor Cloud does not support that exact model variant, use `cursor/grok-4.6`.
-- Live Cursor Cloud probes that create `bc-*` agents must capture agent/run IDs, verify archive/delete cleanup, and report any residual agent; do not assume cleanup from a passed smoke.
-- For Cursor provider/runtime changes, the canonical local runtime release and pre-commit gate is `npm run smoke:platform:all`; see `docs/platform-smoke.md`. That script runs doctor before the macOS/Ubuntu/Windows local-runtime matrix. **Fork status (2026-09-05): this gate is not yet adopted by emmaneugene/pi-cursor-sdk; see the fork note in `docs/platform-smoke.md` for the evidence bar in force.** Cloud runtime changes must also run the opt-in `npm run smoke:cloud` lane. The platform gate uses packed installs across macOS, Ubuntu, and Windows native with PTY/ConPTY capture, host-rendered xterm/PNG visual evidence, JSONL assertions, bridge diagnostics, usage/cache checks, abort cleanup, artifact manifests, and redaction scans. Use `docs/cursor-live-smoke-checklist.md`, `npm run smoke:visual`, `npm run smoke:live`, or direct `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6` runs only for inner-loop debugging and focused visual/card audits before the full platform gate. Do not mark release-ready with optional/deferred/mostly-passing platform smoke items outstanding.
+- For live runtime evidence, use `cursor/grok-4.6:slow` as much as needed.
+- For Cursor provider/runtime changes, the canonical local runtime release and pre-commit gate is `npm run smoke:platform:all`; see `docs/platform-smoke.md`. That script runs doctor before the macOS/Ubuntu/Windows local-runtime matrix. **Fork status (2026-09-05): this gate is not yet adopted by emmaneugene/pi-cursor-sdk; see the fork note in `docs/platform-smoke.md` for the evidence bar in force.** The platform gate uses packed installs across macOS, Ubuntu, and Windows native with PTY/ConPTY capture, host-rendered xterm/PNG visual evidence, JSONL assertions, bridge diagnostics, usage/cache checks, abort cleanup, artifact manifests, and redaction scans. Use `docs/cursor-live-smoke-checklist.md`, `npm run smoke:visual`, `npm run smoke:live`, or direct `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6` runs only for inner-loop debugging and focused visual/card audits before the full platform gate. Do not mark release-ready with optional/deferred/mostly-passing platform smoke items outstanding.
 
 ## PR review workflow (maintainer)
 
@@ -192,7 +186,7 @@ Before publishing any npm/GitHub release or tagging release-ready status:
 
 Before **every commit** that touches Cursor provider/runtime, prompt/session send policy, agents-context dedup, bridge, replay, or related extension wiring:
 
-- Run the canonical local platform gate: `npm run smoke:platform:all` (see `docs/platform-smoke.md`; it runs doctor first). Also run `npm run smoke:cloud` when the commit touches actual cloud runtime execution.
+- Run the canonical local platform gate: `npm run smoke:platform:all` (see `docs/platform-smoke.md`; it runs doctor first).
 - Use `npm run smoke:live` (`scripts/tmux-live-smoke.sh`), `npm run smoke:visual` (`scripts/visual-tui-smoke.mjs`), `npm run smoke:isolated`, or direct `pi -e . --cursor-no-fast --model cursor/grok-4.6` only as inner-loop/debug helpers when narrowing a specific failure before the platform gate. For card/color claims, capture ANSI from the offscreen TUI, render it through the canonical browser/xterm path, save PNG evidence, and inspect JSONL.
 - If Cursor auth (`~/.pi/agent/auth.json` or `CURSOR_API_KEY`) or required Crabbox/platform resources are unavailable, **do not commit**—report blocked, not skipped-ready.
 - Unit tests (`npm test`, `npm run typecheck`) are necessary but not sufficient for these commits.
@@ -204,19 +198,3 @@ For multi-step or tool-heavy work, give short progress updates after meaningful 
 ## Updating this file
 
 Keep this file concise and repo-specific. Update it when commands, package layout, safety constraints, or validation expectations change. Put specialized subdirectory rules in a nested `AGENTS.md` only when that subtree has materially different commands or constraints.
-
-## Cursor Cloud specific instructions
-
-This is a `pi` provider extension (not a server/web app). "Running the app" means launching `pi` with this extension loaded. Standard commands live in `## Setup and commands`; only the non-obvious caveats are below.
-
-- Dependencies install with `npm install` (this triggers `prepare`, which compiles `src/` to `dist/`; the pi manifest loads `dist/index.js`). After editing `src/`, run `npm run build` before any `pi -e .` run or the extension loads the previous build.
-- Node: `engines` requires `>=22.19.0`. Prefer a compliant Node on `PATH` for tests and live `pi` (for example `nvm use 22.22.2`). Older Node may run some commands but is unsupported.
-- `CURSOR_API_KEY` is provided as a cloud-agent secret, so live Cursor runs and full live model discovery work without `/login`. `npm test`, `npm run typecheck`, and `npm pack --dry-run` need no key.
-- Run the extension locally with `./node_modules/.bin/pi -e . --model cursor/grok-4.6` (the bare `pi` is not on `PATH`). Add `--approve` for interactive sessions; print-mode smoke: `./node_modules/.bin/pi -e . --model cursor/grok-4.6 --cursor-no-fast --no-session -p "..."`.
-- Cold-start gotcha: the *first* Cursor SDK run in a fresh VM can take several minutes (SDK/transport warm-up); subsequent runs complete in ~10s. Warm up with one throwaway run before any timing-sensitive or recorded demo, and don't treat a slow first run as a hang.
-- When capturing print-mode (`-p`) output, redirect stdout to a file rather than piping through `tail`/`head` — those pipes buffer until the process exits, hiding streaming progress.
-- Use sessionful runs (`--session-dir`/`--session-id`, not `--no-session`) when testing session ledgers, resume identity, branch/fork/clone/switch behavior, or slash commands such as `/cursor-cloud`; `--no-session` is only proof for one-shot provider behavior.
-- For slow cloud or slash-command probes, prefer print mode for model turns or raw JSONL RPC with an explicit timeout; the packaged `RpcClient` has a fixed 30s request timeout that can falsely fail long cloud operations.
-- Basic setup validation here is unit/typecheck/print-mode only. `npm run smoke:platform:all` remains the maintainer local-runtime release/pre-commit gate and needs the full macOS/Ubuntu/Windows matrix hosts; a Linux-only cloud agent cannot satisfy that gate. Treat Linux-only `smoke:visual` / `smoke:local-resume` / `smoke:platform:doctor` results as partial evidence, not release-ready.
-- Visual smoke (`npm run smoke:visual`) needs `pi` on `PATH` (`export PATH="$PWD/node_modules/.bin:$PATH"`) and Playwright Chromium (`npx playwright install chromium`) for PNG capture; use `--no-screenshot` if Chromium is unavailable.
-- `npm run smoke:live` needs `pi` on `PATH`. Prefer `./node_modules/.bin` on `PATH` rather than relying on a global install.

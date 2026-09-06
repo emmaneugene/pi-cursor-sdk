@@ -1,6 +1,6 @@
 # Cursor Testing Lessons
 
-> **Platform Smoke:** The required local cross-platform release gate is `npm run smoke:platform:all`; cloud-runtime changes additionally require `npm run smoke:cloud`. See [the platform smoke runbook](./platform-smoke.md). For portable guidance, see the [implementation reference](./platform-smoke-implementation.md#portability-to-other-pi-extensions) and the repo-local `docs/pi-extension-platform-testing.md` from a Crabbox checkout. The live smoke checklist remains useful for inner-loop development but is not the release gate.
+> **Platform Smoke:** The required cross-platform release gate is `npm run smoke:platform:all`. See [the platform smoke runbook](./platform-smoke.md). For portable guidance, see the [implementation reference](./platform-smoke-implementation.md#portability-to-other-pi-extensions) and the repo-local `docs/pi-extension-platform-testing.md` from a Crabbox checkout. The live smoke checklist remains useful for inner-loop development but is not the release gate.
 
 ## Purpose
 
@@ -203,7 +203,7 @@ Pass criteria:
 
 ## Local validation ladder
 
-Run local checks first, then the local platform smoke gate before claiming release-ready for provider/runtime changes. Add `npm run smoke:cloud` for cloud-runtime changes:
+Run local checks first, then the platform smoke gate before claiming release-ready for provider/runtime changes:
 
 ```bash
 npm test
@@ -214,7 +214,6 @@ npm run smoke:isolated            # inner-loop helper; requires auth.json or CUR
 npm run smoke:live                # inner-loop partial tmux checklist subset
 npm run smoke:platform:doctor
 npm run smoke:platform:all
-npm run smoke:cloud              # required for cloud-runtime changes
 ```
 
 After changing `scripts/validate-smoke-jsonl.mjs` or replay scan expectations, also run:
@@ -223,13 +222,12 @@ After changing `scripts/validate-smoke-jsonl.mjs` or replay scan expectations, a
 npm test -- test/validate-smoke-jsonl.test.ts
 ```
 
-Then use the [Cursor live smoke checklist](./cursor-live-smoke-checklist.md) only for focused inner-loop surfaces the scripts do not cover (bridge MCP, abort/cancel, full TUI observation, packaging review, cleanup) before rerunning the local platform smoke gate and, for cloud-runtime changes, `npm run smoke:cloud`.
+Then use the [Cursor live smoke checklist](./cursor-live-smoke-checklist.md) only for focused inner-loop surfaces the scripts do not cover (bridge MCP, abort/cancel, full TUI observation, packaging review, cleanup) before rerunning the platform smoke gate.
 
 ## What belongs in CI vs platform/manual smoke
 
 - **CI / default `npm test`:** mocked provider tests, extension lifecycle tests, JSONL validator tests, script syntax/help checks. No live Cursor calls.
 - **Local platform release gate:** `npm run smoke:platform:all` (runs doctor first). Requires real Cursor auth and cross-platform Crabbox setup.
-- **Cloud runtime release gate:** `npm run smoke:cloud` for PRs that touch actual cloud runtime execution.
 - **Focused manual smoke:** `npm run smoke:isolated`, `npm run smoke:live`, and selected live-checklist sections for inner-loop debugging of behavior mocks cannot reproduce.
 
 If platform smoke auth or target setup is unavailable, report the release as **blocked**, not skipped-ready.

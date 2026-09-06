@@ -131,7 +131,7 @@ describe("installed Cursor SDK turn-ended usage contract", () => {
 			expect(isCursorSdkUsageSafeForPiMessage(turn!, model)).toBe(true);
 
 			const partial = makeAssistantMessage();
-			applyCursorUsage(partial, model, context, 7, { runtime: "local", turn: turn! });
+			applyCursorUsage(partial, model, context, 7, { turn: turn! });
 			expect(partial.usage).toMatchObject(fixture.expectedPiMappingFromRawTurnEnded[index]!);
 			expect(
 				partial.usage.input + partial.usage.cacheRead + partial.usage.cacheWrite + partial.usage.output,

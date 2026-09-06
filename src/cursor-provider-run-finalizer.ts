@@ -10,7 +10,6 @@ import {
 	resolveCursorSdkAbortCause,
 	sanitizeCursorProviderError,
 } from "./cursor-provider-errors.js";
-import type { CursorRuntime } from "./cursor-config.js";
 import { CursorLiveRunAbortError } from "./cursor-live-run-coordinator.js";
 import {
 	buildIncompleteCursorToolRunOutcome,
@@ -25,7 +24,6 @@ import type {
 	CursorProviderTurnSend,
 	CursorProviderTurnSendResult,
 	LiveCursorProviderTurnRuntime,
-	LocalCursorProviderTurnPrepareResult,
 } from "./cursor-provider-turn-types.js";
 import { applyCursorUsage } from "./cursor-usage-accounting.js";
 import { hasUsableText } from "./cursor-record-utils.js";
@@ -35,13 +33,12 @@ export type CursorTurnTerminalEvent =
 			kind: "direct";
 			prepared: CursorProviderTurnPrepareResult;
 			outcome: CursorRunOutcome;
-			displayOnlyTraceBlock?: string;
 	  }
 	| { kind: "error"; prepared: CursorProviderTurnPrepareResult | undefined; error: unknown };
 
 function applyLiveRunOutcome(
 	outcome: CursorRunOutcome,
-	prepared: LocalCursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime },
+	prepared: CursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime },
 	context: CursorProviderTurnRunnerParams["context"],
 ): void {
 	if (prepared.runtime.liveRun.disposed) return;
@@ -71,12 +68,11 @@ export interface CursorRunFinalizerParams {
 	sdkEventDebug: () => CursorSdkEventDebugSink | undefined;
 	sdkProcessErrorGuard: ReturnType<typeof installCursorSdkProcessErrorGuard>;
 	resolvedApiKey: () => string | undefined;
-	runtimeTarget: () => CursorRuntime | undefined;
 }
 
 export interface StartCursorLiveRunCompletionParams {
 	send: CursorProviderTurnSend;
-	prepared: LocalCursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime };
+	prepared: CursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime };
 	modelId: string;
 	discardIncompleteTools: (outcome: IncompleteCursorToolRunOutcomeInput) => void;
 }
@@ -114,7 +110,7 @@ export class CursorRunFinalizer {
 				if (!liveRun.disposed) {
 					cursorLiveRuns.markError(
 						liveRun,
-						sanitizeCursorProviderError(error, this.params.resolvedApiKey() ?? runnerParams.options?.apiKey, "local"),
+						sanitizeCursorProviderError(error, this.params.resolvedApiKey() ?? runnerParams.options?.apiKey),
 					);
 				}
 				this.safeCleanup(() => sdkEventDebug?.recordWaitResult({ status: "error", error: String(error) }));
@@ -129,7 +125,7 @@ export class CursorRunFinalizer {
 	async applyTerminalEvent(event: CursorTurnTerminalEvent): Promise<void> {
 		if (this.terminalApplied) return;
 		if (event.kind === "direct") {
-			await this.applyDirectOutcome(event.prepared, event.outcome, event.displayOnlyTraceBlock);
+			await this.applyDirectOutcome(event.prepared, event.outcome);
 			this.terminalApplied = true;
 			return;
 		}
@@ -165,7 +161,6 @@ export class CursorRunFinalizer {
 	private async applyDirectOutcome(
 		prepared: CursorProviderTurnPrepareResult,
 		outcome: CursorRunOutcome,
-		displayOnlyTraceBlock: string | undefined,
 	): Promise<void> {
 		const { stream, partial, model, context } = this.params.runnerParams;
 		prepared.runtime.turnCoordinator.closeTraceBlock();
@@ -184,12 +179,10 @@ export class CursorRunFinalizer {
 					outcome.kind === "finished" && hasUsableText(outcome.finalText) ? [outcome.finalText] : [],
 				);
 				applyCursorUsage(partial, model, context, prepared.meta.promptInputTokens, {
-					runtime: prepared.runtimeTarget,
 					turn: prepared.runtime.turnCoordinator.lastSdkTurnUsage,
 					billed: prepared.runtime.billedTurnUsage,
 				});
 				if (prepared.meta.resumeNotice) emitDisplayOnlyTraceBlock(stream, partial, prepared.meta.resumeNotice);
-				if (displayOnlyTraceBlock) emitDisplayOnlyTraceBlock(stream, partial, displayOnlyTraceBlock);
 				stream.push({ type: "done", reason: "stop", message: partial });
 				break;
 		}
@@ -219,7 +212,6 @@ export class CursorRunFinalizer {
 				sanitizeCursorProviderError(
 					error,
 					this.params.resolvedApiKey() ?? this.params.runnerParams.options?.apiKey,
-					prepared?.runtimeTarget ?? this.params.runtimeTarget(),
 				),
 			);
 		}

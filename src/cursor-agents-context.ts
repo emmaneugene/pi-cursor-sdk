@@ -11,7 +11,6 @@ import {
 	resolveCursorSettingSources,
 } from "./cursor-setting-sources.js";
 import type { SettingSource } from "@cursor/sdk";
-import type { CursorRuntime } from "./cursor-config.js";
 export const CURSOR_PRESERVE_PI_AGENTS_MD_ENV = "PI_CURSOR_PRESERVE_PI_AGENTS_MD";
 
 /** Opening tag prefix pi `buildSystemPrompt()` uses for each context file (path attribute only). */
@@ -152,9 +151,8 @@ export function resolveCursorFacingSystemPrompt(
 	systemPromptOptions?: BuildSystemPromptOptions,
 	settingSourcesRaw?: string,
 	agentDir?: string,
-	runtime: CursorRuntime = "local",
 ): string {
-	if (runtime === "cloud" || !systemPromptOptions) return systemPrompt;
+	if (!systemPromptOptions) return systemPrompt;
 	const contextFiles = systemPromptOptions.contextFiles ?? [];
 	const settingSources =
 		settingSourcesRaw === undefined

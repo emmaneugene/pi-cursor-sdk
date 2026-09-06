@@ -174,8 +174,7 @@ Update:
 
 They must state:
 
-- required local release gate is `npm run smoke:platform:all`;
-- cloud-runtime changes additionally require `npm run smoke:cloud`;
+- required release gate is `npm run smoke:platform:all`;
 - legacy smoke scripts are inner-loop/debug helpers;
 - `tmux` visual smoke is not the canonical cross-platform gate.
 

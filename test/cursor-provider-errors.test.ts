@@ -1,4 +1,3 @@
-import { AuthenticationError, IntegrationNotConnectedError } from "@cursor/sdk";
 import { describe, expect, it } from "vitest";
 import {
 	classifyCursorConnectError,
@@ -224,64 +223,6 @@ describe("cursor-provider-errors", () => {
 			"invalid or unauthorized",
 		);
 		expect(sanitizeCursorProviderError(new Error("Bearer secret-key"), "secret-key")).not.toContain("secret-key");
-	});
-
-	it("uses the installed AuthenticationError class only for cloud guidance", () => {
-		const error = new AuthenticationError("Invalid User API Key at https://alice:pw@api.cursor.com");
-		const localMessage = "Invalid User API Key at https://[redacted]@api.cursor.com";
-		const cloudMessage =
-			"Cursor Cloud Agents request failed because Cloud API authentication rejected the API key. Use a user API key from Cursor Dashboard -> API Keys or a service account API key from Team settings; Team Admin API keys are not supported as Cursor Cloud Agents credentials. Configure the key with /login -> Use an API key -> Cursor, CURSOR_API_KEY, or --api-key, then retry.";
-
-		expect(sanitizeCursorProviderError(error, "secret-key")).toBe(localMessage);
-		expect(sanitizeCursorProviderError(error, "secret-key", "local")).toBe(localMessage);
-		expect(sanitizeCursorProviderError(error, "secret-key", "cloud")).toBe(cloudMessage);
-		expect(cloudMessage).not.toMatch(/secret-key|alice|pw/);
-	});
-
-	it("preserves scrubbed installed IntegrationNotConnectedError remediation", () => {
-		const error = new IntegrationNotConnectedError(
-			"[integration_not_connected] GitHub integration requires Bearer secret-key.",
-			{
-				helpUrl: "https://alice:pw@cursor.com/settings/integrations?token=help-secret",
-				provider: "github",
-			},
-		);
-		const message = sanitizeCursorProviderError(error, "secret-key", "cloud");
-
-		expect(message).toBe(
-			"[integration_not_connected] GitHub integration requires Bearer [redacted]. Connect the github integration: https://cursor.com/settings/integrations?token=[redacted]",
-		);
-		expect(message).not.toMatch(/secret-key|help-secret|alice|pw@|Bearer secret-key/);
-	});
-
-	it.each([
-		"https://cursor.com/settings/integrations/secret%2Fkey",
-		"https://cursor.com/settings/integrations?next=secret%2Fkey",
-		"https://cursor.com/settings/integrations#secret%2Fkey",
-	])("scrubs an encoded API key from IntegrationNotConnectedError help URL %s", (helpUrl) => {
-		const error = new IntegrationNotConnectedError("Connect the integration.", {
-			helpUrl,
-			provider: "github",
-		});
-		const message = sanitizeCursorProviderError(error, "secret/key", "cloud");
-
-		expect(message).toContain("https://cursor.com/settings/integrations");
-		expect(message).not.toMatch(/secret(?:%2F|\/)key/i);
-	});
-
-	it.each([
-		"http://cursor.com/settings/integrations?token=secret-key",
-		"javascript:alert('secret-key')",
-		"not a URL with secret-key",
-	])("omits non-HTTPS IntegrationNotConnectedError help URL %s", (helpUrl) => {
-		const error = new IntegrationNotConnectedError("Connect the integration.", {
-			helpUrl,
-			provider: "github",
-		});
-		const message = sanitizeCursorProviderError(error, "secret-key", "cloud");
-
-		expect(message).toBe("Connect the integration. Connect the github integration.");
-		expect(message).not.toContain("secret-key");
 	});
 
 	it("preserves scrubbed run failure metadata in provider errors", () => {

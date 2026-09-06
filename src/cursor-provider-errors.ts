@@ -1,5 +1,4 @@
 import type { RunError, RunResult } from "@cursor/sdk";
-import type { CursorRuntime } from "./cursor-config.js";
 import { asRecord } from "./cursor-record-utils.js";
 import { scrubSensitiveText } from "./cursor-sensitive-text.js";
 
@@ -9,8 +8,6 @@ const GENERIC_CURSOR_SDK_ERROR_MESSAGE =
 	"Cursor SDK request failed. The Cursor SDK API key may be missing, invalid, or unauthorized. Cursor Agent CLI/Desktop login is not reused. Run /login -> Use an API key -> Cursor, verify CURSOR_API_KEY, or pass --api-key, then retry.";
 const AUTH_CURSOR_SDK_ERROR_MESSAGE =
 	"Cursor SDK request failed because the Cursor SDK API key may be invalid or unauthorized. Cursor Agent CLI/Desktop login is not reused. Run /login -> Use an API key -> Cursor, verify CURSOR_API_KEY, or pass --api-key, then retry.";
-const CLOUD_AUTH_CURSOR_SDK_ERROR_MESSAGE =
-	"Cursor Cloud Agents request failed because Cloud API authentication rejected the API key. Use a user API key from Cursor Dashboard -> API Keys or a service account API key from Team settings; Team Admin API keys are not supported as Cursor Cloud Agents credentials. Configure the key with /login -> Use an API key -> Cursor, CURSOR_API_KEY, or --api-key, then retry.";
 // Keep "Network error" aligned with pi's agent-level retry classifier.
 const NETWORK_CURSOR_SDK_ERROR_MESSAGE =
 	"Network error: Cursor SDK request failed during network or service I/O. Check your connection; pi will retry automatically when auto-retry is enabled.";
@@ -45,54 +42,6 @@ function getErrorStringField(record: Record<string, unknown> | undefined, key: s
 
 function getErrorName(error: unknown, record: Record<string, unknown> | undefined): string | undefined {
 	return error instanceof Error ? error.name : getErrorStringField(record, "name");
-}
-
-function scrubHttpsHelpUrl(helpUrl: string | undefined, apiKey: string | undefined): string | undefined {
-	if (!helpUrl) return undefined;
-	try {
-		const url = new URL(helpUrl);
-		if (url.protocol !== "https:") return undefined;
-		url.username = "";
-		url.password = "";
-		url.pathname = url.pathname
-			.split("/")
-			.map((segment) => {
-				const decoded = decodeURIComponent(segment);
-				const scrubbed = scrubSensitiveText(decoded, apiKey);
-				return scrubbed === decoded ? segment : encodeURIComponent(scrubbed);
-			})
-			.join("/");
-		const scrubbedParams = new URLSearchParams();
-		for (const [name, value] of url.searchParams) {
-			const scrubbedName = scrubSensitiveText(name, apiKey);
-			const scrubbedPair = scrubSensitiveText(`${name}=${value}`, apiKey);
-			scrubbedParams.append(scrubbedName, scrubbedPair === `${name}=${value}` ? value : "[redacted]");
-		}
-		url.search = scrubbedParams.toString();
-		if (url.hash) {
-			const decoded = decodeURIComponent(url.hash.slice(1));
-			const scrubbed = scrubSensitiveText(decoded, apiKey);
-			if (scrubbed !== decoded) url.hash = encodeURIComponent(scrubbed);
-		}
-		return scrubSensitiveText(url.href, apiKey).trim() || undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-function formatIntegrationNotConnectedError(
-	error: unknown,
-	record: Record<string, unknown> | undefined,
-	scrubbedMessage: string,
-	apiKey: string | undefined,
-): string | undefined {
-	if (getErrorName(error, record) !== "IntegrationNotConnectedError") return undefined;
-	const provider = scrubSensitiveText(getErrorStringField(record, "provider") ?? "", apiKey).trim();
-	if (!provider) return undefined;
-	const message = scrubbedMessage || "Cursor Cloud integration is not connected.";
-	const punctuation = /[.!?]$/.test(message) ? "" : ".";
-	const helpUrl = scrubHttpsHelpUrl(getErrorStringField(record, "helpUrl"), apiKey);
-	return `${message}${punctuation} Connect the ${provider} integration${helpUrl ? `: ${helpUrl}` : "."}`;
 }
 
 function getErrorStack(error: unknown, record: Record<string, unknown> | undefined): string {
@@ -352,23 +301,14 @@ export function resolveCursorSdkAbortCause(options: {
 export function sanitizeCursorProviderError(
 	error: unknown,
 	apiKey?: string,
-	runtimeTarget?: CursorRuntime,
 ): string {
 	const record = asRecord(error);
 	const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
 	if (message === MISSING_CURSOR_API_KEY_MESSAGE) return MISSING_CURSOR_API_KEY_MESSAGE;
 	const scrubbed = scrubSensitiveText(message, apiKey).trim();
-	const integrationMessage = runtimeTarget === "cloud"
-		? formatIntegrationNotConnectedError(error, record, scrubbed, apiKey)
-		: undefined;
-	if (integrationMessage) return integrationMessage;
 	const connectClassification = classifyCursorConnectError(error);
-	if (
-		(runtimeTarget === "cloud" && getErrorName(error, record) === "AuthenticationError") ||
-		connectClassification?.kind === "unauthenticated" ||
-		isLikelyAuthError(scrubbed)
-	) {
-		return runtimeTarget === "cloud" ? CLOUD_AUTH_CURSOR_SDK_ERROR_MESSAGE : AUTH_CURSOR_SDK_ERROR_MESSAGE;
+	if (connectClassification?.kind === "unauthenticated" || isLikelyAuthError(scrubbed)) {
+		return AUTH_CURSOR_SDK_ERROR_MESSAGE;
 	}
 	if (connectClassification?.kind === "network" || isCursorSdkConnectionStalledError(error) || isLikelyNetworkTimeout(scrubbed)) return NETWORK_CURSOR_SDK_ERROR_MESSAGE;
 	if (isGenericCursorRunFailureMessage(scrubbed)) return RETRYABLE_CURSOR_RUN_FAILURE_PREFIX;

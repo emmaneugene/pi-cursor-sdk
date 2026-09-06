@@ -4,11 +4,8 @@ import { resolveCursorSdkConfig, type CursorResolvedSdkConfig } from "../src/cur
 import { installCursorSdkProcessErrorGuard } from "../src/cursor-sdk-process-error-guard.js";
 import { makeAssistantMessage, makeContext, makeModel } from "./helpers/pi-harness.js";
 
-function makeResolvedConfig(runtime: "local" | "cloud"): CursorResolvedSdkConfig {
-	return resolveCursorSdkConfig({
-		env: {},
-		builtIn: { runtime, cloud: { contextHandoff: "bootstrap" } },
-	});
+function makeResolvedConfig(): CursorResolvedSdkConfig {
+	return resolveCursorSdkConfig({ env: {} });
 }
 
 const { mockResolveCursorProviderTurnConfig, mockPrepareCursorProviderTurn } = vi.hoisted(() => ({
@@ -31,7 +28,7 @@ vi.mock("../src/cursor-provider-live-run-drain.js", async (importOriginal) => {
 		...actual,
 		drainExistingCursorLiveRunBeforeSend: vi.fn(async () => {
 			// Simulate the config changing underneath the turn while the drain await is in flight.
-			mockResolveCursorProviderTurnConfig.mockReturnValue(makeResolvedConfig("cloud"));
+			mockResolveCursorProviderTurnConfig.mockReturnValue(makeResolvedConfig());
 			return "continue_send";
 		}),
 	};
@@ -41,7 +38,7 @@ describe("CursorProviderTurnRunner config snapshotting (F3)", () => {
 	it("resolves the effective config exactly once per turn and threads the same snapshot into prepare, even if config changes during drain", async () => {
 		const { CursorProviderTurnRunner } = await import("../src/cursor-provider-turn-runner.js");
 
-		const localSnapshot = makeResolvedConfig("local");
+		const localSnapshot = makeResolvedConfig();
 		mockResolveCursorProviderTurnConfig.mockReturnValueOnce(localSnapshot);
 		const prepareMarker = new Error("stop after prepare capture");
 		mockPrepareCursorProviderTurn.mockImplementation(async () => {
@@ -63,6 +60,6 @@ describe("CursorProviderTurnRunner config snapshotting (F3)", () => {
 		expect(mockPrepareCursorProviderTurn).toHaveBeenCalledTimes(1);
 		const preparedCallArgs = mockPrepareCursorProviderTurn.mock.calls[0]?.[0] as { resolvedConfig: CursorResolvedSdkConfig };
 		expect(preparedCallArgs.resolvedConfig).toBe(localSnapshot);
-		expect(preparedCallArgs.resolvedConfig.runtime.value).toBe("local");
+		expect(preparedCallArgs.resolvedConfig.local.resume.value).toBe(true);
 	});
 });

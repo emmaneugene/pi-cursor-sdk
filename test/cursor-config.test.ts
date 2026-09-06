@@ -5,19 +5,6 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	CURSOR_AUTO_REVIEW_ENV,
-	CURSOR_CLOUD_ALLOW_LOCAL_STATE_ENV,
-	CURSOR_CLOUD_AUTO_CREATE_PR_ENV,
-	CURSOR_CLOUD_BRANCH_ENV,
-	CURSOR_CLOUD_CONTEXT_ENV,
-	CURSOR_CLOUD_DIRECT_PUSH_ENV,
-	CURSOR_CLOUD_ENV_ENV,
-	CURSOR_CLOUD_ENV_FROM_FILES_ENV,
-	CURSOR_CLOUD_ENV_NAME_ENV,
-	CURSOR_CLOUD_ENV_TYPE_ENV,
-	CURSOR_CLOUD_ACK_ENV,
-	CURSOR_CLOUD_REPO_ENV,
-	CURSOR_CLOUD_SKIP_REVIEWER_REQUEST_ENV,
-	CURSOR_RUNTIME_ENV,
 	CURSOR_SANDBOX_ENV,
 	CURSOR_LOCAL_FORCE_ENV,
 	CURSOR_LOCAL_RESUME_ENV,
@@ -80,26 +67,6 @@ describe("Cursor SDK config resolver", () => {
 		rmSync(root, { recursive: true, force: true });
 	});
 
-	it("resolves ordinary settings by CLI, env, trusted project, user, built-in order", () => {
-		const user = { runtime: "cloud" as const };
-		const project = { runtime: "local" as const };
-
-		expect(resolveCursorSdkConfig({ user }).runtime).toMatchObject({ value: "cloud", source: "user", trustLevel: "user" });
-		expect(resolveCursorSdkConfig({ user, project }).runtime).toMatchObject({
-			value: "local",
-			source: "project",
-			trustLevel: "trusted-project",
-		});
-		expect(resolveCursorSdkConfig({ env: { [CURSOR_RUNTIME_ENV]: "cloud" }, user, project }).runtime).toMatchObject({
-			value: "cloud",
-			source: "environment",
-		});
-		expect(
-			resolveCursorSdkConfig({ cli: { runtime: "local" }, env: { [CURSOR_RUNTIME_ENV]: "cloud" }, user, project }).runtime,
-		).toMatchObject({ value: "local", source: "cli", trustLevel: "one-shot" });
-		expect(resolveCursorSdkConfig().runtime).toMatchObject({ value: "local", source: "builtin" });
-	});
-
 	it("resolves HTTP/1.1 as session, env, user, then byte-identical default", () => {
 		const user = { local: { useHttp1ForAgent: true } };
 		const project = { local: { useHttp1ForAgent: false } };
@@ -157,44 +124,6 @@ describe("Cursor SDK config resolver", () => {
 		expect(resolveCursorSdkConfig({ env: {} }).bridge.excludeTools).toMatchObject({ value: [], source: "builtin" });
 	});
 
-	it("rejects invalid explicit CLI runtime and cloud-context overrides before lower layers", () => {
-		expect(() => resolveCursorSdkConfig({
-			cli: { runtime: "remote" },
-			env: { [CURSOR_RUNTIME_ENV]: "cloud" },
-		})).toThrow('Invalid --cursor-runtime "remote". Use "local" or "cloud".');
-		expect(() => resolveCursorSdkConfig({
-			cli: { cloud: { contextHandoff: "reuse" } },
-			user: { cloud: { contextHandoff: "bootstrap" } },
-		})).toThrow('Invalid --cursor-cloud-context "reuse". Use "never", "fresh", or "bootstrap".');
-	});
-
-	it("rejects invalid explicit env runtime and cloud-context overrides before lower config", () => {
-		expect(() => resolveCursorSdkConfig({
-			env: { [CURSOR_RUNTIME_ENV]: "remote" },
-			user: { runtime: "cloud" },
-		})).toThrow('Invalid PI_CURSOR_RUNTIME "remote". Use "local" or "cloud".');
-		expect(() => resolveCursorSdkConfig({
-			env: { [CURSOR_CLOUD_CONTEXT_ENV]: "reuse" },
-			user: { runtime: "cloud", cloud: { contextHandoff: "bootstrap" } },
-		})).toThrow('Invalid PI_CURSOR_CLOUD_CONTEXT "reuse". Use "never", "fresh", or "bootstrap".');
-	});
-
-	it("rejects a nonempty cloud env request when every name is malformed or forbidden", () => {
-		expect(() => resolveCursorSdkConfig({
-			env: { [CURSOR_CLOUD_ENV_ENV]: "bad-name,CURSOR_SECRET,9INVALID" },
-		})).toThrow("Invalid PI_CURSOR_CLOUD_ENV: no valid environment variable names were requested.");
-	});
-
-	it("loads cloud PR controls from user JSON", () => {
-		const path = getCursorSdkUserConfigPath(agentDir);
-		mkdirSync(agentDir, { recursive: true });
-		writeFileSync(path, JSON.stringify({ cloud: { autoCreatePR: true, skipReviewerRequest: false } }));
-
-		const resolved = resolveCursorSdkConfig({ env: {}, user: loadCursorSdkUserConfig(path) });
-		expect(resolved.cloud.autoCreatePR).toMatchObject({ value: true, source: "user" });
-		expect(resolved.cloud.skipReviewerRequest).toMatchObject({ value: false, source: "user" });
-	});
-
 	it("keeps legacy fastDefaults shape compatible and writes user config as 0600", () => {
 		const path = getCursorSdkUserConfigPath(agentDir);
 		mkdirSync(agentDir, { recursive: true });
@@ -221,11 +150,11 @@ describe("Cursor SDK config resolver", () => {
 			chmodSync(projectPath, 0o640);
 		}
 
-		saveCursorSdkUserConfig({ runtime: "cloud" }, userPath);
-		saveCursorSdkProjectConfig(cwd, { runtime: "local" });
+		saveCursorSdkUserConfig({ local: { resume: false } }, userPath);
+		saveCursorSdkProjectConfig(cwd, { local: { resume: true } });
 
-		expect(JSON.parse(readFileSync(userPath, "utf8"))).toEqual({ runtime: "cloud" });
-		expect(JSON.parse(readFileSync(projectPath, "utf8"))).toEqual({ runtime: "local" });
+		expect(JSON.parse(readFileSync(userPath, "utf8"))).toEqual({ local: { resume: false } });
+		expect(JSON.parse(readFileSync(projectPath, "utf8"))).toEqual({ local: { resume: true } });
 		if (process.platform !== "win32") {
 			expect(statSync(userPath).mode & 0o777).toBe(0o660);
 			expect(statSync(projectPath).mode & 0o777).toBe(0o640);
@@ -238,7 +167,7 @@ describe("Cursor SDK config resolver", () => {
 		const newCwd = join(root, "new-repo");
 		mkdirSync(newCwd);
 
-		saveCursorSdkProjectConfig(newCwd, { runtime: "local" });
+		saveCursorSdkProjectConfig(newCwd, { local: { resume: true } });
 
 		expect(statSync(getCursorSdkProjectConfigPath(newCwd)).mode & 0o777).toBe(0o666 & ~process.umask());
 	});
@@ -263,17 +192,17 @@ describe("Cursor SDK config resolver", () => {
 	it("loads project config only from the caller's snapshotted trust decision", () => {
 		const projectPath = getCursorSdkProjectConfigPath(cwd);
 		mkdirSync(join(cwd, ".pi"), { recursive: true });
-		writeFileSync(projectPath, JSON.stringify({ runtime: "cloud" }));
+		writeFileSync(projectPath, JSON.stringify({ local: { resume: false } }));
 
 		expect(loadCursorSdkConfig({ cwd, agentDir, projectTrusted: false })).toEqual({ user: {} });
-		expect(loadCursorSdkConfig({ cwd, agentDir, projectTrusted: true })).toEqual({ user: {}, project: { runtime: "cloud" } });
+		expect(loadCursorSdkConfig({ cwd, agentDir, projectTrusted: true })).toEqual({ user: {}, project: { local: { resume: false } } });
 	});
 
 	it("loads raw config objects for updates and rejects invalid files", () => {
 		const path = getCursorSdkUserConfigPath(agentDir);
 		mkdirSync(agentDir, { recursive: true });
-		writeFileSync(path, JSON.stringify({ runtime: "local", future: { enabled: true } }));
-		expect(loadCursorSdkConfigForUpdate(path)).toEqual({ runtime: "local", future: { enabled: true } });
+		writeFileSync(path, JSON.stringify({ local: { resume: false }, future: { enabled: true } }));
+		expect(loadCursorSdkConfigForUpdate(path)).toEqual({ local: { resume: false }, future: { enabled: true } });
 
 		const sentinel = "PI_CURSOR_MALFORMED_SECRET";
 		writeFileSync(path, `{"secret":"${sentinel}`);
@@ -312,13 +241,13 @@ describe("Cursor SDK config resolver", () => {
 	it("times out without changing config or removing an existing lock", () => {
 		const path = getCursorSdkUserConfigPath(agentDir);
 		mkdirSync(agentDir, { recursive: true });
-		writeFileSync(path, '{"runtime":"local"}\n');
+		writeFileSync(path, '{"local":{"resume":false}}\n');
 		writeFileSync(`${path}.lock`, "existing");
 		try {
-			expect(() => updateCursorSdkConfig(path, (current) => ({ ...current, runtime: "cloud" }))).toThrow(
+			expect(() => updateCursorSdkConfig(path, (current) => ({ ...current, local: { resume: true } }))).toThrow(
 				"Timed out waiting for Cursor SDK config lock",
 			);
-			expect(readFileSync(path, "utf8")).toBe('{"runtime":"local"}\n');
+			expect(readFileSync(path, "utf8")).toBe('{"local":{"resume":false}}\n');
 			expect(readFileSync(`${path}.lock`, "utf8")).toBe("existing");
 		} finally {
 			rmSync(`${path}.lock`, { force: true });
@@ -328,9 +257,9 @@ describe("Cursor SDK config resolver", () => {
 	it("cleans locks and temporary files on update, parse, and replacement failures", () => {
 		const path = getCursorSdkUserConfigPath(agentDir);
 		mkdirSync(agentDir, { recursive: true });
-		writeFileSync(path, '{"runtime":"local"}\n');
+		writeFileSync(path, '{"local":{"resume":false}}\n');
 		expect(() => updateCursorSdkConfig(path, () => { throw new Error("update failed"); })).toThrow("update failed");
-		expect(readFileSync(path, "utf8")).toBe('{"runtime":"local"}\n');
+		expect(readFileSync(path, "utf8")).toBe('{"local":{"resume":false}}\n');
 		expect(existsSync(`${path}.lock`)).toBe(false);
 
 		writeFileSync(path, "{invalid");
@@ -342,237 +271,20 @@ describe("Cursor SDK config resolver", () => {
 		expect(() => updateCursorSdkConfig(path, (current) => {
 			rmSync(path);
 			mkdirSync(path);
-			return { ...current, runtime: "cloud" };
+			return { ...current, local: { resume: true } };
 		})).toThrow();
 		expect(existsSync(`${path}.lock`)).toBe(false);
 		expect(readdirSync(agentDir).filter((name) => name.includes(".tmp"))).toEqual([]);
 	});
 
-	it("keeps explicit env safety allows above project defaults", () => {
-		const resolved = resolveCursorSdkConfig({
-			env: { [CURSOR_CLOUD_DIRECT_PUSH_ENV]: "true" },
-			project: { cloud: { directPush: false } },
-		}).cloud.directPush;
-
-		expect(resolved).toMatchObject({ value: true, source: "environment", trustLevel: "environment" });
-		expect(resolved).not.toHaveProperty("cappedBy");
-	});
-
-	it("caps project cloud runtime with user local runtime denial", () => {
-		const projectCloud = resolveCursorSdkConfig({
-			project: { runtime: "cloud" },
-			user: { runtime: "local" },
-		}).runtime;
-		const cliCloud = resolveCursorSdkConfig({
-			cli: { runtime: "cloud" },
-			user: { runtime: "local" },
-		}).runtime;
-
-		expect(projectCloud).toMatchObject({ value: "local", source: "user" });
-		expect(projectCloud.cappedBy).toMatchObject({ source: "user", cappedSource: "project", cappedValue: "cloud" });
-		expect(cliCloud).toMatchObject({ value: "cloud", source: "cli" });
-		expect(cliCloud).not.toHaveProperty("cappedBy");
-	});
-
-	it("applies user safety caps over explicit env allows", () => {
-		const resolved = resolveCursorSdkConfig({
-			env: { [CURSOR_CLOUD_DIRECT_PUSH_ENV]: "true" },
-			user: { cloud: { directPush: false } },
-		}).cloud.directPush;
-
-		expect(resolved).toMatchObject({ value: false, source: "user", trustLevel: "user" });
-		expect(resolved.cappedBy).toMatchObject({ source: "user", cappedSource: "environment", cappedValue: true });
-	});
-
-	it("ignores project cloud override and safety keys in the initial runtime", () => {
-		const resolved = resolveCursorSdkConfig({
-			env: {},
-			project: {
-				cloud: {
-					repo: "project-repo",
-					branch: "project-branch",
-					contextHandoff: "bootstrap",
-					directPush: true,
-					autoCreatePR: true,
-					skipReviewerRequest: true,
-					allowLocalState: true,
-					envNames: ["GH_TOKEN"],
-					envFromFiles: true,
-					environment: { type: "pool", name: "project-pool" },
-					acknowledged: true,
-				},
-			},
-		}).cloud;
-
-		expect(resolved.repo).toMatchObject({ value: undefined, source: "builtin" });
-		expect(resolved.branch).toMatchObject({ value: undefined, source: "builtin" });
-		expect(resolved.contextHandoff).toMatchObject({ value: "fresh", source: "builtin" });
-		expect(resolved.directPush).toMatchObject({ value: false, source: "builtin" });
-		expect(resolved.autoCreatePR).toMatchObject({ value: false, source: "builtin" });
-		expect(resolved.skipReviewerRequest).toMatchObject({ value: false, source: "builtin" });
-		expect(resolved.allowLocalState).toMatchObject({ value: false, source: "builtin" });
-		expect(resolved.envNames).toMatchObject({ value: [], source: "builtin" });
-		expect(resolved.envFromFiles).toMatchObject({ value: false, source: "builtin" });
-		expect(resolved.environment).toMatchObject({ value: undefined, source: "builtin" });
-		expect(resolved.acknowledged).toMatchObject({ value: false, source: "builtin" });
-	});
-
-	it.each(["autoCreatePR", "skipReviewerRequest"] as const)(
-		"resolves %s through CLI, environment, session, user, and excludes project scope",
-		(control) => {
-			const envName = control === "autoCreatePR" ? CURSOR_CLOUD_AUTO_CREATE_PR_ENV : CURSOR_CLOUD_SKIP_REVIEWER_REQUEST_ENV;
-			expect(resolveCursorSdkConfig({ env: {}, user: { cloud: { [control]: true } } }).cloud[control]).toMatchObject({
-				value: true,
-				source: "user",
-			});
-			expect(resolveCursorSdkConfig({
-				env: {},
-				session: { cloud: { [control]: true } },
-				user: { cloud: { [control]: true } },
-			}).cloud[control]).toMatchObject({ value: true, source: "session" });
-			expect(resolveCursorSdkConfig({
-				env: { [envName]: "1" },
-				session: { cloud: { [control]: true } },
-			}).cloud[control]).toMatchObject({ value: true, source: "environment" });
-			const denied = resolveCursorSdkConfig({
-				env: { [envName]: "1" },
-				user: { cloud: { [control]: false } },
-			}).cloud[control];
-			expect(denied).toMatchObject({ value: false, source: "user" });
-			expect(denied.cappedBy).toMatchObject({ cappedSource: "environment", cappedValue: true });
-			const cliOverride = resolveCursorSdkConfig({
-				env: {},
-				cli: { cloud: { [control]: true } },
-				user: { cloud: { [control]: false } },
-			}).cloud[control];
-			expect(cliOverride).toMatchObject({ value: true, source: "cli" });
-			expect(cliOverride).not.toHaveProperty("cappedBy");
-			expect(resolveCursorSdkConfig({ env: {}, project: { cloud: { [control]: true } } }).cloud[control]).toMatchObject({
-				value: false,
-				source: "builtin",
-			});
-		},
-	);
-
-	it("lets explicit one-shot CLI safety allows override user denials", () => {
-		const resolved = resolveCursorSdkConfig({
-			cli: { cloud: { contextHandoff: "bootstrap", directPush: true, allowLocalState: true, envFromFiles: true } },
-			env: { [CURSOR_CLOUD_CONTEXT_ENV]: "fresh" },
-			user: { cloud: { contextHandoff: "never", directPush: false, allowLocalState: false, envFromFiles: false } },
-		}).cloud;
-
-		expect(resolved.contextHandoff).toMatchObject({ value: "bootstrap", source: "cli" });
-		expect(resolved.contextHandoff).not.toHaveProperty("cappedBy");
-		expect(resolved.directPush).toMatchObject({ value: true, source: "cli" });
-		expect(resolved.directPush).not.toHaveProperty("cappedBy");
-		expect(resolved.allowLocalState).toMatchObject({ value: true, source: "cli" });
-		expect(resolved.allowLocalState).not.toHaveProperty("cappedBy");
-		expect(resolved.envFromFiles).toMatchObject({ value: true, source: "cli" });
-		expect(resolved.envFromFiles).not.toHaveProperty("cappedBy");
-	});
-
-	it("filters env cloud env names through the user allowlist unless CLI explicitly overrides", () => {
-		const envFiltered = resolveCursorSdkConfig({
-			env: { [CURSOR_CLOUD_ENV_ENV]: "GH_TOKEN,NODE_ENV" },
-			user: { cloud: { envNames: ["NODE_ENV"] } },
-		}).cloud.envNames;
-		const cliOverride = resolveCursorSdkConfig({
-			cli: { cloud: { envNames: ["GH_TOKEN"] } },
-			user: { cloud: { envNames: ["NODE_ENV"] } },
-		}).cloud.envNames;
-
-		expect(envFiltered).toMatchObject({ value: ["NODE_ENV"], source: "user" });
-		expect(envFiltered.cappedBy).toMatchObject({
-			source: "user",
-			value: ["NODE_ENV"],
-			cappedSource: "environment",
-			cappedValue: ["GH_TOKEN", "NODE_ENV"],
-		});
-		expect(cliOverride).toMatchObject({ value: ["GH_TOKEN"], source: "cli" });
-		expect(cliOverride).not.toHaveProperty("cappedBy");
-	});
-
-	it("resolves remaining cloud scaffold keys from env without secret values", () => {
-		const resolved = resolveCursorSdkConfig({
-			env: {
-				[CURSOR_CLOUD_REPO_ENV]: " https://github.com/acme/repo ",
-				[CURSOR_CLOUD_BRANCH_ENV]: " main ",
-				[CURSOR_CLOUD_ALLOW_LOCAL_STATE_ENV]: "true",
-				[CURSOR_CLOUD_AUTO_CREATE_PR_ENV]: "1",
-				[CURSOR_CLOUD_SKIP_REVIEWER_REQUEST_ENV]: "true",
-				[CURSOR_CLOUD_ENV_ENV]: "GH_TOKEN,CURSOR_SECRET,bad-name, NODE_ENV ,GH_TOKEN",
-				[CURSOR_CLOUD_ENV_FROM_FILES_ENV]: "1",
-				[CURSOR_CLOUD_ENV_TYPE_ENV]: " pool ",
-				[CURSOR_CLOUD_ENV_NAME_ENV]: " large-linux ",
-				[CURSOR_CLOUD_ACK_ENV]: "1",
-			},
-		}).cloud;
-
-		expect(resolved.repo).toMatchObject({ value: "https://github.com/acme/repo", source: "environment" });
-		expect(resolved.branch).toMatchObject({ value: "main", source: "environment" });
-		expect(resolved.allowLocalState).toMatchObject({ value: true, source: "environment" });
-		expect(resolved.autoCreatePR).toMatchObject({ value: true, source: "environment" });
-		expect(resolved.skipReviewerRequest).toMatchObject({ value: true, source: "environment" });
-		expect(resolved.envNames).toMatchObject({ value: ["GH_TOKEN", "NODE_ENV"], source: "environment" });
-		expect(resolved.envFromFiles).toMatchObject({ value: true, source: "environment" });
-		expect(resolved.environment).toMatchObject({ value: { type: "pool", name: "large-linux" }, source: "environment" });
-		expect(resolved.acknowledged).toMatchObject({ value: true, source: "environment" });
-	});
-
-	it("resolves cloud environment atomically from one source", () => {
-		const resolved = resolveCursorSdkConfig({
-			env: { [CURSOR_CLOUD_ENV_NAME_ENV]: "gpu-pool" },
-			user: { cloud: { environment: { type: "pool" } } },
-		}).cloud;
-
-		expect(resolved.environment).toMatchObject({ value: { name: "gpu-pool" }, source: "environment" });
-	});
-
-	it("preserves invalid explicit cloud environment types for preflight", () => {
-		const resolved = resolveCursorSdkConfig({
-			env: { [CURSOR_CLOUD_ENV_TYPE_ENV]: " poll " },
-		}).cloud;
-
-		expect(resolved.environment).toMatchObject({ value: { type: "poll" }, source: "environment" });
-	});
-
-	it("preserves invalid cloud environment type across unrelated save and reload", () => {
-		mkdirSync(agentDir, { recursive: true });
-		const path = getCursorSdkUserConfigPath(agentDir);
-		writeFileSync(path, `${JSON.stringify({ cloud: { environment: { type: "poll" } } }, null, 2)}\n`);
-
-		const loaded = loadCursorSdkUserConfig(path);
-		saveCursorSdkUserConfig(mergeCursorSdkConfig(loaded, { runtime: "cloud" }), path);
-
-		expect(JSON.parse(readFileSync(path, "utf8")).cloud.environment).toEqual({ type: "poll" });
-		expect(loadCursorSdkUserConfig(path).cloud?.environment).toEqual({ type: "poll" });
-	});
-
 	it("merges nested cursor sdk config", () => {
 		expect(
 			mergeCursorSdkConfig(
-				{ runtime: "local", cloud: { repo: "repo", environment: { type: "pool" }, acknowledged: false }, local: { sandboxOptions: { enabled: true } } },
-				{ runtime: "cloud", cloud: { environment: { name: "gpu" }, acknowledged: true }, local: { autoReview: true } },
+				{ local: { sandboxOptions: { enabled: true }, resume: false } },
+				{ local: { autoReview: true, resume: true } },
 			),
 		).toEqual({
-			runtime: "cloud",
-			cloud: { repo: "repo", environment: { name: "gpu" }, acknowledged: true },
-			local: { sandboxOptions: { enabled: true }, autoReview: true },
-		});
-	});
-
-	it("lets session runtime override config but not CLI or env", () => {
-		expect(resolveCursorSdkConfig({ session: { runtime: "cloud" }, project: { runtime: "local" } }).runtime).toMatchObject({
-			value: "cloud",
-			source: "session",
-		});
-		expect(resolveCursorSdkConfig({ env: { [CURSOR_RUNTIME_ENV]: "local" }, session: { runtime: "cloud" } }).runtime).toMatchObject({
-			value: "local",
-			source: "environment",
-		});
-		expect(resolveCursorSdkConfig({ cli: { runtime: "local" }, session: { runtime: "cloud" } }).runtime).toMatchObject({
-			value: "local",
-			source: "cli",
+			local: { sandboxOptions: { enabled: true }, resume: true, autoReview: true },
 		});
 	});
 
@@ -588,17 +300,12 @@ describe("Cursor SDK config resolver", () => {
 		});
 	});
 
-	it("ignores session for local fields but honors it for cloud fields (per-field source order)", () => {
+	it("ignores session for local fields (per-field source order)", () => {
 		const local = resolveCursorSdkConfig({
 			session: { local: { autoReview: true, resume: false } },
 		}).local;
 		expect(local.autoReview).toMatchObject({ value: false, source: "builtin" });
 		expect(local.resume).toMatchObject({ value: true, source: "builtin" });
-
-		const cloud = resolveCursorSdkConfig({
-			session: { cloud: { repo: "session-repo" } },
-		}).cloud;
-		expect(cloud.repo).toMatchObject({ value: "session-repo", source: "session" });
 	});
 
 	it("resolves local safety controls by CLI, env, project, user, built-in order", () => {

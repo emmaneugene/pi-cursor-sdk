@@ -21,20 +21,6 @@ import { buildCursorSmokeEnv } from "./cursor-smoke-env.mjs";
 import { scrubSensitiveText } from "../../shared/cursor-sensitive-text.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const CLOUD_RUNTIME_ENV_NAMES = [
-	"PI_CURSOR_CLOUD_ACK",
-	"PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE",
-	"PI_CURSOR_CLOUD_CONTEXT",
-	"PI_CURSOR_CLOUD_REPO",
-	"PI_CURSOR_CLOUD_BRANCH",
-	"PI_CURSOR_CLOUD_DIRECT_PUSH",
-	"PI_CURSOR_CLOUD_AUTO_CREATE_PR",
-	"PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST",
-	"PI_CURSOR_CLOUD_ENV",
-	"PI_CURSOR_CLOUD_ENV_FROM_FILES",
-	"PI_CURSOR_CLOUD_ENV_TYPE",
-	"PI_CURSOR_CLOUD_ENV_NAME",
-];
 
 export function scrubSmokeText(value) {
 	return scrubSensitiveText(String(value), process.env.CURSOR_API_KEY);
@@ -128,7 +114,6 @@ export function buildLocalResumeSmokeEnv(
 			: localResumeEnv === false
 				? "unset"
 				: localResumeEnv;
-	for (const name of CLOUD_RUNTIME_ENV_NAMES) delete env[name];
 	delete env.PI_CURSOR_LOCAL_RESUME;
 	if (resumeMode === "on") env.PI_CURSOR_LOCAL_RESUME = "1";
 	else if (resumeMode === "off") env.PI_CURSOR_LOCAL_RESUME = "0";
@@ -137,7 +122,6 @@ export function buildLocalResumeSmokeEnv(
 	return {
 		...env,
 		PI_CODING_AGENT_DIR: agentDir,
-		PI_CURSOR_RUNTIME: "local",
 	};
 }
 
@@ -472,8 +456,6 @@ export async function promptAbortAndRead({
 
 export function assertTurnMetadata(label, turn, expected) {
 	const meta = turn.metadata.providerMeta ?? {};
-	if (meta.runtime === "cloud")
-		fail(`${label} unexpectedly recorded cloud runtime`, turn.metadataPath);
 	if (meta.localResume !== true)
 		fail(`${label} did not record localResume=true`, turn.metadataPath);
 	if (meta.resumedAgent !== expected.resumedAgent) {

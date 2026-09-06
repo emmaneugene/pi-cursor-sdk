@@ -1,4 +1,3 @@
-import { AuthenticationError } from "@cursor/sdk";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Type } from "typebox";
 import {
@@ -171,25 +170,6 @@ describe("streamCursor auth and abort", () => {
 		expect(message).toContain("invalid or unauthorized");
 		expect(message).toContain("/login");
 		expect(message).toContain("CURSOR_API_KEY");
-		expect(message).not.toContain("super-secret-key-12345");
-	});
-
-	it("labels cloud Agent.create auth failures as Cloud API auth before prepare completes", async () => {
-		process.env.PI_CURSOR_RUNTIME = "cloud";
-		process.env.PI_CURSOR_CLOUD_ACK = "1";
-		process.env.PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE = "1";
-		mockedCreate.mockRejectedValueOnce(
-			new AuthenticationError("Invalid User API Key at https://alice:super-secret-key-12345@api.cursor.com"),
-		);
-
-		const stream = streamCursor(makeModel(), makeContext(), { apiKey: "super-secret-key-12345" });
-		const events = await collectEvents(stream);
-
-		const message = getErrorEvent(events).error.errorMessage;
-		expect(message).toContain("Cloud API authentication");
-		expect(message).toContain("user API key");
-		expect(message).toContain("service account API key");
-		expect(message).toContain("Team Admin API keys are not supported");
 		expect(message).not.toContain("super-secret-key-12345");
 	});
 

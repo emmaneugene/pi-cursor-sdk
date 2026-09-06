@@ -61,97 +61,7 @@ try {
 		}
 	});
 
-	it("isolates cloud smoke from user and project Cursor config", async () => {
-		const artifactRoot = mkdtempSync(join(tmpdir(), "cloud-smoke-env-test-"));
-		try {
-			process.env.PI_CURSOR_CLOUD_REPO = "ambient/repo";
-			process.env.PI_CURSOR_CLOUD_DIRECT_PUSH = "1";
-			process.env.PI_CURSOR_CLOUD_AUTO_CREATE_PR = "1";
-			process.env.PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST = "1";
-			process.env.PI_CURSOR_CLOUD_ENV = "SECRET";
-			process.env.PI_CURSOR_CLOUD_ENV_TYPE = "pool";
-			process.env.PI_CURSOR_CLOUD_ENV_NAME = "ambient-pool";
-			process.env.CURSOR_CLOUD_SMOKE_ENV_TYPE = "machine";
-			process.env.CURSOR_CLOUD_SMOKE_ENV_NAME = "smoke-machine";
-			const {
-				assertCloudSmokeEvidenceSafe,
-				buildCloudSmokeEnv,
-				buildCloudSmokeWorkspace,
-				normalizeCloudSmokeGitHubRepo,
-			} = await import("../scripts/cloud-runtime-smoke.mjs");
-			const env = buildCloudSmokeEnv(artifactRoot);
-			const workspace = buildCloudSmokeWorkspace(artifactRoot);
-			const agentDir = env.PI_CODING_AGENT_DIR;
-
-			expect(agentDir).toBe(join(artifactRoot, "agent"));
-			expect(existsSync(agentDir!)).toBe(true);
-			expect(workspace).toBe(join(artifactRoot, "workspace"));
-			expect(existsSync(workspace)).toBe(true);
-			expect(env.PI_CURSOR_RUNTIME).toBe("cloud");
-			expect(env.PI_CURSOR_CLOUD_CONTEXT).toBe("fresh");
-			expect(buildCloudSmokeEnv(artifactRoot, { contextHandoff: "bootstrap" }).PI_CURSOR_CLOUD_CONTEXT).toBe("bootstrap");
-			const repoEnv = buildCloudSmokeEnv(artifactRoot, {
-				repoUrl: "https://github.com/example/throwaway.git",
-				startingRef: "starting-ref",
-				directPush: true,
-			});
-			expect(repoEnv.PI_CURSOR_CLOUD_REPO).toBe("https://github.com/example/throwaway.git");
-			expect(repoEnv.PI_CURSOR_CLOUD_BRANCH).toBe("starting-ref");
-			expect(repoEnv.PI_CURSOR_CLOUD_DIRECT_PUSH).toBe("1");
-			expect(repoEnv.PI_CURSOR_CLOUD_ENV_TYPE).toBeUndefined();
-			expect(assertCloudSmokeEvidenceSafe({ schemaVersion: 1, agentId: "bc-00000000-0000-0000-0000-000000000001" }, "secret-key")).toContain('"schemaVersion": 1');
-			expect(() => assertCloudSmokeEvidenceSafe({ value: "secret-key" }, "secret-key")).toThrow("secret scan");
-			expect(() => assertCloudSmokeEvidenceSafe({ stdout: "safe" })).toThrow("forbidden");
-			expect(normalizeCloudSmokeGitHubRepo("github.com/Example/Repo")).toBe("example/repo");
-			expect(normalizeCloudSmokeGitHubRepo("https://github.com/Example/Repo.git")).toBe("example/repo");
-			expect(normalizeCloudSmokeGitHubRepo("ssh://git@github.com/example/repo")).toBeUndefined();
-			expect(normalizeCloudSmokeGitHubRepo("https://github.com/example/repo/more")).toBeUndefined();
-			expect(env.PI_CURSOR_SETTING_SOURCES).toBe("none");
-			expect(env.PI_CURSOR_CLOUD_REPO).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_DIRECT_PUSH).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_AUTO_CREATE_PR).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_ENV).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_ENV_TYPE).toBe("machine");
-			expect(env.PI_CURSOR_CLOUD_ENV_NAME).toBe("smoke-machine");
-		} finally {
-			delete process.env.PI_CURSOR_CLOUD_REPO;
-			delete process.env.PI_CURSOR_CLOUD_DIRECT_PUSH;
-			delete process.env.PI_CURSOR_CLOUD_AUTO_CREATE_PR;
-			delete process.env.PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST;
-			delete process.env.PI_CURSOR_CLOUD_ENV;
-			delete process.env.PI_CURSOR_CLOUD_ENV_TYPE;
-			delete process.env.PI_CURSOR_CLOUD_ENV_NAME;
-			delete process.env.CURSOR_CLOUD_SMOKE_ENV_TYPE;
-			delete process.env.CURSOR_CLOUD_SMOKE_ENV_NAME;
-			rmSync(artifactRoot, { recursive: true, force: true });
-		}
-	});
-
-	it("harvests exact Cloud cleanup IDs from session JSONL and framed lifecycle journals", async () => {
-		const artifactRoot = mkdtempSync(join(tmpdir(), "cloud-smoke-lifecycle-test-"));
-		try {
-			const sessions = join(artifactRoot, "sessions");
-			mkdirSync(sessions, { recursive: true });
-			const firstId = "bc-00000000-0000-0000-0000-000000000001";
-			const secondId = "bc-00000000-0000-0000-0000-000000000002";
-			writeFileSync(join(sessions, "session.jsonl"), [
-				JSON.stringify({ type: "custom", customType: "cursor-cloud-lifecycle", data: { action: "record", agentId: firstId } }),
-				JSON.stringify({ type: "custom", customType: "other", data: { agentId: "bc-*" } }),
-			].join("\n"));
-			writeFileSync(join(sessions, ".cursor-cloud-lifecycle-test.journal"), [
-				'{"partial":',
-				JSON.stringify({ version: 1, action: "record", agentId: secondId }),
-			].join("\n"));
-			const { cloudAgentIdsFromLifecycleArtifacts } = await import("../scripts/cloud-runtime-smoke.mjs");
-
-			expect(new Set(cloudAgentIdsFromLifecycleArtifacts(artifactRoot))).toEqual(new Set([firstId, secondId]));
-		} finally {
-			rmSync(artifactRoot, { recursive: true, force: true });
-		}
-	});
-
-	it("forces local runtime and allows durable shutdown for local resume smoke", async () => {
+	it("allows durable shutdown for local resume smoke", async () => {
 		const harnessSource = readFileSync("scripts/lib/local-resume-smoke-harness.mjs", "utf8");
 		expect(harnessSource).toContain("terminateChild(child, { graceMs: 15_000 })");
 		const smokeSource = readFileSync("scripts/local-resume-smoke.mjs", "utf8");
@@ -160,25 +70,9 @@ try {
 		const artifactRoot = mkdtempSync(join(tmpdir(), "local-resume-smoke-env-test-"));
 		try {
 			const { buildLocalResumeSmokeEnv } = await import("../scripts/local-resume-smoke.mjs");
-			const env = buildLocalResumeSmokeEnv(artifactRoot, {
-				baseEnv: {
-					...process.env,
-					PI_CURSOR_RUNTIME: "cloud",
-					PI_CURSOR_CLOUD_ACK: "1",
-					PI_CURSOR_CLOUD_REPO: "ambient/repo",
-					PI_CURSOR_CLOUD_AUTO_CREATE_PR: "1",
-					PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST: "1",
-					PI_CURSOR_CLOUD_ENV: "SECRET",
-				},
-			});
+			const env = buildLocalResumeSmokeEnv(artifactRoot);
 
-			expect(env.PI_CURSOR_RUNTIME).toBe("local");
 			expect(env.PI_CURSOR_LOCAL_RESUME).toBe("1");
-			expect(env.PI_CURSOR_CLOUD_ACK).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_REPO).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_AUTO_CREATE_PR).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST).toBeUndefined();
-			expect(env.PI_CURSOR_CLOUD_ENV).toBeUndefined();
 			expect(env.PI_CURSOR_PI_TOOL_BRIDGE).toBe("0");
 			expect(env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS).toBe("0");
 			const unsetEnv = buildLocalResumeSmokeEnv(artifactRoot, { localResumeEnv: "unset", baseEnv: { ...process.env, PI_CURSOR_LOCAL_RESUME: "1" } });
@@ -278,7 +172,7 @@ try {
 import { detectCards, assertRequiredCards } from "./scripts/platform-smoke/card-detect.mjs";
 import { isSafeBundlePath } from "./scripts/platform-smoke/targets.mjs";
 const promptOnly = detectCards("1. call pi__read on ./package.json\n2. grep ./README.md\n");
-const rendered = detectCards("read /workspace/pi-cursor-sdk/package.json\ngrep /pi-cursor-sdk/ in C:/workspace/README.md\nbridge visual smoke\nENOENT: no such file or directory\ncursor:local · fast:off · http1\ngrok-4.6\n");
+const rendered = detectCards("read /workspace/pi-cursor-sdk/package.json\ngrep /pi-cursor-sdk/ in C:/workspace/README.md\nbridge visual smoke\nENOENT: no such file or directory\ncursor · fast:off · http1\ngrok-4.6\n");
 const wrapped = detectCards("read /workspace/very-long-test-workspace/package.js\non\n");
 const wrappedMidToken = detectCards("read /workspace/very-long-test-workspace/package.j\nson\n");
 const localPreview = detectCards("read package.json · local file preview\n");

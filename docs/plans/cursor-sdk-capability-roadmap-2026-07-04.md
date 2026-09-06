@@ -1,8 +1,8 @@
 # Cursor SDK capability roadmap
 
-Status: **Active current-state capability ledger and remaining-work plan**. Historical reconciliation baseline: `a2d574b` on 2026-07-18. Implementation status refreshed 2026-07-29 against current source and installed `@cursor/sdk@1.0.23`.
+Status: **Superseded historical plan**. Historical reconciliation baseline: `a2d574b` on 2026-07-18. Implementation status refreshed 2026-07-29 against `@cursor/sdk@1.0.23`.
 
-This document separates landed behavior, open work, deliberate product exclusions, and SDK/API contract gaps. Historical probes are context only; current source, tests, installed SDK types/source, and retained smoke evidence are the acceptance authorities.
+The extension later removed all Cursor Cloud support and now runs local agents only. Cloud references below record the superseded design and are not current product documentation. Current source, tests, and the main [README](../../README.md) are authoritative.
 
 ## Status taxonomy
 

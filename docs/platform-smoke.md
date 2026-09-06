@@ -1,6 +1,6 @@
 # Platform Smoke Gate
 
-Status: current local-runtime release gate for Cursor provider/runtime changes. Cloud-runtime changes also require the separate paid `npm run smoke:cloud` gate. The Crabbox runner, packed-install platform-build suite, and real live PTY/ConPTY suite runner are implemented for macOS, Ubuntu, and Windows native targets with one-lease-per-target orchestration.
+Status: current release gate for Cursor provider/runtime changes. The Crabbox runner, packed-install platform-build suite, and real live PTY/ConPTY suite runner are implemented for macOS, Ubuntu, and Windows native targets with one-lease-per-target orchestration.
 
 Detailed detector, registry, command-rendering, implementation-history, replacement, and portability reference: [Platform Smoke Implementation Reference](./platform-smoke-implementation.md).
 
@@ -12,7 +12,7 @@ Crabbox best-practice baseline applied from `~/Projects/crabbox`: Crabbox owns l
 
 ## Decision
 
-Crabbox is the required local platform smoke runner for `pi-cursor-sdk` releases that touch Cursor provider/runtime behavior. PRs that touch actual cloud runtime execution must also run `npm run smoke:cloud`.
+Crabbox is the required platform smoke runner for `pi-cursor-sdk` releases that touch Cursor provider/runtime behavior.
 
 Inner-loop checks remain useful, but they are not release gates:
 
@@ -25,12 +25,6 @@ The required local release gate is exactly:
 
 ```bash
 npm run smoke:platform:all
-```
-
-Cloud-runtime changes additionally require:
-
-```bash
-npm run smoke:cloud
 ```
 
 `smoke:platform:all` runs `smoke:platform:doctor` first and only starts the target matrix after doctor passes. Maintainers may still run `npm run smoke:platform:doctor` by itself for setup diagnosis.
@@ -47,7 +41,7 @@ No partial adoption exists. The release evidence must include macOS, Ubuntu, and
 ## Non-negotiable constraints
 
 - No GitHub Actions dependency.
-- No cloud provider dependency in the default local platform gate; cloud-runtime changes use the separate paid cloud gate.
+- No remote provider dependency in the platform gate.
 - No Crabbox broker/coordinator dependency.
 - No release gate that runs on only one operating system.
 - No release gate that proves command behavior but not TUI visual behavior.
@@ -160,33 +154,6 @@ Runtime budget is part of the contract:
 
 Ubuntu is covered as its own local-container target, and Windows native remains a full visual TUI target.
 
-## Required cloud smoke gate
-
-Cloud validation stays separate from `smoke:platform:all`. Releases that touch actual cloud execution must run both the local platform gate and:
-
-```bash
-npm run smoke:cloud
-```
-
-The no-flag command is the required `cursor/grok-4.6` matrix. It uses current `gh` CLI authentication to create one private throwaway GitHub repository, seeds clean `main`, `starting-ref`, and `direct-push` branches, and runs persisted-session named lanes for:
-
-- cancellation, with exact agent/run IDs captured before abort, retained `runIdSource` (`metadata` or installed-SDK `Agent.listRuns()` recovery), and terminal `cancelled` independently read through the SDK;
-- explicit HTTPS repository plus `startingRef`, requiring a distinct pushed cloud branch with remote-content and starting-ref-ancestry proof, recording whether the SDK returned branch metadata, and validating any returned PR URL through GitHub;
-- explicit direct-push opt-in, independently fetching the remote branch and checking its changed file content;
-- a nonexistent starting branch, which must fail closed;
-- `/cursor-cloud delete <exact bc-id> --yes` in the run's persisted session, followed by independent `Agent.get` not-found/404 and archived-inclusive list exclusion;
-- passive artifacts and raw usage, recording observed true/false and validating bounded known shapes when the account returns either. Absence is an observation, not a skipped lane.
-
-Prerequisites are intentionally strict: `CURSOR_API_KEY` with cloud entitlement, Cursor's GitHub integration with access to the new private repository, and `gh` auth with private-repository create, clone/push, inspect, and delete capability. Missing auth, entitlement, integration/access, required output, or any cleanup proof fails the gate. The GitHub mutation scope is destructive but bounded to self-created repositories named `pi-cursor-cloud-smoke-<uuid>` with an exact ownership-marker description. A cleanup handle is exposed only after create ownership is established (or an ambiguous create probe observes that exact marker). Deletion rejects arbitrary repository handles and independently requires an authenticated GitHub API HTTP 404 afterward.
-
-Every path harvests exact IDs from provider metadata and canonical lifecycle session JSONL/journals. Final cleanup takes their union, archives every still-existing agent, requires `archived: true`, deletes it, then requires `Agent.get` not-found/404 and `Agent.list({ runtime: "cloud", includeArchived: true })` exclusion. `SIGINT` and `SIGTERM` first terminate the active detached Pi child, reject the lane, and then enter the same agent/repository cleanup coordinator before the process exits. Evidence is staged to a temporary file, then an event-loop signal checkpoint runs immediately before the atomic rename; that rename is the evidence commit point. A signal observed before it discards staged evidence. A signal dispatched after it but before the final terminal checkpoint still fails the process and suppresses the success marker, while the committed completed-cleanup summary remains valid. Emitting the success marker is the terminal-success boundary. Signal handlers stay installed through process teardown and independently set a failing exit code, so a still-active process cannot exit successfully if a signal is dispatched after that boundary, even when the marker was already written. Cleanup or repository-deletion verification failure fails the gate and retains the raw temporary artifact root. Successful runs remove raw artifacts unless `CURSOR_CLOUD_SMOKE_KEEP_ARTIFACTS=1`.
-
-Before removing successful raw artifacts, the gate atomically replaces `docs/evidence/cursor-cloud-smoke-matrix-latest.json` with a known-shape summary containing timestamp, model, lane observations, exact agent/run IDs, agent cleanup proof, repository cleanup proof, and retained evidence provenance. Provenance records the extension package version, installed `@cursor/sdk` version, git source revision, and a deterministic `packageSourceSha256` over the full published package surface from `package.json` `files` plus `package.json` itself (relative path + bytes; directories expanded; symlinks/non-regular paths rejected). Generated `docs/evidence/*` is outside that published surface and is not hashed. Because successful pre-commit checkouts may be uncommitted, the package-source hash is authoritative for code identity and the revision is baseline identity only. The summary is a runtime-validated known shape (explicit six-lane allowlist, complete lane-agent cleanup coverage, repository proof, provenance) that round-trips through the persisted-evidence validator with no prompts or raw output, and must pass canonical secret scrubbing plus forbidden-field scanning; a run or cleanup failure observed before the atomic rename commit point never overwrites the last successful summary. A signal first dispatched after that point can fail the process while retaining the newly committed completed-cleanup summary, as defined above. Offline release-gate resource coordination (run → harvest IDs → cleanup agents → cleanup repo → evidence only on complete success) lives in `coordinateCloudSmokeReleaseGate()` inside `scripts/lib/cloud-smoke-cleanup-evidence.mjs`. GitHub throwaway fixture ownership lives in `scripts/lib/cloud-smoke-github.mjs`, signal-safe child shutdown lives in `scripts/lib/cloud-smoke-shutdown.mjs`, and `scripts/cloud-runtime-smoke.mjs` keeps concrete lane logic.
-
-`npm run smoke:cloud:context` (`--context-matrix`) remains optional, separate proof for fresh-versus-bootstrap context handoff. `fresh` must answer `NO_MARKER`; `bootstrap` must recall the marker. Its agents receive the same archive, delete, `Agent.get` not-found/404, and archived-inclusive list-exclusion verification, but it does not create a GitHub repository or replace the required-matrix evidence summary.
-
-This cloud gate does not replace the local macOS/Ubuntu/Windows `smoke:platform:all` gate.
-
 ## Focused local resume smoke
 
 The platform matrix includes the required local-resume lanes: restart, safety, tool-surface, abort, tree, copy/switch, fallback, compaction, default/opt-out proof, and recorded-ID-only cleanup. Platform lanes run those scripts against the target's shared packed package path, then copy each lane's session JSONL, Cursor SDK debug metadata, runtime-launch record, and other bounded smoke artifacts into its canonical platform suite directory. The same scripts still load the source checkout by default when run directly as focused host-local inner-loop checks. Windows uses the intentionally short target-side evidence component `lr` so the Cursor SDK's derived SQLite path remains below legacy `MAX_PATH`; every suite removes and verifies that directory before use, failing closed on stale or locked evidence.
@@ -257,15 +224,13 @@ Package scripts:
 
 ```json
 {
-  "check:platform-smoke": "node --check platform-smoke.config.mjs && node --check <platform smoke scripts> && vitest run test/platform-artifact-boundaries.test.ts test/platform-smoke-artifact-transport.test.ts test/cloud-smoke-helpers.test.ts test/cursor-sdk-cloud-list-runs-contract.test.ts test/smoke-cli-package-contracts.test.ts test/smoke-tooling.test.ts",
+  "check:platform-smoke": "node --check platform-smoke.config.mjs && node --check <platform smoke scripts> && vitest run test/platform-artifact-boundaries.test.ts test/platform-smoke-artifact-transport.test.ts test/smoke-cli-package-contracts.test.ts test/smoke-tooling.test.ts",
   "smoke:platform": "node scripts/platform-smoke.mjs",
   "smoke:platform:doctor": "node scripts/platform-smoke.mjs doctor",
   "smoke:platform:macos": "node scripts/platform-smoke.mjs run --target macos",
   "smoke:platform:ubuntu": "node scripts/platform-smoke.mjs run --target ubuntu",
   "smoke:platform:windows-native": "node scripts/platform-smoke.mjs run --target windows-native",
   "smoke:platform:all": "npm run smoke:platform:doctor && node scripts/platform-smoke.mjs run --target macos,ubuntu,windows-native",
-  "smoke:cloud": "node scripts/cloud-runtime-smoke.mjs",
-  "smoke:cloud:context": "node scripts/cloud-runtime-smoke.mjs --context-matrix",
   "smoke:local-resume": "node scripts/local-resume-smoke.mjs",
   "smoke:local-resume:safety": "node scripts/local-resume-smoke.mjs --safety",
   "smoke:local-resume:tool-surface": "node scripts/local-resume-smoke.mjs --tool-surface",
@@ -530,7 +495,7 @@ Purpose:
 
 - prove guarded local resume default-on behavior across a pi process restart on each required OS;
 - assert the first turn creates a local `agent-*` and the second turn resumes the same `agent-*`;
-- force local runtime and clear cloud env knobs so ambient cloud settings cannot satisfy this suite.
+- force the local agent path so ambient settings cannot change this suite.
 
 The suite prepares or reuses the target's packed npm install, runs `npm run smoke:local-resume` with that packed extension path, and asserts the `local-resume-smoke-ok` marker plus the resumed local agent id line. It also requires extracted session, debug, and runtime-launch evidence under `local-resume-evidence/`; checkout `pi -e <repo-root>` is reserved for the standalone inner-loop command.
 
@@ -642,7 +607,7 @@ PI_CURSOR_SDK_EVENT_DEBUG=1
 Purpose:
 
 - prove the packed extension completes a real local provider turn through the SDK's opt-in HTTP/1.1/SSE transport on every required OS;
-- prove the final TUI status visibly includes `cursor:local ... http1`;
+- prove the final TUI status visibly includes `cursor ... http1`;
 - keep the default transport covered by the other required live suites.
 
 Required final marker: `HTTP1_LIVE_OK`.
@@ -990,12 +955,6 @@ A local provider/runtime release is ready only after this exact command passes o
 
 ```bash
 npm run smoke:platform:all
-```
-
-Cloud-runtime releases additionally require:
-
-```bash
-npm run smoke:cloud
 ```
 
 `smoke:platform:all` runs doctor first and then all required local targets and suites in one full gate execution.

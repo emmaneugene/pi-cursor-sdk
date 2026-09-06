@@ -68,7 +68,6 @@ function getProjectContextSection(systemPrompt: string): string {
 beforeEach(() => {
 	delete process.env[CURSOR_PRESERVE_PI_AGENTS_MD_ENV];
 	delete process.env[CURSOR_SETTING_SOURCES_ENV];
-	delete process.env.PI_CURSOR_RUNTIME;
 });
 
 describe("classifyContextFileOverlap", () => {
@@ -296,20 +295,6 @@ describe("resolveCursorFacingSystemPrompt", () => {
 		expect(resolved).not.toContain("Global guidance");
 	});
 
-	it("preserves Pi project instructions for cloud runtime", () => {
-		const prompt = buildPiSystemPromptWithContextFiles([GLOBAL_FILE, PROJECT_FILE]);
-		expect(
-			resolveCursorFacingSystemPrompt(
-				prompt,
-				cursorModel,
-				makeSystemPromptOptions([GLOBAL_FILE, PROJECT_FILE]),
-				"all",
-				undefined,
-				"cloud",
-			),
-		).toBe(prompt);
-	});
-
 	it("honors PI_CURSOR_PRESERVE_PI_AGENTS_MD=1", () => {
 		process.env[CURSOR_PRESERVE_PI_AGENTS_MD_ENV] = "1";
 		const prompt = buildPiSystemPromptWithContextFiles([PROJECT_FILE]);
@@ -355,48 +340,6 @@ describe("registerCursorAgentsContextDedup", () => {
 
 		expect(result?.systemPrompt).toBeTypeOf("string");
 		expect(result?.systemPrompt).not.toContain("Project guidance");
-	});
-
-	it("preserves project instructions through registration in cloud runtime", async () => {
-		process.env.PI_CURSOR_RUNTIME = "cloud";
-		process.env[CURSOR_SETTING_SOURCES_ENV] = "all";
-		const pi = createEventHarness();
-		registerCursorAgentsContextDedup(pi);
-		const prompt = buildPiSystemPromptWithContextFiles([PROJECT_FILE]);
-
-		const result = await pi.invokeEvent(
-			"before_agent_start",
-			{
-				type: "before_agent_start",
-				prompt: "hello",
-				systemPrompt: prompt,
-				systemPromptOptions: makeSystemPromptOptions([PROJECT_FILE]),
-			},
-			cursorModelOverrides,
-		);
-
-		expect(result).toBeUndefined();
-		expect(prompt).toContain("Project guidance");
-	});
-
-	it("ignores invalid Cursor runtime overrides for non-Cursor models", async () => {
-		process.env.PI_CURSOR_RUNTIME = "remote";
-		const pi = createEventHarness();
-		registerCursorAgentsContextDedup(pi);
-		const prompt = buildPiSystemPromptWithContextFiles([PROJECT_FILE]);
-
-		const result = await pi.invokeEvent(
-			"before_agent_start",
-			{
-				type: "before_agent_start",
-				prompt: "hello",
-				systemPrompt: prompt,
-				systemPromptOptions: makeSystemPromptOptions([PROJECT_FILE]),
-			},
-			{ model: { provider: "anthropic", id: "claude-sonnet-4-5" } as ExtensionContext["model"] },
-		);
-
-		expect(result).toBeUndefined();
 	});
 
 	it("does not modify prompt when systemPromptOptions is absent", async () => {

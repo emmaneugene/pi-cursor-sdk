@@ -1,16 +1,16 @@
 # @emmaneugene/pi-cursor-sdk
 
-A pi provider extension that lets pi use Cursor models through the local-by-default `@cursor/sdk` agent runtime, with explicit minimal Cursor Cloud opt-in.
+A pi provider extension that lets pi use Cursor models through the local `@cursor/sdk` agent runtime.
 
 This is a maintained fork of [fitchmultz/pi-cursor-sdk](https://github.com/fitchmultz/pi-cursor-sdk)
 
-Use this extension if you primarily use Cursor models inside pi and want Cursor's SDK agent loop preserved while pi adds native model selection, auth, thinking/context controls, session behavior, replay UI, optional local pi tool bridging, and explicit cloud runs when requested.
+Use this extension if you primarily use Cursor models inside pi and want Cursor's SDK agent loop preserved while pi adds native model selection, auth, thinking/context controls, session behavior, replay UI, and optional pi tool bridging.
 
 ## Why use this instead of an OpenAI-compatible Cursor endpoint?
 
 Use `pi-cursor-sdk` when you primarily want to use Cursor models **inside pi**.
 
-This extension runs Cursor models through `@cursor/sdk` and keeps Cursor's agent loop intact. Local remains the default; explicit cloud runtime starts Cursor Cloud after acknowledgement and preflight. pi integrates around that loop: model discovery, model selection, context-window variants, thinking controls where Cursor exposes them, fast/slow aliases, Cursor mode, session handling, native replay cards, and the optional local pi tool bridge.
+This extension runs Cursor models through the local `@cursor/sdk` agent runtime and keeps Cursor's agent loop intact. pi integrates around that loop: model discovery, model selection, context-window variants, thinking controls where Cursor exposes them, fast/slow aliases, Cursor mode, session handling, native replay cards, and the optional pi tool bridge.
 
 OpenAI-compatible Cursor proxies are useful when you want a generic `/v1/chat/completions` or `/v1/responses` endpoint for many clients such as curl, the OpenAI SDK, OpenCode, or other tools. That compatibility comes from translating Cursor behavior into OpenAI-shaped requests, responses, and tool calls.
 
@@ -136,7 +136,7 @@ One-shot setup:
 pi --api-key "your-key" --model cursor/grok-4.6 --cursor-no-fast -p "Say ok only."
 ```
 
-Startup discovery intentionally does not parse Pi CLI arguments. It uses the stored `cursor` key in `~/.pi/agent/auth.json`, then `CURSOR_API_KEY`; without either, the bundled fallback catalog registers. Provider turns still receive Pi's resolved `--api-key`. `/cursor-refresh-models` and `/cursor-cloud` mutations ask Pi's ModelRegistry for provider `cursor`, so command-time auth follows Pi's provider-scoped resolution and is normalized through `CURSOR_API_KEY` placeholders before reaching the Cursor SDK.
+Startup discovery intentionally does not parse Pi CLI arguments. It uses the stored `cursor` key in `~/.pi/agent/auth.json`, then `CURSOR_API_KEY`; without either, the bundled fallback catalog registers. Provider turns still receive Pi's resolved `--api-key`. `/cursor-refresh-models` asks Pi's ModelRegistry for provider `cursor`, so command-time auth follows Pi's provider-scoped resolution and is normalized through `CURSOR_API_KEY` placeholders before reaching the Cursor SDK.
 
 ### Model catalog cache
 
@@ -254,17 +254,16 @@ Composer 2 and Composer 2.5 can default to fast. Use `--cursor-no-fast` or a `:s
 In interactive mode, the footer shows Cursor status only while a Cursor model is active. Fast-capable models show fast state explicitly, and fast and plan mode share one Cursor status value so they do not overwrite each other:
 
 ```text
-cursor:local · fast:n/a
-cursor:local · fast:n/a · plan
-cursor:local · fast:off
-cursor:local · fast:on
-cursor:local · fast:off · plan
-cursor:local · fast:on · plan
-cursor:local · fast:on · http1
-cursor:cloud · fast:n/a
+cursor · fast:n/a
+cursor · fast:n/a · plan
+cursor · fast:off
+cursor · fast:on
+cursor · fast:off · plan
+cursor · fast:on · plan
+cursor · fast:on · http1
 ```
 
-`cursor:local` / `cursor:cloud` shows the selected Cursor runtime. `fast:off` means fast mode is off. `fast:n/a` means the active runtime/model does not expose a local fast toggle. `http1` appears when HTTP/1.1/SSE transport is enabled for local Cursor SDK agents. If you do not see `plan`, Cursor SDK mode is the default `agent` mode.
+`fast:off` means fast mode is off. `fast:n/a` means the active model does not expose a fast toggle. `http1` appears when HTTP/1.1/SSE transport is enabled for Cursor SDK agents. If you do not see `plan`, Cursor SDK mode is the default `agent` mode.
 
 ## Cursor SDK mode
 
@@ -313,20 +312,19 @@ pi --model cursor/grok-4.6 --cursor-local-force
 
 This maps to the next actual `agent.send(..., { local: { force: true } })` only. SDK load, agent acquire, prompt preparation, or a pre-send abort does not consume it. A consumed CLI flag is not rearmed by session reload/tree lifecycle events; the environment override remains once per process. It is not a retry loop and does not cancel another live process's existing run handle; use it only when you know the persisted local run is wedged.
 
-Branch-scoped local resume reattaches to recorded local SDK agents after a pi restart. It is on by default for local runtime and records agent IDs plus their SDK store identity only in pi session custom entries, never user/project config. Independently of resume, each local agent whose send is initiated is also recorded once per native pi session as a best-effort non-resumable `cursor-sdk-agent-lineage` custom entry at the `Agent.send()` boundary for forensic lineage; cloned/forked sessions record their own lineage under their new pi session ID. Disable resume per run with CLI/env, or persist an opt-out in config:
+Branch-scoped local resume reattaches to recorded local SDK agents after a pi restart. It is on by default and records agent IDs plus their SDK store identity only in pi session custom entries, never user/project config. Independently of resume, each local agent whose send is initiated is also recorded once per native pi session as a best-effort non-resumable `cursor-sdk-agent-lineage` custom entry at the `Agent.send()` boundary for forensic lineage; cloned/forked sessions record their own lineage under their new pi session ID. Disable resume per run with CLI/env, or persist an opt-out in config:
 
 ```bash
 pi --model cursor/grok-4.6 --cursor-no-local-resume
 PI_CURSOR_LOCAL_RESUME=0 pi --model cursor/grok-4.6
 ```
 
-Resume is strict: the current pi session file/id, branch path prefix, cwd/repo root, model/API/tool-surface pool key, SDK store identity, and compaction generation must match. Each persisted pi session gets a SQLite store under `<getDefaultSdkStateRoot(cwd)>/pi-sessions/<session-hash>/`, and that same store is used for create/resume, transcript reads, checkpoint lookup, and exact-ID cleanup so parallel pi sessions do not contend on one workspace `index.db`. Fileless sessions use a unique OS-temporary store per acquisition, remove it on graceful disposal, and start a fresh agent after invalidation instead of reopening a disposed temporary store. Legacy resume entries still try the SDK's default workspace store; if that resume fails or the agent is later replaced, the new agent moves to the per-session store. A trailing user message already present at process startup is crash-ambiguous and invalidates the old handle; only a user message appended in the current process may span a recorded handle, preventing restart from resending an already-submitted prompt. A successful process reattachment bootstraps the current pi transcript once while retaining the resumed Cursor agent's native state; later in-process turns remain incremental. If `Agent.resume()` fails, pi bootstraps a new local Cursor agent from the current transcript and streams one display-only continuity note. Superseded local agents can be cleaned up explicitly with `/cursor-local-resume-cleanup --dry-run` and `/cursor-local-resume-cleanup --yes`; cleanup only deletes exact recorded `agent-*` IDs from their recorded store. Cloud resume remains disabled; `/cursor-cloud list|archive|delete` only manages recorded cloud agents.
+Resume is strict: the current pi session file/id, branch path prefix, cwd/repo root, model/API/tool-surface pool key, SDK store identity, and compaction generation must match. Each persisted pi session gets a SQLite store under `<getDefaultSdkStateRoot(cwd)>/pi-sessions/<session-hash>/`, and that same store is used for create/resume, transcript reads, checkpoint lookup, and exact-ID cleanup so parallel pi sessions do not contend on one workspace `index.db`. Fileless sessions use a unique OS-temporary store per acquisition, remove it on graceful disposal, and start a fresh agent after invalidation instead of reopening a disposed temporary store. Legacy resume entries still try the SDK's default workspace store; if that resume fails or the agent is later replaced, the new agent moves to the per-session store. A trailing user message already present at process startup is crash-ambiguous and invalidates the old handle; only a user message appended in the current process may span a recorded handle, preventing restart from resending an already-submitted prompt. A successful process reattachment bootstraps the current pi transcript once while retaining the resumed Cursor agent's native state; later in-process turns remain incremental. If `Agent.resume()` fails, pi bootstraps a new local Cursor agent from the current transcript and streams one display-only continuity note. Superseded local agents can be cleaned up explicitly with `/cursor-local-resume-cleanup --dry-run` and `/cursor-local-resume-cleanup --yes`; cleanup only deletes exact recorded `agent-*` IDs from their recorded store.
 
-Config can also set non-secret defaults in `~/.pi/agent/cursor-sdk.json` or trusted `.pi/cursor-sdk.json`. Project config activates only when Pi's project-trust flow reached this extension and approved the project, or the run started with explicit `--approve`; Pi's implicit trust for a project with no recognized resources is not enough. Because Pi 0.84.0 loads project-local package extensions after the trust event, `pi install -l` users must pass `--approve` on every run that reads or writes `.pi/cursor-sdk.json`. A trust resource added after trust resolution requires restarting pi. `/cursor-runtime ... --save-project` requires the same trust provenance and does not create Pi trust resources automatically. Explicit runtime, fast-default, and HTTP transport saves preserve unrecognized fields, reject malformed or non-object JSON without rewriting it, and serialize concurrent writers. A completed global preference write is retained if Pi's subsequent session-journal append fails, because Pi may already have mutated the in-memory branch; the command reports that partial journal failure and ignores the uncertain session entry until a later successful save or session restart. If a process is force-killed during the tiny update window, the next save reports the `.lock` path; remove it only after confirming no pi process is writing that config.
+Config can also set non-secret defaults in `~/.pi/agent/cursor-sdk.json` or trusted `.pi/cursor-sdk.json`. Project config activates only when Pi's project-trust flow reached this extension and approved the project, or the run started with explicit `--approve`; Pi's implicit trust for a project with no recognized resources is not enough. Because Pi 0.84.0 loads project-local package extensions after the trust event, `pi install -l` users must pass `--approve` on every run that reads or writes `.pi/cursor-sdk.json`. A trust resource added after trust resolution requires restarting pi. Fast-default and HTTP transport saves preserve unrecognized fields, reject malformed or non-object JSON without rewriting it, and serialize concurrent writers. A completed global preference write is retained if Pi's subsequent session-journal append fails, because Pi may already have mutated the in-memory branch; the command reports that partial journal failure and ignores the uncertain session entry until a later successful save or session restart. If a process is force-killed during the tiny update window, the next save reports the `.lock` path; remove it only after confirming no pi process is writing that config.
 
 ```json
 {
-  "runtime": "local",
   "local": {
     "autoReview": true,
     "sandboxOptions": { "enabled": true },
@@ -340,101 +338,7 @@ Config can also set non-secret defaults in `~/.pi/agent/cursor-sdk.json` or trus
 
 `bridge.excludeTools` is a denylist of pi tool names for the pi tool bridge. Denylisted active pi tools are hidden from Cursor; everything else active stays exposed, so an unset list means no restriction, not zero exposure. Names must be strings; empty and malformed entries are dropped, which also means an explicitly empty list falls through to lower-precedence config instead of clearing a user denylist. Trusted project config wins over user config. Overlapping built-in pi tools (`read`, `bash`, `write`, `edit`, `grep`, `find`, `ls`) stay hidden unless `PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1`, and a denylist entry keeps hiding a tool even with that opt-in. A change to the resulting exposed surface splits the local agent pool, so the next turn creates a Cursor agent with the narrowed bridge snapshot.
 
-### Cloud runtime and acknowledgement
-
-Cloud/runtime keys are minimal and explicit. Defaults stay local runtime with the loopback MCP bridge as the sole Pi-tool transport, no inline cloud MCP, and no local-state/env-file forwarding. SDK `customTools` remains deferred pending SDK cancellation/deadline support. Invalid non-empty `--cursor-runtime`, `--cursor-cloud-context`, `PI_CURSOR_RUNTIME`, or `PI_CURSOR_CLOUD_CONTEXT` values fail closed instead of falling through to lower-precedence config.
-
-If `runtime` is explicitly set to `cloud` with `--cursor-runtime cloud`, `PI_CURSOR_RUNTIME=cloud`, `/cursor-runtime cloud`, or config, the provider starts a Cursor cloud agent after preflight instead of silently running local.
-
-On first interactive use, `/cursor-runtime cloud` shows one confirmation covering remote execution, fresh context by default (explicit bootstrap opt-in), unavailable Pi-local tools/bridge and Pi env forwarding, Cursor's ability to branch/commit/push/open PRs, retained cloud agents, and Max Mode billing at Cursor API pricing (including possible spend-limit setup). Cancelling that first-use confirmation writes no session or config state.
-
-Use `/cursor-runtime cloud --save-user` for a persistent personal acknowledgement or `--cursor-cloud-ack` / `PI_CURSOR_CLOUD_ACK=1` for non-interactive runs; acknowledged CLI, environment, session, or user state is not prompted again.
-
-Project config may save a cloud runtime default but not first-use acknowledgement or repo/branch/env/context/direct-push/PR-control/local-state preferences.
-
-### Cloud pull-request controls
-
-Cursor Cloud pull-request controls are strictly opt-in. Omit them to preserve the Cursor SDK's default behavior; when omitted, the extension sends neither SDK field.
-
-```bash
-pi --model cursor/grok-4.6 --cursor-runtime cloud --cursor-cloud-ack \
-  --cursor-cloud-repo https://github.com/your-org/your-repo \
-  --cursor-cloud-branch main \
-  --cursor-cloud-auto-create-pr --cursor-cloud-skip-reviewer-request
-
-PI_CURSOR_CLOUD_ACK=1 \
-PI_CURSOR_CLOUD_REPO=https://github.com/your-org/your-repo \
-PI_CURSOR_CLOUD_BRANCH=main \
-PI_CURSOR_CLOUD_AUTO_CREATE_PR=1 \
-PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST=1 \
-pi --model cursor/grok-4.6 --cursor-runtime cloud
-```
-
-User config uses `cloud.autoCreatePR` and `cloud.skipReviewerRequest`:
-
-```json
-{
-  "runtime": "cloud",
-  "cloud": {
-    "autoCreatePR": true,
-    "skipReviewerRequest": true
-  }
-}
-```
-
-The resolver follows cloud precedence (CLI, environment, session, then user) with user safety denials; project config is excluded. The current public inputs are CLI/environment one-shot controls and user config—there is no PR-control session command.
-
-### Cloud repository and local-state validation
-
-An explicit `--cursor-cloud-branch` / `PI_CURSOR_CLOUD_BRANCH` requires an explicit `--cursor-cloud-repo` / `PI_CURSOR_CLOUD_REPO` because the SDK exposes `startingRef` only on `cloud.repos` entries. Repository values must be HTTPS repository URLs without userinfo, query parameters, or fragments; invalid values fail before `Agent.create()`, and error scrubbing removes URL/SCP-style userinfo.
-
-When an explicit cloud repo matches local Git state, preflight requires exactly one remote whose effective fetch and push URLs identify that target plus a locally observable, non-symbolic remote-tracking ref uniquely covered by that remote's fetch refspec for the requested branch. Local HTTPS remotes can match the same HTTPS identity; equivalent GitHub SSH and scp-style remotes can also match. Other hosts retain transport-specific identity, and host/path matching remains conservative with GitHub-specific case and lowercase `.git` normalization.
-
-`refs/heads/<branch>` is normalized to `<branch>` for both inspection and SDK options; invalid Git branch names and other `refs/*` forms are rejected. An explicit repo without `startingRef` is unverifiable locally because the server default is unknown. Inside a Git worktree, full commit SHAs remain unverified and require the explicit local-state override because local tracking refs do not prove which matching remote contains that commit.
-
-Mismatch, ambiguity, missing refs, or Git errors fail closed. This is local tracking evidence rather than a fetch, so fetch before starting cloud work when remote state may have changed.
-
-Inspection ignores ambient Git repository/index/config environment redirection; ordinary user/system URL and refspec config may veto, but never authorize, a target match. It disables replacement-object ancestry and fails closed when local replacement or graft metadata makes ancestry ambiguous. File-mode forcing is POSIX-only. Sparse checkouts intentionally fail closed because skip-worktree entries require `--cursor-cloud-allow-local-state`. Stashes are intentionally outside validation because they are not active worktree, index, or `HEAD` state.
-
-Without an explicit repo, the current branch's locally observable remote-tracking upstream remains the comparison ref only when that remote's effective fetch and push URLs identify one repository and its fetch refspec uniquely owns that tracking ref. `--cursor-cloud-allow-local-state` / `PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE=1` is the explicit override for accepting unverifiable, dirty, or unpushed local state; when active, launch skips local Git inspection while still validating the configured cloud repo/ref.
-
-### Cloud context and managed environments
-
-Cloud runs use fresh context by default; pass `--cursor-cloud-context=bootstrap` / `PI_CURSOR_CLOUD_CONTEXT=bootstrap` to include prior pi context.
-
-Pass `--cursor-cloud-env-type=cloud|pool|machine` plus optional `--cursor-cloud-env-name=<name>` (or `PI_CURSOR_CLOUD_ENV_TYPE` / `PI_CURSOR_CLOUD_ENV_NAME`) to select a Cursor-managed cloud environment without forwarding local env values. Named `cloud` environments fail closed when combined with `--cursor-cloud-repo`; omit the repo or use a pool/machine environment.
-
-### Cloud reporting and durable lifecycle
-
-When a pi session has a title, cloud agents are created with that title for easier dashboard/list matching.
-
-At cloud run completion, pi streams display-only cloud telemetry when Cursor reports it: agent/run IDs, pushed branch, repository and PR URL, passive artifact paths, and raw cloud usage.
-
-Cloud runtime requires a persisted pi session and rejects `--no-session` before `Agent.send()`.
-
-Immediately after `Agent.create()` returns—and before debug work or abort checks—Pi appends a branch-local lifecycle entry, fsyncs the existing Pi session JSONL anchor through a read-write descriptor, and then fsyncs a newline-framed sidecar keyed by the stable pi session ID (POSIX mode `0600`; Windows inherits the user session directory ACL) in the session directory.
-
-Existing session files use the exact lifecycle entry ID as the branch anchor; a fileless first turn uses an orphan marker so a restart with the same session ID can claim the record onto exactly one matching or replacement branch after its new timestamped JSONL is created. That durable claim then restores normal sibling-branch isolation. It adds the returned run ID before post-send abort handling or waiting and enriches successful runs with branch/PR metadata. Readers skip individually truncated records so one interrupted append cannot hide later valid cleanup IDs.
-
-If the agent intent cannot be persisted, pi does not send; if the returned run cannot be persisted, pi requests bounded cancellation. Both paths fail closed and direct you to the Cursor Cloud dashboard for manual cleanup.
-
-`/cursor-cloud list`, `/cursor-cloud archive <bc-agentId>`, and `/cursor-cloud delete <bc-agentId> --yes` only accept exact recorded `bc-` cloud IDs.
-
-Archive/delete require resolved Cursor auth, fsync a durable intent before the SDK mutation, and fsync a durable success result afterward; an unresolved intent blocks retries and directs manual dashboard inspection instead of guessing whether an irreversible request completed.
-
-### Cloud boundaries
-
-Raw cloud usage is not copied into pi message usage, context occupancy, compaction, or cost totals. The pi bridge is local-only, and pi env forwarding is not implemented yet, so `--cursor-cloud-env` forwarding-name config fails closed with Cursor-native environment setup guidance.
-
-Cloud lifecycle commands are explicit and session-branch scoped:
-
-```bash
-/cursor-cloud list
-/cursor-cloud archive <bc-agentId>
-/cursor-cloud delete <bc-agentId> --yes
-```
-
-They only accept cloud agent IDs recorded in the current session branch or its branch-bound durable sidecar; agent intents are fsynced before send and returned run IDs are recorded before abort handling or waiting so rejected, failed, cancelled, or first-turn-crashed sends remain cleanup-eligible. Persistence failures fail closed with Cursor Cloud dashboard cleanup guidance.
+### Local resume cleanup
 
 Local resume cleanup is explicit and session-ledger scoped:
 
@@ -445,7 +349,7 @@ Local resume cleanup is explicit and session-ledger scoped:
 
 It only deletes superseded local `agent-*` IDs that this extension recorded as cleanup candidates, one exact ID at a time through the Cursor SDK using the candidate's recorded store identity (or the SDK default workspace store for legacy candidates without one), and protects agents still resumable from any session-tree branch. Before SDK deletion it verifies and fsyncs an exact intent in the Pi session JSONL, then verifies and fsyncs the result; a missing or non-durable intent prevents deletion, while a missing or non-durable result leaves the durable intent—and a conservative current-process marker—blocking automatic retry. A candidate with a recorded store identity that is invalid for the current session is durably marked non-retryable and excluded from later cleanup attempts. It does not sweep any SDK store or call lower-level empty delete filters. Removing a pi session file does not automatically remove its persisted store directory. After permanently retiring that session and confirming no pi process is using it, a recorded root may be removed manually only when it is the session-derived `<getDefaultSdkStateRoot(cwd)>/pi-sessions/<session-hash>/` path. Never manually remove the SDK default workspace root, which legacy entries may record and other sessions may share.
 
-Only enabled local safety values are passed to `Agent.create({ local })`; false/default values are omitted to preserve the current local-agent behavior. Local force is one-shot/manual-only through CLI/env and is passed only to the next `Agent.send({ local: { force: true } })`. Local resume is enabled by default for local runtime; opt out with `local.resume: false`, `--cursor-no-local-resume`, or `PI_CURSOR_LOCAL_RESUME=0`. Changes take effect on the next turn without recreating a healthy pooled agent.
+Only enabled local safety values are passed to `Agent.create({ local })`; false/default values are omitted to preserve the current local-agent behavior. Local force is one-shot/manual-only through CLI/env and is passed only to the next `Agent.send({ local: { force: true } })`. Local resume is enabled by default; opt out with `local.resume: false`, `--cursor-no-local-resume`, or `PI_CURSOR_LOCAL_RESUME=0`. Changes take effect on the next turn without recreating a healthy pooled agent.
 
 ## Images
 
@@ -463,7 +367,7 @@ Local Cursor runs use two separate tool surfaces:
 
 Bridge capabilities are snapshotted from `pi.getActiveTools()` and `pi.getAllTools()` for each Cursor run, including per-tool prompt guidelines when pi exposes them. Cursor sees active bridgeable pi tools as collision-safe MCP names such as `pi__sem_reindex` only when they are exposed in that current run. When exposed, Cursor is instructed to prefer `pi__mcp` for MCP work and `pi__subagent` for delegation; Cursor-configured MCP and Cursor-native subagents are fallbacks when the matching pi tool is not exposed or is unavailable. Pi session output, tool cards, confirmations, hooks, renderers, history, and abort behavior use the real pi tool name, such as `sem_reindex`. The bridge queues Cursor's MCP call, emits a normal pi `toolCall`, waits for the matching pi `toolResult`, and resolves that result back into the same live Cursor SDK run without creating a new `Agent`, unless the run was disposed, aborted, or cancelled. The bridge does not call pi tool `execute()` handlers directly.
 
-Overlapping built-in pi tools (`read`, `bash`, `write`, `edit`, `grep`, `find`, `ls`) are hidden by default because Cursor local agents already have native equivalents. Extension/custom tools and non-overlapping active tools present in pi's active tool registry normally remain exposed. The bridge also exposes `cursor_ask_question` as `pi__cursor_ask_question` when enabled, allowing Cursor to ask the user through pi UI instead of silently choosing a default. For local runtime, when pi has visible Agent Skills loaded, the extension rewrites pi's skill catalog for Cursor and exposes `cursor_activate_skill` as `pi__cursor_activate_skill`; Cursor should call that bridge tool with a listed skill name to load the full `SKILL.md` and bundled resource list before applying the skill. If the local bridge is disabled, the catalog remains available and instructs Cursor to fall back to reading the listed `SKILL.md` path directly. Cloud runtime preserves Pi project instructions but omits Pi's local skill catalog and keeps `cursor_activate_skill` inactive because the bridge and local absolute skill paths are unavailable there.
+Overlapping built-in pi tools (`read`, `bash`, `write`, `edit`, `grep`, `find`, `ls`) are hidden by default because Cursor local agents already have native equivalents. Extension/custom tools and non-overlapping active tools present in pi's active tool registry normally remain exposed. The bridge also exposes `cursor_ask_question` as `pi__cursor_ask_question` when enabled, allowing Cursor to ask the user through pi UI instead of silently choosing a default. When pi has visible Agent Skills loaded, the extension rewrites pi's skill catalog for Cursor and exposes `cursor_activate_skill` as `pi__cursor_activate_skill`; Cursor should call that bridge tool with a listed skill name to load the full `SKILL.md` and bundled resource list before applying the skill. If the bridge is disabled, the catalog remains available and instructs Cursor to fall back to reading the listed `SKILL.md` path directly.
 
 Cursor-native tool replay is separate from the bridge. Replay cards are display-only recorded Cursor SDK activity. They never re-run Cursor-side commands, reapply Cursor edits, call MCP servers, or mutate pi state. See [Cursor native tool replay](docs/cursor-native-tool-replay.md).
 
@@ -506,13 +410,13 @@ On bootstrap sends, a compact **callable tool surfaces** block is injected into 
 
 `PI_CURSOR_ASK_QUESTION=0` disables only `cursor_ask_question`, leaving the rest of the pi bridge available; it is enabled by default. `PI_CURSOR_PI_TOOL_BRIDGE=0` is the supported rollback flag and disables the bridge entirely. Both flags treat `false`, `off`, `none`, `no`, and `disabled` as off; `1`, `true`, `on`, `yes`, and `enabled` as on. `PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1` opts in to exposing overlapping pi tool names that Cursor already has native equivalents for. The installed Cursor SDK uses a 60-second MCP protocol default with no public per-server timeout option. pi-cursor-sdk overrides that seam in two directions by default: MCP `callTool` requests are extended to 3600 seconds for long-running local MCP tools (including the pi bridge and configured Cursor MCP servers), and known MCP initialize/listTools requests on first send are shortened to 10 seconds so unavailable configured MCP servers fail fast instead of blocking for a full minute. Unknown Cursor SDK MCP protocol timeout stacks keep the SDK default instead of being shortened. Override tool-call timeouts with `PI_CURSOR_MCP_TOOL_TIMEOUT_MS` or `PI_CURSOR_MCP_TOOL_TIMEOUT_SECONDS`, and first-send initialize/listTools timeouts with `PI_CURSOR_MCP_CONNECT_TIMEOUT_MS` or `PI_CURSOR_MCP_CONNECT_TIMEOUT_SECONDS`. Bridged calls also have a local fail-closed deadline that defaults to the effective MCP tool timeout; lower it with `PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS` when a lost pi result should fail sooner. On expiry, the bridge rejects and removes the pending call and aborts active pi execution when available. The bridge's `listTools` handler returns its snapshot synchronously, so a Cursor UI label such as `GetMcpTools` does not by itself identify a `listTools` deadlock; the durable bridge waiter is `CallTool` awaiting its matching pi result.
 
-`PI_CURSOR_HTTP_1_1=true` maps to the Cursor SDK `Cursor.configure({ local: { useHttp1ForAgent: true } })` compatibility mode for corporate VPN/proxy environments where HTTP/2 streams fail. In interactive sessions, `/cursor-http on`, `/cursor-http off`, and `/cursor-http toggle` set the branch-scoped session preference and save the user default as `local.useHttp1ForAgent` in `~/.pi/agent/cursor-sdk.json`; `/cursor-http` with no argument reports the effective state. Precedence is session command/history, explicit `PI_CURSOR_HTTP_1_1`, user config, then the built-in unset default; project config is ignored for this user-level compatibility choice. Unset performs no SDK configuration, preserving the existing default path. Session shutdown clears extension-owned SDK transport state before module reload. Changing the effective setting splits the local agent pool so an agent created under another transport is not reused. When enabled, the local Cursor footer shows `http1` (for example `cursor:local · fast:on · http1`); cloud status never does. This affects Cursor SDK local-agent backend streams only; it does not configure HTTP proxies, TLS certificates, or HTTP/3.
+`PI_CURSOR_HTTP_1_1=true` maps to the Cursor SDK `Cursor.configure({ local: { useHttp1ForAgent: true } })` compatibility mode for corporate VPN/proxy environments where HTTP/2 streams fail. In interactive sessions, `/cursor-http on`, `/cursor-http off`, and `/cursor-http toggle` set the branch-scoped session preference and save the user default as `local.useHttp1ForAgent` in `~/.pi/agent/cursor-sdk.json`; `/cursor-http` with no argument reports the effective state. Precedence is session command/history, explicit `PI_CURSOR_HTTP_1_1`, user config, then the built-in unset default; project config is ignored for this user-level compatibility choice. Unset performs no SDK configuration, preserving the existing default path. Session shutdown clears extension-owned SDK transport state before module reload. Changing the effective setting splits the local agent pool so an agent created under another transport is not reused. When enabled, the Cursor footer shows `http1` (for example `cursor · fast:on · http1`). This affects Cursor SDK local-agent backend streams, which are all provider streams. It does not configure HTTP proxies, TLS certificates, or HTTP/3.
 
 `PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1` is off by default and emits typed, allowlisted, scrubbed single-line JSONL records to `process.stderr`. These records are operational diagnostics, not anonymous telemetry: they intentionally include tool names, safe correlation IDs, bridge run state, exposed pi↔MCP name pairs, queued requests, result resolution, rejection, cancellation, and pending counts. They must not include endpoint URLs, endpoint path components, endpoint tokens, raw args/results, stdout/stderr payloads, file contents, Cursor settings output, API keys, bearer tokens, cookies, session credentials, or secrets. Do not enable or share bridge debug logs where tool names themselves are sensitive.
 
 ### Maintainer platform smoke release gate
 
-For Cursor provider/runtime changes, the canonical local release and pre-commit gate is the local platform smoke gate in [Platform smoke](docs/platform-smoke.md): run `npm run smoke:platform:all`, which runs doctor before the target matrix. Cloud-runtime changes must also run `npm run smoke:cloud`. The platform gate validates macOS, Ubuntu, and Windows native through Crabbox using packed installs, a required HTTP/1.1/SSE provider-turn lane, PTY/ConPTY ANSI capture, host-rendered xterm/PNG evidence, JSONL assertions, bridge diagnostics, usage/cache checks, abort cleanup, artifact manifests, and redaction scans. After each platform run, `.artifacts/platform-smoke/latest.json` points to the latest useful evidence paths. Do not mark a release ready with optional, deferred, mostly-passing, or unobserved platform smoke checks outstanding.
+For Cursor provider/runtime changes, the canonical release and pre-commit gate is the platform smoke gate in [Platform smoke](docs/platform-smoke.md): run `npm run smoke:platform:all`, which runs doctor before the target matrix. The platform gate validates macOS, Ubuntu, and Windows native through Crabbox using packed installs, a required HTTP/1.1/SSE provider-turn lane, PTY/ConPTY ANSI capture, host-rendered xterm/PNG evidence, JSONL assertions, bridge diagnostics, usage/cache checks, abort cleanup, artifact manifests, and redaction scans. After each platform run, `.artifacts/platform-smoke/latest.json` points to the latest useful evidence paths. Do not mark a release ready with optional, deferred, mostly-passing, or unobserved platform smoke checks outstanding.
 
 The older live smoke helpers remain useful for inner-loop debugging and focused visual audits, not as the release gate. Use [Cursor live smoke checklist](docs/cursor-live-smoke-checklist.md), `npm run smoke:visual`, `npm run smoke:live`, or direct `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6` runs when iterating on a specific TUI/card/runtime issue before the full platform gate. `npm run smoke:visual` captures an offscreen PTY rendered through browser/xterm and saved as PNG screenshots with Playwright, or with `agent_browser` from the generated HTML when available. Its default matrix is native replay only: native replay registration is forced on, Cursor setting sources are disabled, the pi bridge is off, overlapping built-in pi tools are not exposed, and inherited Cursor SDK event-debug artifact env is cleared; `--event-debug` writes to a deterministic debug directory under the visual output directory. The visible TUI/output, rendered screenshots, scrubbed diagnostics, and persisted JSONL must agree. See [Cursor testing lessons](docs/cursor-testing-lessons.md) for auth.json seeding, isolated `/tmp` harness layout, JSONL replay-error scans, and other regression traps.
 
@@ -534,7 +438,6 @@ Actual Cursor runs still need a key from `/login`, `CURSOR_API_KEY`, or `--api-k
 
 ## Limits
 
-- **Cloud runtime is explicit and minimal.** Local remains the default. Cloud runs create Cursor cloud agents only after first-use acknowledgement and safety preflight, use fresh context by default, do not expose the pi bridge or local MCP, do not forward pi env vars, support explicit Cursor-managed environment selection, name agents from the pi session title when available, stream display-only agent/run/branch/PR/artifact/raw-usage telemetry when available, and record only explicit session-branch lifecycle commands for cleanup (`/cursor-cloud list|archive|delete`).
 - **The pi tool bridge is local and MCP-backed.** Bridgeable active pi tools are exposed to local Cursor agents through a tokenized `127.0.0.1` MCP endpoint; internal Cursor replay activity names are excluded, and overlapping built-in pi tools are hidden by default. Set `PI_CURSOR_PI_TOOL_BRIDGE=0` to disable it or `PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1` to expose overlapping built-ins too. Hide individual pi tools from Cursor with `bridge.excludeTools` in `~/.pi/agent/cursor-sdk.json` or trusted `.pi/cursor-sdk.json`.
 - **Cursor native tool replay is display-only.** Replay renders recorded Cursor SDK activity and never re-runs Cursor-side commands, reapplies Cursor edits, calls MCP servers, or mutates pi state. Workflow tools such as Cursor mode/task/todo/plan activity are not pi workflow controls. See [Cursor native tool replay](docs/cursor-native-tool-replay.md) for supported replay cards, ordering, conflict handling, and opt-out flags.
 - **Cursor run state can span tool-use turns.** Within a pi session, the extension reuses one Cursor SDK agent across compatible follow-up turns and sends incremental prompts when context still matches. It recreates the agent when context diverges, after compaction or `/tree` navigation, on API key changes, after send errors, after five minutes without a successful send, or on session shutdown. Idle recreate uses `Agent.create`, not `Agent.resume`. For bridged pi tools, the matching pi `toolResult` resolves into the same live Cursor SDK run without creating a new `Agent`, unless the run was disposed, aborted, or cancelled. Replay can also split one live Cursor SDK run across pi `toolUse` turns for display.
@@ -543,7 +446,7 @@ Actual Cursor runs still need a key from `/login`, `CURSOR_API_KEY`, or `--api-k
 - **AGENTS.md / CLAUDE.md are not duplicated on Cursor models when Cursor loads the same rules.** Pi discovers global and project context files (`AGENTS.md`, `CLAUDE.md`, and case variants) unless you start with `-nc`. On `cursor/*` models the extension removes only `<project_instructions>` blocks that overlap Cursor `settingSources` via the `before_agent_start` hook: `user` for `~/.pi/agent/AGENTS.md`, `project` for repo/parent `AGENTS.md` and `CLAUDE.md` (verified Cursor behavior: local agents load project `AGENTS.md` and `CLAUDE.md` alongside Cursor rules). `~/.pi/agent/CLAUDE.md` is not stripped (Cursor user rules use `~/.claude/CLAUDE.md`, not pi's agent dir). With `PI_CURSOR_SETTING_SOURCES=none` or `plugins`-only, pi context is left intact. Set `PI_CURSOR_PRESERVE_PI_AGENTS_MD=1` to keep duplicate injection.
 - **Max Mode is not a manual pi variant.** Cursor's SDK may enable Max Mode automatically for models that require it. This extension only advertises exact context-window variants that the SDK catalog exposes and otherwise uses conservative SDK-derived default/non-Max context windows.
 - **Output token limits are conservative.** Cursor SDK model metadata does not currently expose output token limits directly.
-- **Local token usage uses Cursor SDK data when safely attributable.** For local turns with in-time SDK usage, pi records the latest per-turn raw `turn-ended` `inputTokens`, `outputTokens`, `cacheReadTokens`, and `cacheWriteTokens`; that raw local shape keeps full-prompt `inputTokens` with cache as a partition (published SDK `toTokenUsage` totals differ), so pi maps disjoint components (`input = inputTokens - cacheRead - cacheWrite`, plus cache fields) and sets `totalTokens = inputTokens + outputTokens` for occupancy/compaction. If the local SDK reports no usage in time, the extension falls back to local `input/output` activity estimates while setting `totalTokens` to the current replayable context estimate so the footer/compaction percentage does not collapse after split tool turns. Later usage for that live run is ignored rather than risk applying stale usage to the wrong pi turn. Raw cloud usage remains display-only until its field semantics are independently captured. Cursor SDK cost is not exposed, so pi cost remains zero/absent.
+- **Local token usage uses Cursor SDK data when safely attributable.** For local turns with in-time SDK usage, pi records the latest per-turn raw `turn-ended` `inputTokens`, `outputTokens`, `cacheReadTokens`, and `cacheWriteTokens`; that raw local shape keeps full-prompt `inputTokens` with cache as a partition (published SDK `toTokenUsage` totals differ), so pi maps disjoint components (`input = inputTokens - cacheRead - cacheWrite`, plus cache fields) and sets `totalTokens = inputTokens + outputTokens` for occupancy/compaction. If the local SDK reports no usage in time, the extension falls back to local `input/output` activity estimates while setting `totalTokens` to the current replayable context estimate so the footer/compaction percentage does not collapse after split tool turns. Later usage for that live run is ignored rather than risk applying stale usage to the wrong pi turn. Cursor SDK cost is not exposed, so pi cost remains zero/absent.
 
 ## Environment variable reference
 
@@ -561,7 +464,6 @@ All `PI_CURSOR_*` overrides in one list. They are otherwise documented where eac
 
 | Variable | Default | Effect |
 |---|---|---|
-| `PI_CURSOR_RUNTIME` | `local` | Selects the `local` or `cloud` SDK runtime. An invalid non-empty value fails closed. See [Cursor SDK mode](#cursor-sdk-mode). |
 | `PI_CURSOR_LOCAL_FORCE` | Off | Passes `{ local: { force: true } }` to the next local `Agent.send()`; the override is consumed once. |
 | `PI_CURSOR_LOCAL_RESUME` | On | Allows reuse of a matching persisted local agent. `PI_CURSOR_LOCAL_RESUME=0` opts out. |
 | `PI_CURSOR_SANDBOX` | Off | Passes local sandbox enablement into Cursor SDK agent options. Only enabled values are sent. The SDK runs `cursorsandbox` from the platform package; the extension points the SDK locator at that package during local `Agent.create` / `Agent.resume`. |
@@ -595,21 +497,6 @@ See [Cursor provider tool contract](#cursor-provider-tool-contract) for the narr
 | `PI_CURSOR_NATIVE_TOOL_DISPLAY` | TTY/mode-dependent | Requests native rendering of Cursor tool cards. `tui`, `json`, and `rpc` default on; any other explicit mode defaults off. When no mode is supplied, the default follows `stdout.isTTY`. See [Cursor native tool replay](docs/cursor-native-tool-replay.md). |
 | `PI_CURSOR_REGISTER_NATIVE_TOOLS` | Follows native-display request; always off in `print` mode | Registers Cursor-native replay tools. Setting it to true does not override `PI_CURSOR_NATIVE_TOOL_DISPLAY=0`; setting it to false disables registration everywhere. |
 | `PI_CURSOR_TASK_PRESENTATION` | `subagent-meta` | Task activity titles and transcript headers: exact `task`, `subagent`, or `subagent-meta`. |
-
-### Cloud runtime
-
-| Variable | Default | Effect |
-|---|---|---|
-| `PI_CURSOR_CLOUD_ACK` | Off | First-use acknowledgement. Without it, cloud preflight fails with `cloud_ack_required`. See [Cloud runtime and acknowledgement](#cloud-runtime-and-acknowledgement). |
-| `PI_CURSOR_CLOUD_REPO` | Unset | HTTPS repository URL for the cloud agent. Must have no userinfo, query, or fragment. |
-| `PI_CURSOR_CLOUD_BRANCH` | Unset | Starting ref (branch, `refs/heads/<branch>`, or 40-hex SHA). Requires an explicit repo. |
-| `PI_CURSOR_CLOUD_CONTEXT` | `fresh` | Prior pi context handling: `never`, `fresh`, or `bootstrap`. Invalid values fail closed; `never` fails preflight when the session has prior context. |
-| `PI_CURSOR_CLOUD_ENV_TYPE` / `PI_CURSOR_CLOUD_ENV_NAME` | Unset | Cursor-managed environment selection. Types are exact lowercase `cloud`, `pool`, or `machine`, plus an optional name. An invalid type, or a name without a type, fails cloud preflight. A named `cloud` environment combined with a repo fails closed. |
-| `PI_CURSOR_CLOUD_AUTO_CREATE_PR` | Off | Requests that Cursor Cloud create a pull request. |
-| `PI_CURSOR_CLOUD_SKIP_REVIEWER_REQUEST` | Off | Requests that Cursor Cloud not add the user as reviewer. |
-| `PI_CURSOR_CLOUD_DIRECT_PUSH` | Off | Sets cloud `workOnCurrentBranch: true`. |
-| `PI_CURSOR_CLOUD_ALLOW_LOCAL_STATE` | Off | Skips local Git inspection and accepts unverifiable, dirty, or unpushed state. |
-| `PI_CURSOR_CLOUD_ENV` / `PI_CURSOR_CLOUD_ENV_FROM_FILES` | Unset / off | Requested local-env forwarding. `PI_CURSOR_CLOUD_ENV` is a comma-separated list of shell-style names; `CURSOR_*` names are forbidden and invalid entries are removed, while an all-invalid non-empty list is a configuration error. Any surviving request, or an enabled `PI_CURSOR_CLOUD_ENV_FROM_FILES`, currently fails preflight (`env_forwarding_not_implemented`); use Cursor-native environment setup instead. |
 
 ### Maintainer debug capture
 
@@ -666,9 +553,9 @@ pi install npm:pi-cursor-sdk
 
 That does not mean the model cannot think. It means the Cursor SDK does not expose a pi-controllable thinking parameter for that model. The model may still think internally and may still emit thinking deltas that pi renders natively.
 
-### I do not see `cursor:local` / `cursor:cloud` or `plan` in the footer
+### I do not see `cursor` or `plan` in the footer
 
-The Cursor footer appears only while a Cursor model is active. Fast-capable local models show `cursor:local · fast:on` or `cursor:local · fast:off`; Cursor models without a fast parameter show `cursor:local · fast:n/a`. Cloud runtime shows `cursor:cloud · fast:n/a`. Cursor SDK mode is the default `agent` mode when `plan` is absent. When both are active, pi shows one combined Cursor status such as `cursor:local · fast:on · plan` or `cursor:cloud · fast:n/a · plan`.
+The Cursor footer appears only while a Cursor model is active. Fast-capable models show `cursor · fast:on` or `cursor · fast:off`; Cursor models without a fast parameter show `cursor · fast:n/a`. Cursor SDK mode is the default `agent` mode when `plan` is absent. When plan mode is active, pi shows one combined Cursor status such as `cursor · fast:on · plan`.
 
 ### My Cursor app settings or rules do not seem to apply
 

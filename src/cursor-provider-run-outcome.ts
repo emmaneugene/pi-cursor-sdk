@@ -6,7 +6,6 @@ import {
 	resolveCursorSdkAbortCause,
 	sanitizeCursorProviderError,
 } from "./cursor-provider-errors.js";
-import type { CursorRuntime } from "./cursor-config.js";
 import { hasUsableText } from "./cursor-record-utils.js";
 import {
 	buildIncompleteCursorToolRunOutcome,
@@ -46,7 +45,6 @@ export interface ResolveCursorRunOutcomeParams {
 	runErrorFallback?: RunError;
 	resolvedApiKey?: string;
 	optionsApiKey?: string;
-	runtimeTarget: CursorRuntime;
 }
 
 function hasCursorAssistantText(
@@ -109,7 +107,6 @@ export function resolveCursorRunOutcome(params: ResolveCursorRunOutcomeParams): 
 			errorMessage: sanitizeCursorProviderError(
 				failureDetail,
 				params.resolvedApiKey ?? params.optionsApiKey,
-				params.runtimeTarget,
 			),
 		};
 	}

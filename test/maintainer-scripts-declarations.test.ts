@@ -28,7 +28,6 @@ import {
 	parseDebugSdkEventsArgs,
 	type CursorSdkEventJsonlSink,
 } from "../scripts/debug-sdk-events.mjs";
-import type { buildCloudSmokeEnv as cloudSmokeEnvDeclaration } from "../scripts/cloud-runtime-smoke.d.mts";
 import {
 	commonBooleanFlag,
 	commonProbeFlags,
@@ -56,7 +55,6 @@ import {
 	terminateChild,
 	waitForChildClose,
 } from "../scripts/lib/cursor-child-process.mjs";
-import { createCloudSmokeShutdownController } from "../scripts/lib/cloud-smoke-shutdown.mjs";
 import { createScriptFail } from "../scripts/lib/cursor-script-fail.mjs";
 import {
 	CURSOR_SDK_STARTUP_NOISE_PATTERNS,
@@ -86,23 +84,6 @@ const packageJson = require("../package.json") as { files: string[] };
 /** Type-only exports that intentionally have no runtime .mjs value. */
 const DECLARATION_TYPE_ONLY_EXPORTS: Record<string, readonly string[]> = {
 	"shared/cursor-model-selection-identities.d.mts": ["CursorModelSelectionIdentity"],
-	"scripts/cloud-runtime-smoke.d.mts": [
-		"CloudSmokeBranchLaneEvidence",
-		"CloudSmokeCancelLaneEvidence",
-		"CloudSmokeCleanupEvidence",
-		"CloudSmokeDirectPushLaneEvidence",
-		"CloudSmokeEvidenceBranch",
-		"CloudSmokeEvidenceProvenance",
-		"CloudSmokeLaneEvidence",
-		"CloudSmokeLaneName",
-		"CloudSmokeLifecycleDeleteLaneEvidence",
-		"CloudSmokeMatrixEvidence",
-		"CloudSmokeMissingBranchLaneEvidence",
-		"CloudSmokeOwnedRepository",
-		"CloudSmokePassiveArtifactsLaneEvidence",
-		"CloudSmokeReleaseGateState",
-		"CloudSmokeThrowawayRepositoryEvidence",
-	],
 	"scripts/debug-provider-events.d.mts": [
 		"CursorDebugCaptureCounts",
 		"CursorDebugCaptureSummary",
@@ -115,32 +96,6 @@ const DECLARATION_TYPE_ONLY_EXPORTS: Record<string, readonly string[]> = {
 		"CursorSdkEventDebugSummary",
 		"CursorSdkEventTimingSnapshot",
 		"CursorSdkEventJsonlSink",
-	],
-	"scripts/lib/cloud-smoke-artifacts.d.mts": [
-		"CloudSmokeLifecycleRecord",
-		"CloudSmokeMetadataRecord",
-	],
-	"scripts/lib/cloud-smoke-cleanup-evidence.d.mts": [
-		"CloudSmokeBranchLaneEvidence",
-		"CloudSmokeCancelLaneEvidence",
-		"CloudSmokeCleanupEvidence",
-		"CloudSmokeDirectPushLaneEvidence",
-		"CloudSmokeEvidenceBranch",
-		"CloudSmokeEvidenceProvenance",
-		"CloudSmokeLaneEvidence",
-		"CloudSmokeLaneName",
-		"CloudSmokeLifecycleDeleteLaneEvidence",
-		"CloudSmokeMatrixEvidence",
-		"CloudSmokeMissingBranchLaneEvidence",
-		"CloudSmokePassiveArtifactsLaneEvidence",
-		"CloudSmokeReleaseGateState",
-		"CloudSmokeThrowawayRepositoryEvidence",
-	],
-	"scripts/lib/cloud-smoke-github.d.mts": [
-		"CloudSmokeOwnedRepository",
-	],
-	"scripts/lib/cloud-smoke-shutdown.d.mts": [
-		"CloudSmokeShutdownController",
 	],
 	"scripts/lib/cursor-cli-args.d.mts": [
 		"CursorCliBooleanFlagSpec",
@@ -289,13 +244,6 @@ const _readArgvValue: string = readArgvValue(["--model", "cursor"], 1, "--model"
 const _parsedArgv: Record<string, unknown> = parseArgv([], { defaults: {}, flags: {}, fail: createScriptFail("test") });
 const _sealedNodePath: string = sealedNodePath("/usr/local/bin/node", "/tmp/bin");
 const _smokeEnv: Record<string, string | undefined> = buildCursorSmokeEnv({ settingSources: "none", nativeToolDisplay: true });
-const _cloudSmokeEnvReturn: AssertEqual<ReturnType<typeof cloudSmokeEnvDeclaration>, NodeJS.ProcessEnv> = true;
-const _cloudSmokeEnvContextArg: AssertEqual<Parameters<typeof cloudSmokeEnvDeclaration>[1], {
-	contextHandoff?: "fresh" | "bootstrap" | "never";
-	repoUrl?: string;
-	startingRef?: string;
-	directPush?: boolean;
-} | undefined> = true;
 const _smokeEnvPlan: { envEntries: Array<[string, string]> } = buildCursorSmokeEnvPlan({ settingSources: "none" });
 const _terminalHtml: string = buildTerminalHtml({
 	ansi: "ok",
@@ -306,7 +254,6 @@ const _writeTerminalScreenshot: (htmlPath: string, pngPath: string, width: numbe
 const _requiredApiKey: string = requireApiKey({ apiKey: "key" }, {}, createScriptFail("test"));
 const _signalChild: (child: ChildProcess, signal: NodeJS.Signals) => void = signalChild;
 const _terminateChild: (child: ChildProcess, options?: { graceMs?: number }) => Promise<void> = terminateChild;
-const _cloudSmokeShutdown = createCloudSmokeShutdownController((child) => terminateChild(child, { graceMs: 15_000 }));
 
 // @ts-expect-error startup noise patterns are string literals, not regular expressions
 const _invalidStartupNoisePatternType: readonly RegExp[] = CURSOR_SDK_STARTUP_NOISE_PATTERNS;
@@ -405,8 +352,6 @@ void [
 	_isOutputSuppressed,
 	_isStartupNoise,
 	_parsedJsonLines,
-	_cloudSmokeEnvReturn,
-	_cloudSmokeEnvContextArg,
 	_failFactory,
 	_scrubbedFromShared,
 	_scrubbedFromScriptLib,

@@ -96,7 +96,7 @@ describe("Cursor HTTP/1.1 state", () => {
 			"info",
 		);
 		expect(getStoredCursorHttp1Enabled()).toBeUndefined();
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:local · fast:off · http1");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
 	});
 
 	it("toggles session state and atomically updates cursor-sdk.json", async () => {
@@ -115,7 +115,7 @@ describe("Cursor HTTP/1.1 state", () => {
 			future: { enabled: true },
 			local: { futureLocal: "keep", useHttp1ForAgent: true },
 		});
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:local · fast:off · http1");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
 
 		await commands.get("cursor-http")!.handler("toggle", commandCtx);
 
@@ -143,7 +143,7 @@ describe("Cursor HTTP/1.1 state", () => {
 			"Cursor HTTP/1.1 preference was saved globally, but persisting the session entry failed: journal failed",
 			"error",
 		);
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:local · fast:off · http1");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
 	});
 
 	it("restores the global preference from cursor-sdk.json", async () => {
@@ -156,7 +156,7 @@ describe("Cursor HTTP/1.1 state", () => {
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
 
 		expect(getStoredCursorHttp1Enabled()).toBeUndefined();
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:local · fast:off · http1");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
 	});
 
 	it("restores branch history on session start and tree navigation", async () => {
@@ -164,29 +164,15 @@ describe("Cursor HTTP/1.1 state", () => {
 		const { pi, ctx } = createHarness(enabledBranch);
 		const getBranch = vi.mocked(ctx.sessionManager.getBranch);
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:local · fast:off · http1");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
 
 		getBranch.mockReturnValue([customEntry("http-off", CURSOR_HTTP1_ENTRY_TYPE, { enabled: false })]);
 		await pi.invokeEventWithContext("session_tree", { type: "session_tree", oldLeafId: null, newLeafId: null }, ctx);
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:local · fast:off");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off");
 
 		getBranch.mockReturnValue(enabledBranch);
 		await pi.invokeEventWithContext("session_tree", { type: "session_tree", oldLeafId: null, newLeafId: null }, ctx);
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:local · fast:off · http1");
-	});
-
-	it("does not show the local-only marker for cloud runtime", async () => {
-		process.env[CURSOR_HTTP1_ENV] = "1";
-		const { pi, ctx } = createHarness([
-			customEntry("runtime", __testUtils.RUNTIME_ENTRY_TYPE, {
-				runtime: "cloud",
-				cloudAcknowledged: true,
-			}),
-		]);
-
-		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
-
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor:cloud · fast:n/a");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
 	});
 
 	it("rejects invalid command arguments", async () => {

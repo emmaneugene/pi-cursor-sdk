@@ -4,7 +4,7 @@ import type { LocalAgentStore, SDKAgent } from "@cursor/sdk";
 import { buildIncompleteCursorToolRunOutcome } from "../src/cursor-incomplete-tool-visibility.js";
 import { CursorRunFinalizer } from "../src/cursor-provider-run-finalizer.js";
 import { CursorSdkTurnCoordinator } from "../src/cursor-provider-turn-coordinator.js";
-import type { CursorProviderTurnPrepareResult, LiveCursorProviderTurnRuntime, LocalCursorProviderTurnPrepareResult } from "../src/cursor-provider-turn-types.js";
+import type { CursorProviderTurnPrepareResult, LiveCursorProviderTurnRuntime } from "../src/cursor-provider-turn-types.js";
 import { installCursorSdkProcessErrorGuard } from "../src/cursor-sdk-process-error-guard.js";
 import type { CursorSdkEventDebugSink } from "../src/cursor-sdk-event-debug.js";
 import type { SessionCursorAgentLease } from "../src/cursor-session-agent.js";
@@ -26,8 +26,7 @@ describe("CursorRunFinalizer", () => {
 	it("settles live-run ownership before best-effort debug writes after wait failure", async () => {
 		const trackRunCompletion = vi.fn();
 		mockAwaitFinalizeCursorRunOutcome.mockRejectedValueOnce(new Error("run wait failed"));
-		const prepared: LocalCursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime } = {
-			runtimeTarget: "local",
+		const prepared: CursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime } = {
 			agent: { agentId: "agent-1" } as SDKAgent,
 			cwd: process.cwd(),
 			payload: { text: "hello" },
@@ -109,7 +108,6 @@ describe("CursorRunFinalizer", () => {
 			sdkEventDebug: () => debugSink,
 			sdkProcessErrorGuard,
 			resolvedApiKey: () => "test-key",
-			runtimeTarget: () => prepared.runtimeTarget,
 		});
 		finalizer.startLiveRunCompletion({
 			send: {
@@ -150,7 +148,6 @@ describe("CursorRunFinalizer", () => {
 			textDeltas: [],
 		});
 		const prepared: CursorProviderTurnPrepareResult = {
-			runtimeTarget: "local",
 			agent: { agentId: "agent-1" } as SDKAgent,
 			cwd: process.cwd(),
 			payload: { text: "hello" },
@@ -208,7 +205,6 @@ describe("CursorRunFinalizer", () => {
 			sdkEventDebug: () => debugSink,
 			sdkProcessErrorGuard,
 			resolvedApiKey: () => undefined,
-			runtimeTarget: () => prepared.runtimeTarget,
 		});
 
 		await expect(
@@ -258,7 +254,6 @@ describe("CursorRunFinalizer", () => {
 			textDeltas: [],
 		});
 		const prepared: CursorProviderTurnPrepareResult = {
-			runtimeTarget: "local",
 			agent: { agentId: "agent-1" } as SDKAgent,
 			cwd: process.cwd(),
 			payload: { text: "hello" },
@@ -315,7 +310,6 @@ describe("CursorRunFinalizer", () => {
 			sdkEventDebug: () => debugSink,
 			sdkProcessErrorGuard,
 			resolvedApiKey: () => undefined,
-			runtimeTarget: () => prepared.runtimeTarget,
 		});
 
 		await finalizer.applyTerminalEvent({
