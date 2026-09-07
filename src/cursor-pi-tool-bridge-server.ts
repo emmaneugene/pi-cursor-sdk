@@ -64,6 +64,10 @@ export class CursorPiToolBridgeRegistry implements CursorPiToolBridge {
 		return run;
 	}
 
+	hasLiveRuns(): boolean {
+		return this.runs.size > 0;
+	}
+
 	async disposeAll(reason = "Cursor pi tool bridge disposed"): Promise<void> {
 		await Promise.all([...this.runs].map(async (run) => {
 			run.cancel(reason);

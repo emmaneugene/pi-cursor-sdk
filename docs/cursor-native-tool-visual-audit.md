@@ -76,7 +76,7 @@ npm install
 npx playwright install chromium
 ```
 
-`npx playwright install chromium` is only needed for automatic PNG capture. When running inside the pi agent harness, `agent_browser` is the preferred screenshot tool for generated HTML/ANSI output because it can open local files, verify saved artifacts, and capture exact evidence paths; in that case, run `npm run smoke:visual -- --no-screenshot ...` and screenshot the generated `.html` with `agent_browser`. Outside the harness, use Playwright through the checked-in runner.
+Automatic PNG capture uses Playwright's Chromium or a system Chrome installation. If neither is available, run `npx playwright install chromium`. When running inside the pi agent harness, `agent_browser` is the preferred screenshot tool for generated HTML/ANSI output because it can open local files, verify saved artifacts, and capture exact evidence paths. In that case, run `npm run smoke:visual -- --no-screenshot ...` and screenshot the generated `.html` with `agent_browser`. Outside the harness, use Playwright through the checked-in runner.
 
 ## Runner contract
 
@@ -95,8 +95,8 @@ npx playwright install chromium
 - `TERM=xterm-256color`
 - cwd set to the target audit repo; the tmux session starts in `--cwd` with a non-login shell so a stale tmux-server cwd cannot print `getcwd` errors
 - `--session-id` forwarded to pi only when explicitly provided, so fresh captures avoid the new-session warning line
-- prompt paste plus carriage return into the interactive TUI
-- bounded post-prompt wait via `--wait-ms`
+- prompt submitted after the Cursor TUI footer appears, using bracketed tmux paste and a literal carriage return
+- bounded TUI readiness wait via `--startup-ms` and bounded post-submit wait via `--wait-ms`
 - artifacts outside the repo by default
 - `<label>.ansi`, `<label>.txt`, `<label>.html`, `<label>.png`, `<label>.jsonl.path`, and `<label>.manifest.json`
 - `--label`, `--ext`, `--cwd`, `--prompt`, `--prompt-file`, `--wait-ms`, and `--out-dir`

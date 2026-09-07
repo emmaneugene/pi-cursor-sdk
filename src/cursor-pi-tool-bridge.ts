@@ -89,6 +89,11 @@ Get-CimInstance Win32_Process -Filter "Name = 'bash.exe' OR Name = 'sh.exe'" |
 }
 
 export function registerCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): CursorPiToolBridge {
+	// Replacing a bridge during a live MCP run cancels its pending pi tool
+	// calls. Keep the active registry as a final safety belt.
+	if (registeredCursorPiToolBridge?.hasLiveRuns()) {
+		return registeredCursorPiToolBridge;
+	}
 	bridgeToolExecutionAbortTracker.abortAll("Cursor pi tool bridge extension reloaded");
 	void registeredCursorPiToolBridge?.disposeAll("Cursor pi tool bridge extension reloaded");
 	const bridge = new CursorPiToolBridgeRegistry(pi);

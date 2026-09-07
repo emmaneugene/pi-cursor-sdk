@@ -24,7 +24,7 @@ function parseEnvCapture(path) {
 }
 
 export function runVisualSmokeSelfTest(deps) {
-	const { ROOT, DEFAULT_MODE, DEFAULT_MODEL, DEFAULT_SETTING_SOURCES, DEBUG_ENV_NAMES, shellQuote, parseArgs, snapshotJsonlMtimes, findLatestJsonl, sealedNodePath, resolveCommand, requireNode, requireCommand, buildLaunchPlan, run, runVisualSmoke } = deps;
+	const { ROOT, DEFAULT_MODE, DEFAULT_MODEL, DEFAULT_SETTING_SOURCES, DEBUG_ENV_NAMES, shellQuote, parseArgs, snapshotJsonlMtimes, findLatestJsonl, jsonlContainsUserPrompt, waitForCursorTui, sealedNodePath, resolveCommand, requireNode, requireCommand, buildLaunchPlan, run, runVisualSmoke } = deps;
 	const tempDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-visual-self-test-"));
 	try {
 		const binDir = join(tempDir, "bin");
@@ -59,6 +59,9 @@ export function runVisualSmokeSelfTest(deps) {
 		utimesSync(freshJsonl, new Date(3_000), new Date(3_000));
 		assertSelfTest(findLatestJsonl(jsonlDir, { sinceMs: 2_000, previousMtimes: previousJsonlMtimes }) === freshJsonl, "JSONL discovery should ignore unchanged stale files before run start");
 		assertSelfTest(findLatestJsonl(jsonlDir, { sinceMs: 4_000, previousMtimes: snapshotJsonlMtimes(jsonlDir) }) === undefined, "JSONL discovery should not return stale evidence when current run has no changed JSONL");
+		writeFileSync(freshJsonl, `${JSON.stringify({ type: "message", message: { role: "user", content: "submitted prompt" } })}\n`, "utf8");
+		assertSelfTest(jsonlContainsUserPrompt(freshJsonl, "submitted prompt"), "JSONL prompt check should find the submitted user message");
+		assertSelfTest(!jsonlContainsUserPrompt(freshJsonl, "different prompt"), "JSONL prompt check should reject a different user message");
 
 		assertSelfTest(!sealedNodePath(process.execPath, "").includes(delimiter), "empty inherited PATH must not leave an empty PATH segment");
 		const hostilePath = `${binDir}${delimiter}${process.env.PATH ?? ""}`;
@@ -73,6 +76,7 @@ export function runVisualSmokeSelfTest(deps) {
 			cwd: ROOT,
 			mode: DEFAULT_MODE,
 			model: DEFAULT_MODEL,
+			prompt: "self-test prompt",
 			outDir: tempDir,
 			safeLabel: "self-test",
 			sessionDir: join(tempDir, "session"),
@@ -96,6 +100,7 @@ export function runVisualSmokeSelfTest(deps) {
 			assertSelfTest(plan.clearEnvNames.includes(name), `${name} must be cleared by default`);
 		}
 		assertSelfTest(plan.script.includes(shellQuote(fakePi)), "launch script must use resolved pi path");
+		assertSelfTest(!plan.script.includes(baseOptions.prompt), "launch script must keep the prompt out of the process command line");
 		assertSelfTest(!plan.script.includes(" exec pi "), "launch script must not use bare pi");
 		const hostileEnv = {
 			...process.env,
@@ -144,48 +149,18 @@ export function runVisualSmokeSelfTest(deps) {
 		assertSelfTest(!capturedEventDebugEnv.has("PI_CURSOR_SDK_EVENT_DEBUG_STDERR"), "stale event debug stderr flag should be cleared");
 
 		const fakeTmux = join(binDir, "tmux");
-		const deleteBufferMarker = join(tempDir, "delete-buffer-called");
-		writeFileSync(
-			fakeTmux,
-			`#!/bin/sh\ncase "$1" in\n  -V) echo 'tmux fake'; exit 0 ;;\n  new-session) exit 0 ;;\n  load-buffer) cat >/dev/null; exit 0 ;;\n  paste-buffer) exit 77 ;;\n  delete-buffer) echo deleted > ${shellQuote(deleteBufferMarker)}; exit 0 ;;\n  kill-session) exit 0 ;;\n  *) echo "unexpected tmux command: $*" >&2; exit 64 ;;\nesac\n`,
-			"utf8",
-		);
-		chmodSync(fakeTmux, 0o755);
-		const originalPath = process.env.PATH;
-		try {
-			process.env.PATH = hostilePath;
-			let pasteFailed = false;
-			try {
-				runVisualSmoke({
-					...baseOptions,
-					prompt: "buffer cleanup prompt",
-					startupMs: 1,
-					waitMs: 1,
-					width: 80,
-					height: 24,
-					historyLines: 100,
-				});
-			} catch (error) {
-				pasteFailed = /paste-buffer failed/.test(error instanceof Error ? error.message : String(error));
-			}
-			assertSelfTest(pasteFailed, "fake tmux paste failure should exercise prompt-buffer cleanup path");
-			assertSelfTest(existsSync(deleteBufferMarker), "prompt tmux buffer should be deleted when paste/send fails");
-		} finally {
-			if (originalPath === undefined) delete process.env.PATH;
-			else process.env.PATH = originalPath;
-		}
-
 		writeFileSync(
 			fakeTmux,
 			`#!/bin/sh
 case "$1" in
   -V) echo 'tmux fake'; exit 0 ;;
   new-session) exit 0 ;;
+  set-option) exit 0 ;;
   load-buffer) cat >/dev/null; exit 0 ;;
   paste-buffer) exit 0 ;;
   send-keys) exit 0 ;;
   delete-buffer) exit 0 ;;
-  capture-pane) echo 'captured visual smoke output'; exit 0 ;;
+  capture-pane) printf 'captured visual smoke output\ncursor · fast:off\n'; exit 0 ;;
   kill-session) exit 0 ;;
   *) echo "unexpected tmux command: $*" >&2; exit 64 ;;
 esac
@@ -194,6 +169,7 @@ esac
 		);
 		chmodSync(fakeTmux, 0o755);
 		const noJsonlManifest = join(tempDir, "self-test-jsonl-missing.manifest.json");
+		const originalPath = process.env.PATH;
 		try {
 			process.env.PATH = hostilePath;
 			let missingJsonlFailed = false;

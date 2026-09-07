@@ -896,6 +896,35 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	});
 
 
+	it("keeps a live bridge when registerCursorPiToolBridge is called again during a run", async () => {
+		const pi = createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] });
+		const nestedPi = createBridgePiHarness({ active: [], tools: [] });
+		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
+		const first = registerCursorPiToolBridge(pi);
+		const run = await first.createRun();
+		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
+		try {
+			const callPromise = client.callTool({ name: "pi__read", arguments: { path: "README.md" } });
+			const observedCallError = callPromise.catch((error: unknown) => error);
+			await waitForQueuedRequests(run);
+
+			const second = registerCursorPiToolBridge(nestedPi);
+			await sleep(50);
+
+			expect(second).toBe(first);
+			expect(__testUtils.getRegisteredBridgeForTests()?.hasLiveRuns()).toBe(true);
+			const raced = await Promise.race([
+				observedCallError.then((error) => ({ settled: true as const, error })),
+				sleep(20).then(() => ({ settled: false as const })),
+			]);
+			expect(raced.settled).toBe(false);
+		} finally {
+			await client.close().catch(() => undefined);
+			await transport.close().catch(() => undefined);
+			await run.dispose();
+		}
+	});
+
 	it("rejects pending MCP waits on registered session shutdown cleanup", async () => {
 		const pi = createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] });
 		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";

@@ -11,6 +11,7 @@ import { __testUtils as cursorSessionScopeTestUtils } from "../../src/cursor-ses
 import { __testUtils as cursorSessionResumeTestUtils } from "../../src/cursor-session-agent-resume.js";
 import { __testUtils as cursorSessionLineageTestUtils } from "../../src/cursor-session-agent-lineage.js";
 import { __testUtils as cursorSdkProcessErrorGuardTestUtils } from "../../src/cursor-sdk-process-error-guard.js";
+import { __testUtils as cursorExtensionFactoryGuardTestUtils } from "../../src/cursor-extension-factory-guard.js";
 import { installCursorSessionStoreMock } from "./cursor-session-store.js";
 
 export {
@@ -33,9 +34,11 @@ export async function resetIndexExtensionTestState(): Promise<void> {
 	delete process.env.PI_CURSOR_REGISTER_NATIVE_TOOLS;
 	delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
 	delete process.env.PI_CURSOR_ASK_QUESTION;
+	delete process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS;
 	delete process.env.PI_CURSOR_AUTO_REVIEW;
 	delete process.env.PI_CURSOR_SANDBOX;
 	await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
+	cursorExtensionFactoryGuardTestUtils.reset();
 	cursorSessionScopeTestUtils.reset();
 	cursorSessionResumeTestUtils.reset();
 	cursorSessionLineageTestUtils.reset();

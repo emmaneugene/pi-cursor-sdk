@@ -112,7 +112,17 @@ export async function writeTerminalScreenshot(htmlPath, pngPath, width, height) 
 	let browser;
 	try {
 		const { chromium } = await import("playwright");
-		browser = await chromium.launch();
+		try {
+			browser = await chromium.launch();
+		} catch (bundledBrowserError) {
+			try {
+				browser = await chromium.launch({ channel: "chrome" });
+			} catch (systemBrowserError) {
+				const bundledMessage = bundledBrowserError instanceof Error ? bundledBrowserError.message : String(bundledBrowserError);
+				const systemMessage = systemBrowserError instanceof Error ? systemBrowserError.message : String(systemBrowserError);
+				throw new Error(`bundled Chromium: ${bundledMessage}\nsystem Chrome: ${systemMessage}`);
+			}
+		}
 		const page = await browser.newPage({
 			viewport: {
 				width: Math.max(1_200, width * 10),
@@ -125,7 +135,7 @@ export async function writeTerminalScreenshot(htmlPath, pngPath, width, height) 
 		await page.locator("#terminal").screenshot({ path: pngPath });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`failed to capture PNG with Playwright: ${message}\nInstall Chromium with: npx playwright install chromium\nOr rerun with --no-screenshot and capture ${htmlPath} with agent_browser.`);
+		throw new Error(`failed to capture PNG with Playwright: ${message}\nInstall system Chrome or Chromium with: npx playwright install chromium\nOr rerun with --no-screenshot and capture ${htmlPath} with agent_browser.`);
 	} finally {
 		if (browser) await browser.close();
 	}

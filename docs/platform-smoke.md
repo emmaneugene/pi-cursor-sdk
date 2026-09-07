@@ -434,7 +434,7 @@ Doctor checks:
 17. `tar` is available on macOS and native Windows.
 18. `node-pty` self-test passes on every target.
 19. Target pi tool probe proves the shell tool accepts platform-rendered commands on every target.
-20. Host-side xterm/Playwright render self-test passes by rendering a minimal ANSI fixture through the repo xterm helper and launching Playwright Chromium to write a tiny PNG. If this fails, run `npm install` and `npx playwright install chromium` before live suites.
+20. Host-side xterm/Playwright render self-test passes by rendering a minimal ANSI fixture through the repo xterm helper and launching Playwright Chromium or system Chrome to write a tiny PNG. If neither browser is available, run `npm install` and `npx playwright install chromium` before live suites.
 21. `CURSOR_API_KEY` is present.
 22. Artifact root is writable.
 23. `git status --short` is recorded.

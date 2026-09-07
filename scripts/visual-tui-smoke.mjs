@@ -14,7 +14,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_WIDTH = 150;
 const DEFAULT_HEIGHT = 45;
 const DEFAULT_WAIT_MS = 60_000;
-const DEFAULT_STARTUP_MS = 5_000;
+const DEFAULT_STARTUP_MS = 15_000;
 const DEFAULT_HISTORY_LINES = 3_000;
 const DEFAULT_MODEL = "cursor/grok-4.6";
 const DEFAULT_MODE = "plan";
@@ -33,15 +33,15 @@ Usage:
 
 Required:
   --label LABEL                 Artifact filename prefix. Sanitized for paths.
-  --prompt PROMPT               Prompt to paste into the interactive pi TUI.
+  --prompt PROMPT               Prompt to submit in the interactive pi TUI.
                                 Use --prompt-file PATH for multi-line prompts.
 
 Common options:
   --ext PATH                    Extension repo to load with pi -e. Default: repo root.
   --cwd PATH                    Working directory for the pi session. Default: current directory.
   --out-dir PATH                Artifact directory. Default: /tmp/pi-cursor-sdk-visual-smoke-<timestamp>.
-  --wait-ms N                   Milliseconds to wait after sending the prompt. Default: ${DEFAULT_WAIT_MS}.
-  --startup-ms N                Milliseconds to wait before pasting the prompt. Default: ${DEFAULT_STARTUP_MS}.
+  --wait-ms N                   Milliseconds to wait for the response before capture. Default: ${DEFAULT_WAIT_MS}.
+  --startup-ms N                Maximum milliseconds to wait for TUI readiness. Default: ${DEFAULT_STARTUP_MS}.
   --model MODEL                 Cursor model. Default: ${DEFAULT_MODEL}.
   --mode agent|plan             Cursor SDK mode. Default: ${DEFAULT_MODE}.
   --session-dir PATH            pi session directory. Default: <out-dir>/<label>.session.
@@ -82,8 +82,8 @@ Artifacts written:
 Prerequisites:
   - pi, node, tmux, and npm-installed dev dependencies on PATH / in node_modules.
   - The runner resolves pi/tmux from the parent PATH, uses process.execPath for node, and seals pi-shim PATH for prereq checks and tmux.
-  - For automatic PNG capture, install a Playwright browser once when needed:
-      npx playwright install chromium
+  - Automatic PNG capture uses Playwright's Chromium or a system Chrome installation.
+    If neither is available, install Chromium once: npx playwright install chromium
   - In the pi agent harness, --no-screenshot plus agent_browser on the generated HTML is also acceptable.
 
 Examples:
@@ -340,6 +340,41 @@ function findLatestJsonl(root, { sinceMs = 0, previousMtimes = new Map() } = {})
 	return matches[0]?.path;
 }
 
+function jsonlContainsUserPrompt(path, prompt) {
+	for (const line of readFileSync(path, "utf8").split("\n")) {
+		if (!line.trim()) continue;
+		let entry;
+		try {
+			entry = JSON.parse(line);
+		} catch {
+			continue;
+		}
+		if (entry?.type !== "message" || entry.message?.role !== "user") continue;
+		const content = entry.message.content;
+		const text = typeof content === "string"
+			? content
+			: Array.isArray(content)
+				? content.filter((part) => part?.type === "text" && typeof part.text === "string").map((part) => part.text).join("")
+				: "";
+		if (text === prompt) return true;
+	}
+	return false;
+}
+
+function waitForCursorTui(commands, sessionName, timeoutMs) {
+	const deadline = Date.now() + timeoutMs;
+	do {
+		try {
+			const pane = capturePane(commands.tmux, sessionName, ["-p", "-S", "-100"]);
+			if (pane.includes("cursor ·")) return;
+		} catch {
+			// The pane can be unavailable briefly while tmux starts the shell.
+		}
+		sleep(100);
+	} while (Date.now() < deadline);
+	throw new Error(`Cursor TUI did not become ready within ${timeoutMs}ms`);
+}
+
 function checkLeftovers(patterns) {
 	if (patterns.length === 0) return;
 	const result = run("ps", ["-axo", "pid,etime,command"]);
@@ -465,18 +500,19 @@ function runVisualSmoke(options) {
 		]);
 		if (start.status !== 0) throw new Error(`tmux new-session failed: ${start.stderr?.toString().trim() || start.status}`);
 		sessionStarted = true;
+		const remainOnExit = run(commands.tmux, ["set-option", "-t", sessionName, "remain-on-exit", "on"]);
+		if (remainOnExit.status !== 0) throw new Error(`tmux remain-on-exit setup failed: ${remainOnExit.stderr?.toString().trim() || remainOnExit.status}`);
 
-		sleep(options.startupMs);
+		waitForCursorTui(commands, sessionName, options.startupMs);
 		const load = run(commands.tmux, ["load-buffer", "-b", bufferName, "-"], { input: Buffer.from(options.prompt, "utf8") });
 		if (load.status !== 0) throw new Error(`tmux load-buffer failed: ${load.stderr?.toString().trim() || load.status}`);
 		bufferLoaded = true;
 		try {
-			const paste = run(commands.tmux, ["paste-buffer", "-b", bufferName, "-t", sessionName]);
+			const paste = run(commands.tmux, ["paste-buffer", "-p", "-S", "-b", bufferName, "-t", sessionName]);
 			if (paste.status !== 0) throw new Error(`tmux paste-buffer failed: ${paste.stderr?.toString().trim() || paste.status}`);
-			// Give bracketed paste handling a moment to finish before submitting.
 			sleep(250);
-			const enter = run(commands.tmux, ["send-keys", "-t", sessionName, "Enter"]);
-			if (enter.status !== 0) throw new Error(`tmux send-keys failed: ${enter.stderr?.toString().trim() || enter.status}`);
+			const submit = run(commands.tmux, ["send-keys", "-t", sessionName, "-H", "0d"]);
+			if (submit.status !== 0) throw new Error(`tmux prompt submit failed: ${submit.stderr?.toString().trim() || submit.status}`);
 		} finally {
 			run(commands.tmux, ["delete-buffer", "-b", bufferName]);
 			bufferLoaded = false;
@@ -507,6 +543,11 @@ function runVisualSmoke(options) {
 			writeVisualManifest(manifestPath, options, partialArtifacts, { message, writtenAt: new Date().toISOString() });
 			throw new Error(message);
 		}
+		if (!jsonlContainsUserPrompt(jsonlPath, options.prompt)) {
+			const message = "current-run JSONL does not contain the submitted prompt";
+			writeVisualManifest(manifestPath, options, { ...partialArtifacts, jsonlPath }, { message, writtenAt: new Date().toISOString() });
+			throw new Error(message);
+		}
 		writeUtf8(jsonlPathFile, `${jsonlPath}\n`);
 
 		return { ...partialArtifacts, jsonlPath };
@@ -531,6 +572,8 @@ try {
 			parseArgs,
 			snapshotJsonlMtimes,
 			findLatestJsonl,
+			jsonlContainsUserPrompt,
+			waitForCursorTui,
 			sealedNodePath,
 			resolveCommand,
 			requireNode,

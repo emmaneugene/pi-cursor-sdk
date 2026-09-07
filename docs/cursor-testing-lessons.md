@@ -28,6 +28,21 @@ Passing hundreds of unit tests did not prove that chain was safe. Regression cov
 
 When changing provider/runtime behavior, ask whether the bug spans **pi extension lifecycle**, **active tool state**, **provider streaming**, and **persisted JSONL**. If yes, add an integration-style unit test or live smoke coverage for that chain.
 
+## In-process child sessions re-run the extension factory
+
+Pi subagents build a child `AgentSession` in the same process (`createAgentSession` + `bindExtensions`). That re-invokes the `pi-cursor-sdk` factory against a new ExtensionAPI while the parent Cursor run still owns the process-global bridge, session scope, and pooled SDK agent.
+
+The observed failure: the child dies at `0 tool uses` with no transcript file, the parent turn aborts with `This operation was aborted`, and bridge diagnostics show `request_rejected` / `cancelled` with `Cursor pi tool bridge extension reloaded`.
+
+Regression coverage:
+
+- `src/cursor-extension-factory-guard.ts` — the first factory owns the process; nested loads no-op until the owner session shuts down and Pi can create its replacement runtime
+- `test/cursor-extension-factory-guard.test.ts` — owner tokens reject stale release and release for every Pi shutdown reason
+- `test/index-factory-guard.test.ts` — nested factory does not re-register, does not steal session scope, and does not dispose a live parent MCP run
+- `test/cursor-pi-tool-bridge.test.ts` — `registerCursorPiToolBridge` keeps the existing registry when a run is live
+
+If the host resolves a Cursor model for a child, that child uses the process-global Cursor agent pool. This guard stops the parent teardown; it does not give the child an independent Cursor session agent. Cursor-child model selection remains a separate live-test requirement.
+
 ## Dual-check invariant: `context.tools` vs pi active tools
 
 Native replay routing intentionally uses two layers:

@@ -57,6 +57,7 @@ import { __testUtils as cursorProviderTestUtils } from "../src/cursor-provider.j
 import { streamCursorLazy } from "../src/cursor-provider-lazy.js";
 import { __testUtils as cursorSessionScopeTestUtils } from "../src/cursor-session-scope.js";
 import { __testUtils as cursorPiToolBridgeTestUtils } from "../src/cursor-pi-tool-bridge.js";
+import { __testUtils as cursorExtensionFactoryGuardTestUtils } from "../src/cursor-extension-factory-guard.js";
 import { __testUtils as cursorHttp1TestUtils } from "../src/cursor-http1.js";
 import { installCursorSessionStoreMock } from "./helpers/cursor-session-store.js";
 import {
@@ -75,6 +76,7 @@ describe("extension session cwd integration", () => {
 	beforeEach(async () => {
 		installCursorSessionStoreMock();
 		await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
+		cursorExtensionFactoryGuardTestUtils.reset();
 		vi.clearAllMocks();
 		delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
 		delete process.env.PI_CURSOR_REGISTER_NATIVE_TOOLS;
@@ -91,6 +93,7 @@ describe("extension session cwd integration", () => {
 
 	afterEach(async () => {
 		cursorSessionScopeTestUtils.reset();
+		cursorExtensionFactoryGuardTestUtils.reset();
 		await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
 	});
 

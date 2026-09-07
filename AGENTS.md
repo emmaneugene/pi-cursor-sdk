@@ -6,7 +6,8 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 
 ## Repository map
 
-- `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, question tool, and pi tool bridge hooks.
+- `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, question tool, and pi tool bridge hooks. The factory is a process-wide singleton: a nested in-process child `createAgentSession` load is ignored until the owner session shuts down.
+- `src/cursor-extension-factory-guard.ts` owns that tokenized factory claim/release so a child session cannot dispose the parent bridge, rewrite session scope, or replace the pooled SDK agent.
 - `src/model-discovery.ts` discovers Cursor models, builds pi model metadata, stores per-model metadata, and defines fallback models.
 - `shared/cursor-model-selection-identities.mjs` owns canonical selectable model/context/fast identities and context-window key normalization shared by runtime discovery and the snapshot generator; its `.d.mts` file owns the TypeScript contract.
 - `src/cursor-provider.ts` is a thin `streamCursor()` wrapper that delegates turn execution to the turn runner.

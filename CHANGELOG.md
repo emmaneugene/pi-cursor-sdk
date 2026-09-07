@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 - 2026-09-07
+
+### Fixed
+
+- Keep the first in-process factory as the Cursor owner. A pi child session that calls `createAgentSession` + `bindExtensions` no longer re-runs the factory in a way that disposes the live parent bridge (`Cursor pi tool bridge extension reloaded`), steals session scope, or aborts the parent `pi__subagent` call.
+
 ## 0.4.0 - 2026-09-06
 
 Breaking: Cursor Cloud support is removed. Cursor SDK runs are local-only.
