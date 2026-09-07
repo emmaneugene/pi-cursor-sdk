@@ -32,16 +32,25 @@ When changing provider/runtime behavior, ask whether the bug spans **pi extensio
 
 Pi subagents build a child `AgentSession` in the same process (`createAgentSession` + `bindExtensions`). That re-invokes the `pi-cursor-sdk` factory against a new ExtensionAPI while the parent Cursor run still owns the process-global bridge, session scope, and pooled SDK agent.
 
-The observed failure: the child dies at `0 tool uses` with no transcript file, the parent turn aborts with `This operation was aborted`, and bridge diagnostics show `request_rejected` / `cancelled` with `Cursor pi tool bridge extension reloaded`.
+The first observed failure: the child died at `0 tool uses` with no transcript file. The parent turn aborted with `This operation was aborted`. Bridge diagnostics showed `request_rejected` / `cancelled` with `Cursor pi tool bridge extension reloaded`.
+
+The process-owner guard fixed that abort, but an unconditional nested-factory return introduced a second failure. A child that selected `cursor/grok-4.6` had model metadata from the parent but no `cursor` provider in its own model runtime. Pi reported `unrecognized provider error` before the first child turn.
+
+Nested factories must split registration by ownership:
+
+- The owner registers process-global controls, session state, native replay, and the owner bridge.
+- Each nested child registers the Cursor provider on its own ExtensionAPI.
+- Each nested child uses its own scope key and SDK agent pool entry. A Cursor child must not wait for the busy parent agent that is waiting for the subagent result.
+- Each nested child uses its own bridge registry over the child's active pi tools. Child shutdown must not call the process-wide bridge abort path.
+- Nested children disable local resume and native replay wrappers. They dispose their isolated SDK agent after the provider run completes.
 
 Regression coverage:
 
-- `src/cursor-extension-factory-guard.ts` — the first factory owns the process; nested loads no-op until the owner session shuts down and Pi can create its replacement runtime
 - `test/cursor-extension-factory-guard.test.ts` — owner tokens reject stale release and release for every Pi shutdown reason
-- `test/index-factory-guard.test.ts` — nested factory does not re-register, does not steal session scope, and does not dispose a live parent MCP run
-- `test/cursor-pi-tool-bridge.test.ts` — `registerCursorPiToolBridge` keeps the existing registry when a run is live
-
-If the host resolves a Cursor model for a child, that child uses the process-global Cursor agent pool. This guard stops the parent teardown; it does not give the child an independent Cursor session agent. Cursor-child model selection remains a separate live-test requirement.
+- `test/index-factory-guard.test.ts` — nested factories register only the child-local provider and bridge hooks without stealing owner scope
+- `test/cursor-session-agent.test.ts` — a nested scope acquires its own SDK agent while the parent scope is busy
+- `test/cursor-pi-tool-bridge.test.ts` — nested bridge shutdown does not reject a pending owner bridge call
+- `test/cursor-provider-run-finalizer.test.ts` — live provider completion runs the nested lifecycle disposal path
 
 ## Dual-check invariant: `context.tools` vs pi active tools
 

@@ -20,7 +20,6 @@ import {
 	abandonSessionCursorAgent,
 	createCursorNativeReplayId,
 	cursorLiveRuns,
-	getActiveCursorLiveRunForCurrentScope,
 	getPendingCursorLiveRun,
 } from "./cursor-provider-live-run-drain.js";
 import {
@@ -66,19 +65,22 @@ interface PrepareCursorProviderTurnContext extends PrepareCursorProviderTurnPara
 	fastEnabled: boolean | undefined;
 }
 
-export function resolveCursorProviderTurnConfig(cwd: string) {
-	return resolveEffectiveCursorConfig({ cwd, projectTrusted: getCursorSessionProjectTrusted() });
+export function resolveCursorProviderTurnConfig(cwd: string, projectTrusted = getCursorSessionProjectTrusted()) {
+	return resolveEffectiveCursorConfig({ cwd, projectTrusted });
 }
 
 function buildLocalCursorProviderTurnLifecycle(
 	lease: SessionCursorAgentLease,
 	scopeKey: string,
+	disposeAgentAfterTurn: boolean,
 ): CursorProviderTurnLifecycle {
 	return {
 		trackRunCompletion: (completion) => lease.trackRunCompletion(completion),
 		commitSend: (context, bootstrapped) => lease.commitSend(context, bootstrapped),
 		abandon: () => abandonSessionCursorAgent(scopeKey),
-		dispose: async () => {},
+		dispose: async () => {
+			if (disposeAgentAfterTurn) await resetSessionCursorAgent(scopeKey);
+		},
 	};
 }
 
@@ -86,7 +88,7 @@ async function prepareCursorLocalProviderTurn(
 	prepareParams: PrepareCursorProviderTurnContext,
 ): Promise<CursorProviderTurnPrepareResult> {
 	const { params, cwd, resolvedApiKey, sdkEventDebug, throwIfAborted, resolvedConfig, agentMode, selection, fastEnabled } = prepareParams;
-	const { model, context, options } = params;
+	const { model, context, options, runtimeContext } = params;
 
 	let restoreCursorSdkOutputFilter: (() => void) | undefined;
 	let sessionAgentScopeKey: string | undefined;
@@ -113,6 +115,7 @@ async function prepareCursorLocalProviderTurn(
 		const queuedBridgeRequestsBeforeLiveRun: CursorPiBridgeToolRequest[] = [];
 		let liveRunForBridgeQueue: CursorLiveRun | undefined;
 		const bridgeExcludeToolNames = buildCursorBridgeExcludeToolNames(resolvedConfig);
+		const localResumeEnabled = runtimeContext?.localResume ?? resolvedConfig.local.resume.value;
 
 		const sessionAgentAcquireParams = {
 			apiKey: resolvedApiKey,
@@ -121,8 +124,12 @@ async function prepareCursorLocalProviderTurn(
 			modelSelection: selection,
 			settingSources,
 			localSafety,
-			localResume: resolvedConfig.local.resume.value,
+			localResume: localResumeEnabled,
 			useHttp1ForAgent,
+			runtimeScope: runtimeContext
+				? { scopeKey: runtimeContext.scopeKey, sessionFile: runtimeContext.sessionFile }
+				: undefined,
+			bridge: runtimeContext?.bridge,
 			bridgeExcludeToolNames,
 			debugRecorder: sdkEventDebug,
 			onBridgeToolRequest: (request: CursorPiBridgeToolRequest) => {
@@ -185,7 +192,7 @@ async function prepareCursorLocalProviderTurn(
 		};
 		const sessionBridgeRun = bridgeRun;
 		const promptInputTokens = estimateCursorPromptTokens(prompt, promptOptions);
-		const useNativeToolReplay = isCursorNativeToolDisplayRuntimeEnabled();
+		const useNativeToolReplay = runtimeContext?.nativeToolReplay ?? isCursorNativeToolDisplayRuntimeEnabled();
 		const activeToolNames = getActiveContextToolNames(context);
 		sdkEventDebug?.recordProviderMeta({
 			model: {
@@ -203,7 +210,7 @@ async function prepareCursorLocalProviderTurn(
 			toolManifestEnabled: resolveCursorToolManifestEnabled(),
 			agentMode,
 			localForce: resolvedConfig.local.force.value,
-			localResume: resolvedConfig.local.resume.value,
+			localResume: localResumeEnabled,
 			resumedAgent: sessionAgentLease.resumed,
 			activeToolNames: activeToolNames ? [...activeToolNames] : [],
 			sessionAgentScopeKey,
@@ -266,7 +273,11 @@ async function prepareCursorLocalProviderTurn(
 			sessionAgentLease,
 			localForce: resolvedConfig.local.force,
 			restoreCursorSdkOutputFilter,
-			lifecycle: buildLocalCursorProviderTurnLifecycle(sessionAgentLease, sessionAgentScopeKey),
+			lifecycle: buildLocalCursorProviderTurnLifecycle(
+			sessionAgentLease,
+			sessionAgentScopeKey,
+			runtimeContext?.disposeAgentAfterTurn === true,
+		),
 			runtime: liveRun
 				? { kind: "live", liveRun, turnCoordinator }
 				: { kind: "direct", turnCoordinator },

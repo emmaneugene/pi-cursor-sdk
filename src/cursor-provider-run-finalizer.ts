@@ -147,6 +147,7 @@ export class CursorRunFinalizer {
 		if (liveCompletion) {
 			void liveCompletion.waitCompletion
 				.finally(async () => {
+					await prepared?.lifecycle.dispose().catch(() => {});
 					await this.finalizeSdkEventDebugBestEffort();
 					this.safeCleanup(() => this.params.sdkProcessErrorGuard.dispose());
 				})

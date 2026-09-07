@@ -4,6 +4,7 @@ import type { Context } from "@earendil-works/pi-ai";
 import {
 	getRegisteredCursorPiToolBridge,
 	type CursorPiBridgeToolRequest,
+	type CursorPiToolBridge,
 	type CursorPiToolBridgeRun,
 } from "./cursor-pi-tool-bridge.js";
 import { computeCursorContextFingerprint } from "./context.js";
@@ -136,6 +137,8 @@ interface SessionCursorAgentCreateParams {
 	bridgeExcludeToolNames?: ReadonlySet<string>;
 	onBridgeToolRequest?: (request: CursorPiBridgeToolRequest) => void;
 	debugRecorder?: CursorSdkEventDebugRecorder;
+	runtimeScope?: { scopeKey: string; sessionFile: string | undefined };
+	bridge?: CursorPiToolBridge;
 	localResume?: boolean;
 	forceCreate?: boolean;
 	createAgent?: CursorSdkModule["Agent"]["create"];
@@ -453,16 +456,17 @@ async function createSessionAgentEntry(
 	let bridgeRun: CursorPiToolBridgeRun | undefined;
 	let sessionStore: OpenCursorSessionStore | undefined;
 	try {
-		const registeredBridge = getRegisteredCursorPiToolBridge();
+		const registeredBridge = params.bridge ?? getRegisteredCursorPiToolBridge();
 		if (registeredBridge) {
-			bridgeRun = await registeredBridge.createRun({
+			const createdBridgeRun = await registeredBridge.createRun({
 				onToolRequest: params.onBridgeToolRequest,
 				debugRecorder: params.debugRecorder,
 				excludeToolNames: params.bridgeExcludeToolNames,
 			});
-			if (!bridgeRun.enabled || !bridgeRun.mcpServers) {
-				await bridgeRun.dispose();
-				bridgeRun = undefined;
+			if (!createdBridgeRun.enabled || !createdBridgeRun.mcpServers) {
+				await createdBridgeRun.dispose();
+			} else {
+				bridgeRun = createdBridgeRun;
 			}
 		}
 
@@ -559,8 +563,8 @@ export function invalidateSessionAgent(
 }
 
 export async function acquireSessionCursorAgent(params: SessionCursorAgentCreateParams): Promise<SessionCursorAgentLease> {
-	const scopeKey = getCursorSessionScopeKey();
-	const persistentStore = getCursorSessionFile() !== undefined;
+	const scopeKey = params.runtimeScope?.scopeKey ?? getCursorSessionScopeKey();
+	const persistentStore = params.runtimeScope ? params.runtimeScope.sessionFile !== undefined : getCursorSessionFile() !== undefined;
 	let forceCreate = params.forceCreate === true;
 
 	while (true) {

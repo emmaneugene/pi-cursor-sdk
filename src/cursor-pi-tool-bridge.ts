@@ -88,18 +88,13 @@ Get-CimInstance Win32_Process -Filter "Name = 'bash.exe' OR Name = 'sh.exe'" |
 	});
 }
 
-export function registerCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): CursorPiToolBridge {
-	// Replacing a bridge during a live MCP run cancels its pending pi tool
-	// calls. Keep the active registry as a final safety belt.
-	if (registeredCursorPiToolBridge?.hasLiveRuns()) {
-		return registeredCursorPiToolBridge;
-	}
-	bridgeToolExecutionAbortTracker.abortAll("Cursor pi tool bridge extension reloaded");
-	void registeredCursorPiToolBridge?.disposeAll("Cursor pi tool bridge extension reloaded");
-	const bridge = new CursorPiToolBridgeRegistry(pi);
-	registeredCursorPiToolBridge = bridge;
+function attachCursorPiToolBridgeHandlers(
+	pi: CursorPiToolBridgeExtensionApi,
+	bridge: CursorPiToolBridgeRegistry,
+	options: { abortAllOnShutdown: boolean; isActive: () => boolean },
+): void {
 	pi.on("tool_call", (event, ctx) => {
-		if (registeredCursorPiToolBridge !== bridge) return undefined;
+		if (!options.isActive()) return undefined;
 		if (!bridge.hasPendingPiToolCallId(event.toolCallId)) {
 			return isCursorPiBridgeToolCallId(event.toolCallId)
 				? { block: true, reason: "Cursor pi bridge tool call is no longer pending" }
@@ -124,8 +119,34 @@ export function registerCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): 
 	});
 	pi.on("session_shutdown", async (event) => {
 		const reason = `Cursor pi tool bridge session shutdown: ${event.reason}`;
-		bridgeToolExecutionAbortTracker.abortAll(reason);
+		if (options.abortAllOnShutdown) bridgeToolExecutionAbortTracker.abortAll(reason);
 		await bridge.disposeAll(reason);
+	});
+}
+
+export function registerCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): CursorPiToolBridge {
+	// Replacing a bridge during a live MCP run cancels its pending pi tool
+	// calls. Keep the active registry as a final safety belt.
+	if (registeredCursorPiToolBridge?.hasLiveRuns()) {
+		return registeredCursorPiToolBridge;
+	}
+	bridgeToolExecutionAbortTracker.abortAll("Cursor pi tool bridge extension reloaded");
+	void registeredCursorPiToolBridge?.disposeAll("Cursor pi tool bridge extension reloaded");
+	const bridge = new CursorPiToolBridgeRegistry(pi);
+	registeredCursorPiToolBridge = bridge;
+	attachCursorPiToolBridgeHandlers(pi, bridge, {
+		abortAllOnShutdown: true,
+		isActive: () => registeredCursorPiToolBridge === bridge,
+	});
+	return bridge;
+}
+
+/** Register a bridge owned only by one nested in-process child session. */
+export function registerNestedCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): CursorPiToolBridge {
+	const bridge = new CursorPiToolBridgeRegistry(pi);
+	attachCursorPiToolBridgeHandlers(pi, bridge, {
+		abortAllOnShutdown: false,
+		isActive: () => true,
 	});
 	return bridge;
 }

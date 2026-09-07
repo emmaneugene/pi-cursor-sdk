@@ -67,8 +67,8 @@ export function getPendingCursorLiveRun(context: Context): CursorLiveRun | undef
 	return cursorLiveRuns.getPendingFromContext(context, getCursorNativeReplayIdFromToolCallId);
 }
 
-export function getActiveCursorLiveRunForCurrentScope(): CursorLiveRun | undefined {
-	return cursorLiveRuns.getActiveForScope();
+export function getActiveCursorLiveRunForScope(scopeKey?: string): CursorLiveRun | undefined {
+	return cursorLiveRuns.getActiveForScope(scopeKey);
 }
 
 function splitTextIntoReplayDeltas(text: string): string[] {
@@ -427,10 +427,11 @@ export async function drainExistingCursorLiveRunBeforeSend(
 	context: Context,
 	signal?: AbortSignal,
 	turnDebugRecorder?: CursorSdkEventDebugRecorder,
+	scopeKey?: string,
 ): Promise<LiveRunPreSendOutcome> {
 	turnDebugRecorder?.recordDrainEvent("pre_send_start", {});
 	while (true) {
-		const run = getPendingCursorLiveRun(context) ?? getActiveCursorLiveRunForCurrentScope();
+		const run = getPendingCursorLiveRun(context) ?? getActiveCursorLiveRunForScope(scopeKey);
 		if (!run || run.disposed) {
 			turnDebugRecorder?.recordDrainEvent("pre_send_end", { outcome: "continue_send", reason: "no_pending_run" });
 			return "continue_send";

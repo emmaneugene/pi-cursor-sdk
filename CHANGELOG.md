@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 - 2026-09-07
+
+### Fixed
+
+- Register an isolated Cursor provider, SDK agent scope, and pi tool bridge for nested in-process child sessions. A non-Cursor parent can now dispatch a pi subagent with a Cursor model, and a Cursor parent can dispatch a Cursor-model pi subagent without waiting on or disposing its own busy Cursor SDK agent.
+
 ## 0.4.1 - 2026-09-07
 
 ### Fixed

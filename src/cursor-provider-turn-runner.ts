@@ -62,7 +62,8 @@ export class CursorProviderTurnRunner {
 
 		try {
 			this.throwIfAborted();
-			const cwd = getCursorSessionCwd();
+			const runtimeContext = this.params.runtimeContext;
+			const cwd = runtimeContext?.cwd ?? getCursorSessionCwd();
 			this.sdkEventDebug = CursorSdkEventDebugSink.maybeCreate({
 				cwd,
 				modelId: model.id,
@@ -70,13 +71,21 @@ export class CursorProviderTurnRunner {
 			});
 			sdkEventDebugRef.current = this.sdkEventDebug;
 			this.sdkEventDebug?.recordContextSnapshot(context);
-			const resolvedConfig = resolveCursorProviderTurnConfig(cwd);
-			const localScopeKey = getCursorSessionScopeKey();
+			const resolvedConfig = resolveCursorProviderTurnConfig(cwd, runtimeContext?.projectTrusted);
+			const localScopeKey = runtimeContext?.scopeKey ?? getCursorSessionScopeKey();
 			sdkProcessErrorGuard.containLocalTransportClosedPipe(() =>
 				invalidateSessionAgent(localScopeKey, { deadTransport: true }),
 			);
 			if (
-				(await drainExistingCursorLiveRunBeforeSend(stream, partial, model, context, options?.signal, this.sdkEventDebug)) ===
+				(await drainExistingCursorLiveRunBeforeSend(
+					stream,
+					partial,
+					model,
+					context,
+					options?.signal,
+					this.sdkEventDebug,
+					localScopeKey,
+				)) ===
 				"stream_ended"
 			) {
 				return;

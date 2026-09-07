@@ -25,6 +25,7 @@ vi.mock("../src/cursor-provider-turn-finalize.js", () => ({
 describe("CursorRunFinalizer", () => {
 	it("settles live-run ownership before best-effort debug writes after wait failure", async () => {
 		const trackRunCompletion = vi.fn();
+		const disposeLifecycle = vi.fn().mockResolvedValue(undefined);
 		mockAwaitFinalizeCursorRunOutcome.mockRejectedValueOnce(new Error("run wait failed"));
 		const prepared: CursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime } = {
 			agent: { agentId: "agent-1" } as SDKAgent,
@@ -62,7 +63,7 @@ describe("CursorRunFinalizer", () => {
 				commitSend: () => {},
 				trackRunCompletion,
 				abandon: async () => {},
-				dispose: async () => {},
+				dispose: disposeLifecycle,
 			},
 			runtime: {
 				kind: "live",
@@ -109,7 +110,7 @@ describe("CursorRunFinalizer", () => {
 			sdkProcessErrorGuard,
 			resolvedApiKey: () => "test-key",
 		});
-		finalizer.startLiveRunCompletion({
+		const liveCompletion = finalizer.startLiveRunCompletion({
 			send: {
 				run: asMockCursorRun({
 					id: "run-1",
@@ -125,11 +126,13 @@ describe("CursorRunFinalizer", () => {
 			discardIncompleteTools: () => {},
 		});
 
+		await finalizer.cleanup(prepared, undefined, liveCompletion);
 		expect(mockAwaitFinalizeCursorRunOutcome).toHaveBeenCalledTimes(1);
 		expect(trackRunCompletion).toHaveBeenCalledTimes(1);
 		await expect(trackRunCompletion.mock.calls[0]?.[0]).resolves.toBeUndefined();
 		expect(prepared.runtime.liveRun).toMatchObject({ done: true, errorMessage: "run wait failed" });
 		expect(captureRunArtifacts).not.toHaveBeenCalled();
+		await vi.waitFor(() => expect(disposeLifecycle).toHaveBeenCalledOnce());
 		sdkProcessErrorGuard.dispose();
 	});
 

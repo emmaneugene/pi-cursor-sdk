@@ -1,8 +1,9 @@
+import { randomUUID } from "node:crypto";
 import type { ExtensionAPI, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { discoverModels, type CursorModelFallbackIssue } from "./model-discovery.js";
 import { registerCursorRuntimeControls } from "./cursor-state.js";
 import { registerCursorNativeToolDisplay } from "./cursor-native-tool-display-registration.js";
-import { registerCursorPiToolBridge } from "./cursor-pi-tool-bridge.js";
+import { registerCursorPiToolBridge, registerNestedCursorPiToolBridge } from "./cursor-pi-tool-bridge.js";
 import { registerCursorQuestionTool } from "./cursor-question-tool.js";
 import { registerCursorSkillTool } from "./cursor-skill-tool.js";
 import { registerCursorSessionScope } from "./cursor-session-scope.js";
@@ -16,6 +17,9 @@ import { registerCursorAgentsContextDedup } from "./cursor-agents-context-regist
 import { registerCursorOverflowNormalization } from "./cursor-provider-overflow.js";
 import { registerCursorSdkSessionProcessErrorGuard } from "./cursor-sdk-process-error-guard.js";
 import { prepareCursorSessionForCompaction } from "./cursor-session-compaction-prep.js";
+import { disposeSessionCursorAgent } from "./cursor-session-agent.js";
+import { getCursorSessionCwd, getCursorSessionProjectTrusted } from "./cursor-session-scope.js";
+import type { CursorProviderRuntimeContext } from "./cursor-provider-runtime-context.js";
 import {
 	claimCursorExtensionFactory,
 	registerCursorExtensionFactoryRelease,
@@ -39,24 +43,70 @@ type CursorExtensionApi =
 	& Parameters<typeof registerCursorSdkSessionProcessErrorGuard>[0]
 	& Parameters<typeof registerCursorExtensionFactoryRelease>[0];
 
-function createCursorProviderConfig(models: ProviderModelConfig[]): ProviderConfig {
+let activeCursorProviderModels: ProviderModelConfig[] | undefined;
+
+function createCursorProviderConfig(
+	models: ProviderModelConfig[],
+	streamSimple: NonNullable<ProviderConfig["streamSimple"]> = streamCursorLazy,
+): ProviderConfig {
 	return {
 		name: "Cursor",
 		baseUrl: "https://cursor.com",
 		apiKey: CURSOR_API_KEY_CONFIG_VALUE,
 		api: "cursor-sdk",
 		models,
-		streamSimple: streamCursorLazy,
+		streamSimple,
 	};
 }
 
-function registerCursorProvider(pi: Pick<ExtensionAPI, "registerProvider">, models: ProviderModelConfig[]): void {
-	pi.registerProvider("cursor", createCursorProviderConfig(models));
+function registerCursorProvider(
+	pi: Pick<ExtensionAPI, "registerProvider">,
+	models: ProviderModelConfig[],
+	streamSimple?: NonNullable<ProviderConfig["streamSimple"]>,
+): void {
+	pi.registerProvider("cursor", createCursorProviderConfig(models, streamSimple));
+}
+
+function registerNestedCursorProvider(pi: CursorExtensionApi, models: ProviderModelConfig[]): void {
+	const bridge = registerNestedCursorPiToolBridge(pi);
+	const nestedRuntimeId = randomUUID();
+	let runtimeContext: CursorProviderRuntimeContext = {
+		scopeKey: `__nested_cursor__:${nestedRuntimeId}`,
+		cwd: getCursorSessionCwd(),
+		sessionFile: undefined,
+		projectTrusted: getCursorSessionProjectTrusted(),
+		bridge,
+		localResume: false,
+		nativeToolReplay: false,
+		disposeAgentAfterTurn: true,
+	};
+	pi.on("session_start", (_event, ctx) => {
+		const sessionFile = ctx.sessionManager?.getSessionFile?.() ?? undefined;
+		const sessionId = ctx.sessionManager?.getSessionId?.() ?? nestedRuntimeId;
+		runtimeContext = {
+			...runtimeContext,
+			scopeKey: sessionFile ?? `__nested_cursor__:${sessionId}`,
+			cwd: ctx.cwd,
+			sessionFile,
+			projectTrusted: ctx.isProjectTrusted?.() === true || runtimeContext.projectTrusted,
+		};
+	});
+	pi.on("session_shutdown", async () => {
+		await disposeSessionCursorAgent(runtimeContext.scopeKey);
+	});
+	registerCursorProvider(pi, models, (model, context, options) =>
+		streamCursorLazy(model, context, options, runtimeContext));
 }
 
 export default async function (pi: CursorExtensionApi) {
 	const factoryClaim = claimCursorExtensionFactory();
-	if (factoryClaim.kind === "nested") return;
+	if (factoryClaim.kind === "nested") {
+		if (!activeCursorProviderModels) {
+			throw new Error("Nested Cursor provider loaded before the owner model catalog was ready");
+		}
+		registerNestedCursorProvider(pi, activeCursorProviderModels);
+		return;
+	}
 
 	try {
 		// Discover first. A discovery failure must not leave process-global
@@ -67,6 +117,7 @@ export default async function (pi: CursorExtensionApi) {
 				fallbackIssue = issue;
 			},
 		});
+		activeCursorProviderModels = models;
 
 		// Session cwd must register before other session_start listeners that depend on it.
 		registerCursorSessionScope(pi);

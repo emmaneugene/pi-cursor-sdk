@@ -15,6 +15,7 @@ import type { CursorSdkTurnCoordinator } from "./cursor-provider-turn-coordinato
 import type { CursorPrompt } from "./context.js";
 import type { CursorResolvedSetting } from "./cursor-config.js";
 import type { CursorSdkTurnUsage } from "./cursor-usage-accounting.js";
+import type { CursorProviderRuntimeContext } from "./cursor-provider-runtime-context.js";
 
 export interface CursorProviderTurnRunnerParams {
 	model: Model<Api>;
@@ -22,6 +23,7 @@ export interface CursorProviderTurnRunnerParams {
 	stream: AssistantMessageEventStream;
 	partial: AssistantMessage;
 	options?: SimpleStreamOptions;
+	runtimeContext?: CursorProviderRuntimeContext;
 	sdkEventDebugRef: { current?: CursorSdkEventDebugSink };
 }
 

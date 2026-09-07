@@ -9,6 +9,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { streamCursor } from "./cursor-provider.js";
 import { sanitizeCursorProviderError } from "./cursor-provider-errors.js";
+import type { CursorProviderRuntimeContext } from "./cursor-provider-runtime-context.js";
 
 function makeProviderRuntimeErrorMessage(model: Model<Api>, error: unknown, apiKey?: string): AssistantMessage {
 	return {
@@ -35,11 +36,12 @@ export function streamCursorLazy(
 	model: Model<Api>,
 	context: Context,
 	options?: SimpleStreamOptions,
+	runtimeContext?: CursorProviderRuntimeContext,
 ): AssistantMessageEventStream {
 	const outer = createAssistantMessageEventStream();
 	queueMicrotask(async () => {
 		try {
-			for await (const event of streamCursor(model, context, options)) {
+			for await (const event of streamCursor(model, context, options, runtimeContext)) {
 				outer.push(event);
 			}
 		} catch (error) {

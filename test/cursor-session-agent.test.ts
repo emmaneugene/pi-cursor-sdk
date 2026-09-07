@@ -54,6 +54,48 @@ describe("cursor-session-agent", () => {
 		expect(mockDispose).not.toHaveBeenCalled();
 	});
 
+	it("uses an explicit nested scope without waiting for a busy parent agent", async () => {
+		let resolveParentCompletion: (() => void) | undefined;
+		const parentCompletion = new Promise<void>((resolve) => {
+			resolveParentCompletion = resolve;
+		});
+		const createAgent = vi.fn()
+			.mockResolvedValueOnce({
+				agentId: "agent-parent",
+				[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
+			})
+			.mockResolvedValueOnce({
+				agentId: "agent-child",
+				[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
+			});
+		const parentScopeKey = "/tmp/sessions/parent.jsonl";
+		const childScopeKey = "/tmp/sessions/child.jsonl";
+		cursorSessionScopeTestUtils.set("/tmp/project", parentScopeKey);
+		const params = {
+			apiKey: "test-key",
+			agentMode: "agent" as const,
+			cwd: "/tmp/project",
+			modelSelection: { id: "composer-2.5" },
+			createAgent,
+		};
+		const parent = await acquireSessionCursorAgent(params);
+		parent.trackRunCompletion(parentCompletion);
+
+		const child = await Promise.race([
+			acquireSessionCursorAgent({
+				...params,
+				runtimeScope: { scopeKey: childScopeKey, sessionFile: childScopeKey },
+			}),
+			new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("child acquire waited for parent")), 100)),
+		]);
+
+		expect(child.scopeKey).toBe(childScopeKey);
+		expect(child.agent.agentId).toBe("agent-child");
+		expect(createAgent).toHaveBeenCalledTimes(2);
+		resolveParentCompletion?.();
+		await parentCompletion;
+	});
+
 	it("passes one session-scoped store through Agent.create and disposes it with the pooled agent", async () => {
 		const storeMock = installCursorSessionStoreMock();
 		const scopeKey = "/tmp/sessions/store-session.jsonl";

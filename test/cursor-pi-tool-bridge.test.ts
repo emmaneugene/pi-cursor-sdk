@@ -17,6 +17,7 @@ import {
 	buildCursorPiToolBridgeSnapshot,
 	buildCursorPiToolBridgeSurfaceSignature,
 	registerCursorPiToolBridge,
+	registerNestedCursorPiToolBridge,
 	resolveCursorPiToolBridgeBuiltinsEnabled,
 	resolveCursorPiToolBridgeDebugEnabled,
 	resolveCursorPiToolBridgeEnabled,
@@ -922,6 +923,35 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 			await client.close().catch(() => undefined);
 			await transport.close().catch(() => undefined);
 			await run.dispose();
+		}
+	});
+
+	it("keeps a parent bridge run alive when a nested bridge shuts down", async () => {
+		const parentPi = createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] });
+		const nestedPi = createBridgePiHarness({ active: [], tools: [] });
+		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
+		const parentBridge = registerCursorPiToolBridge(parentPi);
+		const parentRun = await parentBridge.createRun();
+		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(parentRun));
+		try {
+			const callPromise = client.callTool({ name: "pi__read", arguments: { path: "README.md" } });
+			const observedCallError = callPromise.catch((error: unknown) => error);
+			await waitForQueuedRequests(parentRun);
+
+			const nestedBridge = registerNestedCursorPiToolBridge(nestedPi);
+			expect(nestedBridge).not.toBe(parentBridge);
+			expect(__testUtils.getRegisteredBridgeForTests()).toBe(parentBridge);
+			await nestedPi.runSessionShutdown({ reason: "quit" });
+
+			const raced = await Promise.race([
+				observedCallError.then((error) => ({ settled: true as const, error })),
+				sleep(20).then(() => ({ settled: false as const })),
+			]);
+			expect(raced.settled).toBe(false);
+		} finally {
+			await client.close().catch(() => undefined);
+			await transport.close().catch(() => undefined);
+			await parentRun.dispose();
 		}
 	});
 

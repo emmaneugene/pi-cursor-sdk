@@ -56,15 +56,15 @@ describe("extension factory nested-session guard", () => {
 		await extensionFactory(childPi);
 
 		expect(mockedDiscover).toHaveBeenCalledOnce();
-		expect(childPi.registerProvider).not.toHaveBeenCalled();
+		expect(childPi.registerProvider).toHaveBeenCalledOnce();
+		expect(childPi._registered[0]?.config.streamSimple).not.toBe(parentPi._registered[0]?.config.streamSimple);
 		expect(childPi.registerCommand).not.toHaveBeenCalled();
 		expect(childPi.registerTool).not.toHaveBeenCalled();
-		expect(childPi.on).not.toHaveBeenCalled();
 		expect(cursorPiToolBridgeTestUtils.getRegisteredBridgeForTests()).toBe(parentBridge);
 
 		await childPi.runSessionShutdown({ reason: "quit" });
 		await extensionFactory(laterChildPi);
-		expect(laterChildPi.registerProvider).not.toHaveBeenCalled();
+		expect(laterChildPi.registerProvider).toHaveBeenCalledOnce();
 	});
 
 	it("does not let a child session_start steal the parent Cursor session scope", async () => {
@@ -140,7 +140,7 @@ describe("extension factory nested-session guard", () => {
 
 			expect(cursorPiToolBridgeTestUtils.getRegisteredBridgeForTests()).toBe(bridge);
 			expect(cursorPiToolBridgeTestUtils.getRegisteredBridgeForTests()?.hasLiveRuns()).toBe(true);
-			expect(childPi.registerProvider).not.toHaveBeenCalled();
+			expect(childPi.registerProvider).toHaveBeenCalledOnce();
 			const raced = await Promise.race([
 				observedCallError.then((error) => ({ settled: true as const, error })),
 				sleep(20).then(() => ({ settled: false as const })),

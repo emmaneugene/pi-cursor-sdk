@@ -6,8 +6,9 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 
 ## Repository map
 
-- `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, question tool, and pi tool bridge hooks. The factory is a process-wide singleton: a nested in-process child `createAgentSession` load is ignored until the owner session shuts down.
-- `src/cursor-extension-factory-guard.ts` owns that tokenized factory claim/release so a child session cannot dispose the parent bridge, rewrite session scope, or replace the pooled SDK agent.
+- `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, question tool, and pi tool bridge hooks. The first in-process factory owns process-global state. Nested child factories register an isolated Cursor provider and bridge without replacing the owner.
+- `src/cursor-extension-factory-guard.ts` owns the tokenized process-owner claim/release so a child session cannot dispose the parent bridge, rewrite parent session scope, or replace the parent pooled SDK agent.
+- `src/cursor-provider-runtime-context.ts` carries the nested child's explicit scope, cwd, trust, bridge, replay, and resume policy through provider turns.
 - `src/model-discovery.ts` discovers Cursor models, builds pi model metadata, stores per-model metadata, and defines fallback models.
 - `shared/cursor-model-selection-identities.mjs` owns canonical selectable model/context/fast identities and context-window key normalization shared by runtime discovery and the snapshot generator; its `.d.mts` file owns the TypeScript contract.
 - `src/cursor-provider.ts` is a thin `streamCursor()` wrapper that delegates turn execution to the turn runner.
@@ -26,7 +27,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-session-store.ts` owns per-session Cursor SDK SQLite store identity derivation, open/disposal, temporary fileless stores, and guarded removal.
 - `src/cursor-http1.ts` owns branch-scoped local HTTP/1.1 session state, global-preference override tracking, and extension-owned SDK configuration/null reset.
 - `src/cursor-sdk-platform-package.ts` owns bundled Cursor SDK platform-package resolution for ripgrep, the tree-sitter vendor directory, and `cursorsandbox`, plus the local-agent argv[1] host-entry so the SDK locator can see that package.
-- `src/cursor-session-agent.ts` owns session-scoped SDK agent pooling, transport-aware pool identity, send-state commits, busy tracking for in-flight SDK `run.wait()` work, and scoped acquire/dispose state.
+- `src/cursor-session-agent.ts` owns session-scoped SDK agent pooling, explicit nested-child pool scopes, transport-aware pool identity, send-state commits, busy tracking for in-flight SDK `run.wait()` work, and scoped acquire/dispose state.
 - `src/cursor-session-agent-lineage.ts` owns non-resumable per-session local agent lineage custom entries independent of local resume.
 - `src/cursor-session-agent-lifecycle.ts` owns lazy session-agent lifecycle invalidation on model select, compaction, tree navigation, shutdown, and scope changes, including shutdown-time HTTP transport reset before module reload.
 - `src/cursor-session-compaction-prep.ts` owns `prepareCursorSessionForCompaction()` (release scoped live runs, reset pooled agent, suppress summarizer resume-handle persist) wired from `session_before_compact` in `src/index.ts`.
@@ -60,7 +61,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-pi-tool-bridge-types.ts` owns shared bridge/MCP type contracts.
 - `src/cursor-env-boolean.ts` owns canonical env boolean parsing (default and tri-state optional) for bridge diagnostics, flags, and native replay gating.
 - `src/cursor-live-run-coordinator.ts` owns live Cursor run registry/scope matching, queued events, drain leases, idle disposal timers, and release cleanup.
-- `src/cursor-pi-tool-bridge.ts` re-exports bridge registration and snapshot helpers; exposes active pi tools to local Cursor agents through a per-run loopback MCP bridge.
+- `src/cursor-pi-tool-bridge.ts` re-exports bridge registration and snapshot helpers; exposes active pi tools through owner and nested-child loopback MCP bridge registries without cross-session shutdown.
 - `src/cursor-pi-tool-bridge-snapshot.ts` owns bridge snapshot building, env gating, and surface signatures.
 - `src/cursor-pi-tool-bridge-server.ts` owns loopback HTTP routing and run endpoint registry for bridge runs.
 - `src/cursor-pi-tool-bridge-run.ts` owns MCP transport setup, pending bridge calls, pi tool dispatch, cancellation, and run lifecycle.
