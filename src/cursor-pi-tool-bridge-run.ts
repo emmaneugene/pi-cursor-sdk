@@ -183,6 +183,10 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 		await this.resolveToolResults(context.messages.map(asToolResultMessage).filter((message): message is ToolResultMessage => message !== undefined));
 	}
 
+	hasPendingCalls(): boolean {
+		return this.pendingCount() > 0;
+	}
+
 	hasPendingPiToolCallId(piToolCallId: string): boolean {
 		return this.pendingByPiToolCallId.has(piToolCallId);
 	}

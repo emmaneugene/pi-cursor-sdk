@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3 - 2026-09-11
+
+### Fixed
+
+- Keep live Cursor runs open while bridged pi tools await results. Long `cursor_ask_question` waits and other bridge calls now use the bridge CallTool deadline instead of being cancelled by the five-minute inactive-run cleanup.
+
 ## 0.4.2 - 2026-09-07
 
 ### Fixed

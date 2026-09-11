@@ -325,8 +325,9 @@ describe("streamCursor bridge MCP", () => {
 		expect(getCreatedAgentOptions().mcpServers).toBeUndefined();
 	});
 
-	it("emits bridge MCP requests as real pi tool calls and resumes the same Cursor run after tool results in plan mode", async () => {
+	it("keeps bridge MCP requests alive past idle disposal and resumes the same Cursor run in plan mode", async () => {
 		await setCursorModeForBridgeTest("plan");
+		cursorProviderTestUtils.setCursorNativeReplayIdleDisposeMs(100);
 		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		const registeredTools: RegisteredTool[] = [];
@@ -361,10 +362,11 @@ describe("streamCursor bridge MCP", () => {
 				unsupportedReason: () => undefined,
 			});
 		});
+		const mockDispose = vi.fn().mockResolvedValue(undefined);
 		mockCreatedAgent({
 			agentId: "agent-1",
 			send: mockSend,
-			[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
+			[Symbol.asyncDispose]: mockDispose,
 		});
 
 		const firstEventsPromise = collectEvents(streamCursor(makeModel("composer-2"), makeContext(), { apiKey: "test-key" }));
@@ -415,6 +417,13 @@ describe("streamCursor bridge MCP", () => {
 			expect(trace).not.toContain("Cursor MCP did not complete");
 			expect(trace).not.toContain("Cursor tool started without a completion event");
 			expect(nativeToolDisplayTestUtils.nativeToolResultCount()).toBe(0);
+
+			const activeRun = cursorProviderTestUtils.getActiveCursorLiveRunForScope();
+			if (!activeRun?.bridgeRun) throw new Error("Expected an active bridge run");
+			const hasPendingCalls = vi.spyOn(activeRun.bridgeRun, "hasPendingCalls");
+			await vi.waitFor(() => expect(hasPendingCalls).toHaveBeenCalled());
+			expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(1);
+			expect(mockDispose).not.toHaveBeenCalled();
 
 			const readToolResultMessage = {
 				role: "toolResult" as const,
@@ -508,21 +517,22 @@ describe("streamCursor bridge MCP", () => {
 		expect(hasEventType(events, "toolcall_start")).toBe(false);
 	});
 
-	it("rejects pending bridge MCP waits, clears live runs on idle disposal, and abandons the session agent", async () => {
+	it("releases an abandoned live run after its pending bridge call reaches the bridge deadline", async () => {
 		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		cursorProviderTestUtils.setCursorNativeReplayIdleDisposeMs(1);
+		process.env.PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS = "300";
+		cursorProviderTestUtils.setCursorNativeReplayIdleDisposeMs(20);
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createTestToolInfo("read", Type.Object({ path: Type.String() }), "Read files")],
 		});
 		const mockDispose = vi.fn().mockResolvedValue(undefined);
-		const runWait = vi.fn(() => new Promise<{ id: string; status: "finished"; result: string }>(() => {}));
+		const sdkCancel = vi.fn().mockResolvedValue(undefined);
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
 			agentId: "agent-1",
 			status: "running",
-			wait: runWait,
-			cancel: vi.fn(),
+			wait: vi.fn(() => new Promise<{ id: string; status: "finished"; result: string }>(() => {})),
+			cancel: sdkCancel,
 			supports: () => true,
 			unsupportedReason: () => undefined,
 		});
@@ -538,17 +548,15 @@ describe("streamCursor bridge MCP", () => {
 		const { client, transport } = await connectMcpClient(getPiToolsMcpUrlFromAgentCreateOptions(createOptions));
 		try {
 			const callErrorPromise = client.callTool({ name: "pi__read", arguments: { path: "README.md" } }).catch((error: unknown) => error);
-			const firstEvents = await firstEventsPromise;
-			const firstDone = getDoneEvent(firstEvents);
-
+			const firstDone = getDoneEvent(await firstEventsPromise);
 			expect(firstDone.reason).toBe("toolUse");
-			expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(1);
 
-			await vi.waitFor(() => expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0));
 			const error = await callErrorPromise;
 			expect(error).toBeInstanceOf(Error);
-			expect((error as Error).message).toMatch(/disposed|cancelled|MCP error/i);
-			expect(mockDispose).toHaveBeenCalledTimes(1);
+			expect((error as Error).message).toMatch(/timed out|MCP error/i);
+			await vi.waitFor(() => expect(mockDispose).toHaveBeenCalledTimes(1));
+			expect(sdkCancel).toHaveBeenCalledTimes(1);
+			expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0);
 		} finally {
 			await client.close().catch(() => undefined);
 			await transport.close().catch(() => undefined);

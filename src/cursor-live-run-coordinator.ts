@@ -111,6 +111,11 @@ function isPendingBridgeToolRequest(run: CursorLiveRun, request: CursorPiBridgeT
 	return bridgeRun?.hasPendingPiToolCallId(request.piToolCallId) === true;
 }
 
+function hasPendingBridgeCalls(run: CursorLiveRun): boolean {
+	if (run.bridgeRun?.hasPendingCalls()) return true;
+	return run.sessionBridgeRun !== run.bridgeRun && run.sessionBridgeRun?.hasPendingCalls() === true;
+}
+
 export interface CursorLiveRunRecord {
 	id: string;
 	disposed: boolean;
@@ -494,6 +499,12 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 			if (state.leased || state.leaseQueue.length > 0) return;
 			state.idleDisposeRequested = false;
 			state.idleDisposeTimer = setTimeout(() => {
+				if (hasPendingBridgeCalls(run)) {
+					// Bridge calls have their own deadline. Reuse the idle interval to avoid a hot
+					// polling loop if the SDK does not emit a terminal event after that deadline.
+					coordinator.requestIdleDispose(run);
+					return;
+				}
 				void coordinator.release(run).catch(() => {
 					// Idle dispose must not leave release failures as unhandled rejections.
 				});
