@@ -369,7 +369,7 @@ LIST_OUT="$ISOLATED/list-models.txt"
 run_in_dir_capture_combined "list-models" 30 "$PROJECT_DIR" "$LIST_OUT" "${PI_CURSOR_ENV[@]}" \
 	"$PI_BIN" --approve --cursor-no-fast --list-models cursor
 "$RG_BIN" -q "grok-4\\.6" "$LIST_OUT" || fail "grok-4.6 not listed (see $LIST_OUT)"
-"$RG_BIN" -q "composer-2\\.5|composer-2-5" "$LIST_OUT" || fail "composer-2-5 not listed (see $LIST_OUT)"
+"$RG_BIN" -q "composer-2\\.5" "$LIST_OUT" || fail "composer-2.5 not listed (see $LIST_OUT)"
 
 log "check: basic provider prompt"
 BASIC_DIR="$SESSION_ROOT/basic"

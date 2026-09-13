@@ -18,7 +18,6 @@ export interface CursorPromptOptions {
 	/** Compact callable-surface summary; included on bootstrap prompts when set. */
 	toolManifest?: string;
 	includePiBridgeGuidance?: boolean;
-	includePiAskQuestionGuidance?: boolean;
 }
 
 export const CURSOR_APPROX_CHARS_PER_TOKEN = 4;
@@ -54,10 +53,9 @@ export function getCursorToolTailGuardText(
 }
 
 function getCursorToolBoundaryText(
-	options: Pick<CursorPromptOptions, "agentMode" | "includePiAskQuestionGuidance"> & { hasToolManifest?: boolean; includePiBridgeGuidance?: boolean } = {},
+	options: Pick<CursorPromptOptions, "agentMode"> & { hasToolManifest?: boolean; includePiBridgeGuidance?: boolean } = {},
 ): string {
 	const includePiBridgeGuidance = options.includePiBridgeGuidance !== false;
-	const includePiAskQuestionGuidance = includePiBridgeGuidance && options.includePiAskQuestionGuidance !== false;
 	const lines = [
 		"Cursor SDK tool boundary:",
 		"Call only Cursor SDK/MCP tools exposed in this run; pi history names, replay labels, and transcript names are not callable.",
@@ -65,7 +63,6 @@ function getCursorToolBoundaryText(
 			? "For exposed pi bridge tools, call pi__* MCP names, not pi card/history names."
 			: undefined,
 		"Do not claim pi-side or WebSearch/WebFetch tools unless Cursor ran an equivalent tool.",
-		includePiAskQuestionGuidance ? "Use pi__cursor_ask_question for material choices if exposed." : undefined,
 		getCursorPlanModeToolGuidanceText(options.agentMode, { includePiBridgeGuidance }),
 		"Images: only latest user images are sent; ask to reattach prior images.",
 	].filter((line): line is string => line !== undefined);
@@ -406,7 +403,6 @@ export function buildCursorPrompt(context: Context, options: CursorPromptOptions
 		agentMode: options.agentMode,
 		hasToolManifest: Boolean(options.toolManifest),
 		includePiBridgeGuidance: options.includePiBridgeGuidance,
-		includePiAskQuestionGuidance: options.includePiAskQuestionGuidance,
 	})];
 	if (options.toolManifest) {
 		sectionsBeforeMessages.push(options.toolManifest);

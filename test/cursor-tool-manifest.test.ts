@@ -13,22 +13,22 @@ describe("cursor-tool-manifest", () => {
 			bridgeSnapshot: {
 				tools: [
 					{
-						piToolName: "cursor_ask_question",
-						mcpToolName: "pi__cursor_ask_question",
+						piToolName: "sem_reindex",
+						mcpToolName: "pi__sem_reindex",
 						description: "ask",
 						inputSchema: { type: "object" },
 						sourceInfo: { source: "extension", path: "test", scope: "temporary", origin: "top-level" },
 					},
 				],
-				mcpToolNameToPiToolName: new Map([["pi__cursor_ask_question", "cursor_ask_question"]]),
-				piToolNameToMcpToolName: new Map([["cursor_ask_question", "pi__cursor_ask_question"]]),
+				mcpToolNameToPiToolName: new Map([["pi__sem_reindex", "sem_reindex"]]),
+				piToolNameToMcpToolName: new Map([["sem_reindex", "pi__sem_reindex"]]),
 			},
 		});
 
 		expect(text).toContain("Callable tool surfaces this run:");
 		expect(text).toContain("Cursor host/MCP");
 		expect(text).toContain("Pi tool toggles affect pi tools/bridge exposure only");
-		expect(text).toContain("pi__cursor_ask_question");
+		expect(text).toContain("pi__sem_reindex");
 		expect(text).toContain("cursor-replay-*");
 	});
 
@@ -39,8 +39,8 @@ describe("cursor-tool-manifest", () => {
 			bridgeSnapshot: {
 				tools: [
 					{
-						piToolName: "cursor_ask_question",
-						mcpToolName: "pi__cursor_ask_question",
+						piToolName: "sem_reindex",
+						mcpToolName: "pi__sem_reindex",
 						description: "ask",
 						inputSchema: { type: "object" },
 						sourceInfo: { source: "extension", path: "test", scope: "temporary", origin: "top-level" },
@@ -55,7 +55,7 @@ describe("cursor-tool-manifest", () => {
 		expect(text).toContain("Cursor host/MCP");
 		expect(text).toContain("configured MCP depends on Cursor settings");
 		expect(text).not.toContain("Pi bridge");
-		expect(text).not.toContain("pi__cursor_ask_question");
+		expect(text).not.toContain("pi__sem_reindex");
 	});
 
 	it("notes disabled bridge", () => {

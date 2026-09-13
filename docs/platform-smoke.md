@@ -18,7 +18,7 @@ This fork does not use the Crabbox platform matrix as a current release gate. Th
 npm test
 npm run typecheck
 npm pack --dry-run
-# one live print-mode Cursor run with cursor/grok-4.6:slow
+# one live print-mode Cursor run with cursor/grok-4.6
 npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'
 ```
 

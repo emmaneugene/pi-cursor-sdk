@@ -136,7 +136,7 @@ export function startRpc({
 	baseEnv = process.env,
 }) {
 	const model =
-		process.env.CURSOR_LOCAL_RESUME_SMOKE_MODEL || "cursor/grok-4.6:slow";
+		process.env.CURSOR_LOCAL_RESUME_SMOKE_MODEL || "cursor/grok-4.6";
 	const workspaceDir = join(artifactDir, "workspace");
 	mkdirSync(workspaceDir, { recursive: true });
 	const pi = findPiCommand();
@@ -160,6 +160,7 @@ export function startRpc({
 			...extraExtensions.flatMap((path) => ["-e", path]),
 			"--model",
 			model,
+			"--cursor-no-fast",
 			"--cursor-runtime",
 			"local",
 			"--approve",

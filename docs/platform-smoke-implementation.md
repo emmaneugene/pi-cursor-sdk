@@ -48,7 +48,7 @@ Excluded from release visual matrix with required rationale:
 - `webSearch`: network/search dependent.
 - `webFetch`: network dependent.
 
-Adding a registry entry requires adding it to the required or excluded list with rationale. `ls` is currently excluded from the required one-prompt matrix because composer-2-5 does not route the deterministic source-enumeration step through the native `ls` surface reliably; the suite instead gates that behavior through a successful native `find` result for `src/cursor-provider.ts`.
+Adding a registry entry requires adding it to the required or excluded list with rationale. `ls` is currently excluded from the required one-prompt matrix because composer-2.5 does not route the deterministic source-enumeration step through the native `ls` surface reliably; the suite instead gates that behavior through a successful native `find` result for `src/cursor-provider.ts`.
 
 ## Platform command rendering
 

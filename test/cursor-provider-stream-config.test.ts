@@ -32,7 +32,7 @@ import { isAbsolute, join } from "node:path";
 async function setCursorModeForProviderTest(mode: "agent" | "plan"): Promise<void> {
 	const pi = createPiHarness({ flagValues: { "cursor-mode": mode } });
 	registerCursorRuntimeControls(pi);
-	await pi.runSessionStart({ model: makeModel("gpt-5.5@1m") });
+	await pi.runSessionStart({ model: makeModel("gpt-5.5") });
 }
 
 describe("streamCursor prompt and model config", () => {
@@ -51,7 +51,7 @@ describe("streamCursor prompt and model config", () => {
 			}),
 		});
 
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 
 		expect(mockedCreate.mock.calls[0][0].local).toMatchObject({
 			cwd: process.cwd(),
@@ -81,7 +81,7 @@ describe("streamCursor prompt and model config", () => {
 			});
 		});
 
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 
 		expect(mockedCreate).toHaveBeenCalledTimes(1);
 		expect(pathAtCreate).toBeTruthy();
@@ -108,7 +108,7 @@ describe("streamCursor prompt and model config", () => {
 			}),
 		});
 
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 
 		expect(mockedCreate.mock.calls[0][0].local).toMatchObject({ autoReview: true, sandboxOptions: { enabled: true } });
 	});
@@ -133,7 +133,7 @@ describe("streamCursor prompt and model config", () => {
 		});
 
 		try {
-			await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+			await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -146,7 +146,7 @@ describe("streamCursor prompt and model config", () => {
 		process.env.PI_CURSOR_SANDBOX = "0";
 		const pi = createPiHarness({ flagValues: { "cursor-auto-review": true, "cursor-sandbox": true } });
 		registerCursorRuntimeControls(pi);
-		await pi.runSessionStart({ model: makeModel("gpt-5.5@1m") });
+		await pi.runSessionStart({ model: makeModel("gpt-5.5") });
 		mockCreatedAgent({
 			send: vi.fn().mockResolvedValue({
 				id: "run-1",
@@ -159,7 +159,7 @@ describe("streamCursor prompt and model config", () => {
 			}),
 		});
 
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 
 		expect(mockedCreate.mock.calls[0][0].local).toMatchObject({ autoReview: true, sandboxOptions: { enabled: true } });
 	});
@@ -185,7 +185,7 @@ describe("streamCursor prompt and model config", () => {
 				{ role: "user", content: "latest request must remain", timestamp: 2 },
 			],
 		};
-		const smallModel = { ...makeModel("gpt-5.5@1m"), contextWindow: 250, maxTokens: 50 };
+		const smallModel = { ...makeModel("gpt-5.5"), contextWindow: 250, maxTokens: 50 };
 
 		const stream = streamCursor(smallModel, context, { apiKey: "test-key" });
 		await collectEvents(stream);
@@ -225,7 +225,7 @@ describe("streamCursor prompt and model config", () => {
 				},
 			],
 		};
-		const smallModel = { ...makeModel("gpt-5.5@1m"), contextWindow: 250, maxTokens: 50 };
+		const smallModel = { ...makeModel("gpt-5.5"), contextWindow: 250, maxTokens: 50 };
 
 		const stream = streamCursor(smallModel, context, { apiKey: "test-key" });
 		await collectEvents(stream);
@@ -257,7 +257,7 @@ describe("streamCursor prompt and model config", () => {
 		context.tools = [];
 
 		try {
-			await collectEvents(streamCursor(makeModel("gpt-5.5@272k"), context, { apiKey: "test-key", reasoning: "medium" }));
+			await collectEvents(streamCursor(makeModel("gpt-5.5"), context, { apiKey: "test-key", reasoning: "medium" }));
 		} finally {
 			if (previousManifest === undefined) delete process.env.PI_CURSOR_TOOL_MANIFEST;
 			else process.env.PI_CURSOR_TOOL_MANIFEST = previousManifest;
@@ -270,7 +270,6 @@ describe("streamCursor prompt and model config", () => {
 		expect(sentMessage.text).toContain("Cursor host/MCP");
 		expect(sentMessage.text).not.toContain("Bridged pi tools:");
 		expect(sentMessage.text).not.toContain("Pi bridge");
-		expect(sentMessage.text).not.toContain("Use pi__cursor_ask_question");
 		expect(sentMessage.text).not.toContain("prefer pi__mcp");
 	});
 
@@ -298,7 +297,7 @@ describe("streamCursor prompt and model config", () => {
 		context.tools = [];
 
 		try {
-			await collectEvents(streamCursor(makeModel("gpt-5.5@272k"), context, { apiKey: "test-key", reasoning: "medium" }));
+			await collectEvents(streamCursor(makeModel("gpt-5.5"), context, { apiKey: "test-key", reasoning: "medium" }));
 		} finally {
 			if (previousManifest === undefined) delete process.env.PI_CURSOR_TOOL_MANIFEST;
 			else process.env.PI_CURSOR_TOOL_MANIFEST = previousManifest;
@@ -306,7 +305,6 @@ describe("streamCursor prompt and model config", () => {
 
 		const sentMessage = mockSend.mock.calls[0]?.[0] as { text: string };
 		expect(sentMessage.text).toContain("For exposed pi bridge tools");
-		expect(sentMessage.text).not.toContain("Use pi__cursor_ask_question");
 		expect(sentMessage.text).toContain("Pi bridge: call exposed pi__* MCP names");
 		expect(sentMessage.text).toContain("prefer pi__mcp for MCP work and pi__subagent for delegation");
 		expect(sentMessage.text).toContain("pi__sem_reindex");
@@ -340,7 +338,7 @@ describe("streamCursor prompt and model config", () => {
 			],
 		};
 
-		const stream = streamCursor(makeModel("gpt-5.5@1m"), context, { apiKey: "test-key" });
+		const stream = streamCursor(makeModel("gpt-5.5"), context, { apiKey: "test-key" });
 		await collectEvents(stream);
 
 		expect(mockSend).toHaveBeenCalledWith(
@@ -405,7 +403,7 @@ describe("streamCursor prompt and model config", () => {
 			[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
 		});
 
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 
 		expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ mode: "plan" }));
 		expect(mockSend.mock.calls[0]?.[1]).toMatchObject({
@@ -438,24 +436,24 @@ describe("streamCursor prompt and model config", () => {
 		});
 
 		await setCursorModeForProviderTest("agent");
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 		expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ mode: "agent" }));
 		expect(mockSend.mock.calls[0]?.[1]).toMatchObject({ mode: "agent" });
 
 		await setCursorModeForProviderTest("plan");
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 		expect(mockedCreate).toHaveBeenCalledTimes(1);
 		expect(mockSend.mock.calls[1]?.[1]).toMatchObject({ mode: "plan" });
 
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 		expect(mockSend.mock.calls[2]?.[1]).toMatchObject({ mode: "plan" });
 
 		await setCursorModeForProviderTest("agent");
-		await collectEvents(streamCursor(makeModel("gpt-5.5@1m"), makeContext(), { apiKey: "test-key" }));
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 		expect(mockSend.mock.calls[3]?.[1]).toMatchObject({ mode: "agent" });
 	});
 
-	it("passes Cursor alias model selection back to the SDK", async () => {
+	it("ignores catalog aliases and sends the canonical default selection", async () => {
 		modelDiscoveryTestUtils.registerModelItems([
 			{
 				id: "gpt-5.5",
@@ -491,15 +489,15 @@ describe("streamCursor prompt and model config", () => {
 			[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
 		});
 
-		const stream = streamCursor(makeModel("gpt-latest@272k"), makeContext(), { apiKey: "test-key", reasoning: "medium" });
+		const stream = streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key", reasoning: "medium" });
 		await collectEvents(stream);
 
 		expect(mockedCreate).toHaveBeenCalledWith(
 			expect.objectContaining({
 				model: {
-					id: "gpt-latest",
+					id: "gpt-5.5",
 					params: [
-						{ id: "context", value: "272k" },
+						{ id: "context", value: "1m" },
 						{ id: "reasoning", value: "medium" },
 					],
 				},
@@ -508,7 +506,7 @@ describe("streamCursor prompt and model config", () => {
 	});
 
 	it("passes Cursor model selection with context and pi thinking off to Agent.create", async () => {
-		const modelWithParams = makeModel("gpt-5.5@1m");
+		const modelWithParams = makeModel("gpt-5.5");
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
 			agentId: "agent-1",
@@ -542,7 +540,7 @@ describe("streamCursor prompt and model config", () => {
 
 	it("applies pi medium thinking level to Cursor reasoning parameter", async () => {
 		const modelWithParams = {
-			...makeModel("gpt-5.5@1m"),
+			...makeModel("gpt-5.5"),
 			reasoning: true,
 			thinkingLevelMap: { low: "low", medium: "medium", high: "high", xhigh: "extra-high", off: null, minimal: null },
 		};
@@ -577,9 +575,9 @@ describe("streamCursor prompt and model config", () => {
 		);
 	});
 
-	it("maps pi xhigh thinking to Cursor extra-high reasoning for a sibling context", async () => {
+	it("maps pi xhigh thinking to Cursor extra-high reasoning", async () => {
 		const modelWithParams = {
-			...makeModel("gpt-5.5@272k"),
+			...makeModel("gpt-5.5"),
 			reasoning: true,
 			thinkingLevelMap: { low: "low", medium: "medium", high: "high", xhigh: "extra-high", off: null, minimal: null },
 		};
@@ -605,7 +603,7 @@ describe("streamCursor prompt and model config", () => {
 				model: {
 					id: "gpt-5.5",
 					params: [
-						{ id: "context", value: "272k" },
+						{ id: "context", value: "1m" },
 						{ id: "fast", value: "false" },
 						{ id: "reasoning", value: "extra-high" },
 					],
@@ -616,7 +614,7 @@ describe("streamCursor prompt and model config", () => {
 
 	it("applies pi thinking level to Cursor Claude effort and thinking parameters", async () => {
 		const modelWithParams = {
-			...makeModel("claude-opus-4-7@1m"),
+			...makeModel("claude-opus-4-7"),
 			reasoning: true,
 			thinkingLevelMap: {
 				off: "false",
@@ -659,7 +657,7 @@ describe("streamCursor prompt and model config", () => {
 
 	it("turns Cursor thinking off when pi thinking is off", async () => {
 		const modelWithParams = {
-			...makeModel("claude-sonnet-4-6@1m"),
+			...makeModel("claude-sonnet-4-6"),
 			reasoning: true,
 			thinkingLevelMap: { off: "false", low: "low", medium: "medium", high: "high", xhigh: "xhigh" },
 		};

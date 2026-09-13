@@ -23,55 +23,49 @@ const models = [
 ] satisfies ModelListItem[];
 
 describe("Cursor model-selection identities", () => {
-	it("matches runtime registration and canonicalizes default fast aliases", () => {
+	it("registers one canonical pi model per Cursor catalog model", () => {
 		const identities = getCursorModelSelectionIdentities(models);
 		const runtimeIds = modelDiscoveryTestUtils.registerModelItems(models).map(({ id }) => id).sort();
 		expect(identities.map(({ piModelId }) => piModelId).sort()).toEqual(runtimeIds);
-		expect(Object.fromEntries(identities.map(({ piModelId, contextWindowKey, baseContextWindowKey }) => [
+		expect(identities.map(({ piModelId, defaultContext, contextWindowKey }) => ({
 			piModelId,
-			{ contextWindowKey, baseContextWindowKey },
-		]))).toEqual({
-			"model-a@1m": { contextWindowKey: "model-a@1m", baseContextWindowKey: "model-a@1m" },
-			"model-a@1m:fast": { contextWindowKey: "model-a@1m:fast", baseContextWindowKey: "model-a@1m:fast" },
-			"model-a@1m:slow": { contextWindowKey: "model-a@1m", baseContextWindowKey: "model-a@1m" },
-			"alias-a@1m": { contextWindowKey: "alias-a@1m", baseContextWindowKey: "model-a@1m" },
-			"alias-a@1m:fast": { contextWindowKey: "alias-a@1m:fast", baseContextWindowKey: "model-a@1m:fast" },
-			"alias-a@1m:slow": { contextWindowKey: "alias-a@1m", baseContextWindowKey: "model-a@1m" },
-			"model-b": { contextWindowKey: "model-b", baseContextWindowKey: "model-b" },
-		});
+			defaultContext,
+			contextWindowKey,
+		}))).toEqual([
+			{ piModelId: "model-a", defaultContext: "1m", contextWindowKey: "model-a@1m" },
+			{ piModelId: "model-b", defaultContext: undefined, contextWindowKey: "model-b" },
+		]);
 	});
 
-	it("omits stale and ambiguous IDs while collapsing equivalent entries", () => {
+	it("canonicalizes default-context evidence and drops aliases and variants", () => {
 		const normalized = normalizeCursorContextWindowEntries(
 			models,
 			new Map([
 				["default", 200_000],
-				["model-a@1m:slow", 300_000],
-				["model-a@1m:fast", 1_000_000],
-				["alias-a@1m:slow", 300_000],
+				["model-a@1m", 300_000],
+				["alias-a@1m", 300_000],
+				["model-a@1m:fast", 300_000],
 				["shared", 123_000],
 				["removed-model", 456_000],
 			]),
 		);
 		expect(Object.fromEntries(normalized)).toEqual({
 			default: 200_000,
-			"model-a@1m": 300_000,
-			"model-a@1m:fast": 1_000_000,
-			"alias-a@1m": 300_000,
+			"model-a": 300_000,
 		});
 	});
 
-	it("rejects conflicting windows for equivalent selections", () => {
+	it("rejects conflicting windows for a canonical model and its default context", () => {
 		expect(() =>
 			normalizeCursorContextWindowEntries(
 				models,
 				new Map([
-					["model-a@1m", 1_000_000],
-					["model-a@1m:slow", 300_000],
+					["model-a", 1_000_000],
+					["model-a@1m", 300_000],
 				]),
 				"checkpoint input",
 			),
-		).toThrow("checkpoint input assigns conflicting windows to equivalent selection model-a@1m");
+		).toThrow("checkpoint input assigns conflicting windows to canonical model model-a");
 	});
 
 	it("keeps every bundled key canonical and reachable in the fallback catalog", () => {

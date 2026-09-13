@@ -238,7 +238,7 @@ npm pack --dry-run
 # -ne keeps a host `pi install` of this package from colliding with -e .
 SMOKE_DIR="$(mktemp -d /tmp/pi-cursor-sdk-release.XXXXXX)"
 PI_CURSOR_SETTING_SOURCES=none \
-pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6:slow \
+pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/session" --no-tools \
   -p 'Reply exactly: LIVE_PRINT_OK'
 

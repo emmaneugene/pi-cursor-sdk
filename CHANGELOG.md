@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 - 2026-09-13
+
+### Breaking changes
+
+Cursor model aliases, context-specific model IDs, `:fast` / `:slow` virtual models, and the dedicated `cursor_ask_question` tool are removed.
+
+### Changed
+
+- Register exactly one pi model for each item returned by `Cursor.models.list()`. The model picker now uses canonical Cursor IDs only, while the catalog item's default variant supplies its context and fast parameters.
+- Keep fast mode as runtime state through `/cursor-fast`, saved defaults, `--cursor-fast`, and `--cursor-no-fast` instead of registering extra model rows.
+- Remove the dedicated `cursor_ask_question` tool and `PI_CURSOR_ASK_QUESTION`. Cursor models continue to receive pi's richer `AskUserQuestion` tool through the existing tool bridge as `pi__AskUserQuestion`.
+
 ## 0.4.3 - 2026-09-11
 
 ### Fixed

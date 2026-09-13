@@ -64,23 +64,15 @@ describe("discoverModels", () => {
 		const modelIds = models.map((model) => model.id);
 		expect(modelIds).toEqual(
 			expect.arrayContaining([
-				"claude-opus-4-7@1m",
-				"claude-opus-4-7@300k",
-				"claude-opus-4-8@1m",
-				"claude-opus-4-8@300k",
-				"claude-sonnet-4-6@1m",
-				"claude-sonnet-4-6@200k",
+				"claude-opus-4-7",
+				"claude-opus-4-8",
+				"claude-sonnet-4-6",
 				"composer-2.5",
-				"composer-2-5",
-				"composer-latest",
 				"grok-4.6",
-				"grok-4.6:fast",
-				"grok-4.6:slow",
-				"gpt-5.5@1m",
-				"gpt-5.5@272k",
+				"gpt-5.5",
 			]),
 		);
-		expect(modelIds.length).toBeGreaterThan(20);
+		expect(modelIds).toHaveLength(FALLBACK_MODEL_ITEMS.length);
 		expect(issues).toEqual([
 			expect.objectContaining({
 				reason: "missing-api-key",
@@ -99,7 +91,7 @@ describe("discoverModels", () => {
 		process.env.CURSOR_API_KEY = "   ";
 		const issues: CursorModelFallbackIssue[] = [];
 		const models = await discoverModels({ onFallback: (issue) => issues.push(issue) });
-		expect(models.some((model) => model.id === "gpt-5.5@1m")).toBe(true);
+		expect(models.some((model) => model.id === "gpt-5.5")).toBe(true);
 		expect(issues).toEqual([expect.objectContaining({ reason: "missing-api-key" })]);
 		expect(mockedList).not.toHaveBeenCalled();
 	});
@@ -216,7 +208,7 @@ describe("discoverModels", () => {
 		expect(models[0].name).toBe("Model A");
 	});
 
-	it("sorts by base id while preserving Cursor SDK context value order inside each model", async () => {
+	it("sorts canonical models and keeps each default variant's parameters", async () => {
 		process.env.CURSOR_API_KEY = "test-key-123";
 		mockedList.mockResolvedValueOnce([
 			{
@@ -235,118 +227,15 @@ describe("discoverModels", () => {
 
 		const models = await discoverModels();
 
-		expect(models.map((model) => model.id)).toEqual(["a-model@300k", "a-model@1m", "z-model@long", "z-model@short"]);
-		expect(getCursorModelMetadata("a-model@300k")?.defaultParams).toEqual([{ id: "context", value: "300k" }]);
-		expect(getCursorModelMetadata("z-model@long")?.defaultParams).toEqual([{ id: "context", value: "long" }]);
+		expect(models.map((model) => model.id)).toEqual(["a-model", "z-model"]);
+		expect(getCursorModelMetadata("a-model")?.defaultParams).toEqual([{ id: "context", value: "1m" }]);
+		expect(getCursorModelMetadata("z-model")?.defaultParams).toEqual([{ id: "context", value: "short" }]);
 	});
 
-	it("registers Cursor model aliases with the same params and context variants", async () => {
-		process.env.CURSOR_API_KEY = "test-key-123";
-		mockedList.mockResolvedValueOnce([
-			{
-				id: "gpt-5.5",
-				displayName: "GPT-5.5",
-				aliases: ["gpt-latest", "gpt-latest", ""],
-				parameters: [
-					{ id: "context", displayName: "Context", values: [{ value: "1m" }, { value: "272k" }] },
-					{ id: "reasoning", displayName: "Reasoning", values: [{ value: "none" }, { value: "medium" }] },
-				],
-				variants: [
-					{
-						params: [
-							{ id: "context", value: "1m" },
-							{ id: "reasoning", value: "medium" },
-						],
-						displayName: "GPT-5.5",
-						isDefault: true,
-					},
-				],
-			},
-		]);
 
-		const models = await discoverModels();
 
-		expect(models.map((model) => model.id)).toEqual(["gpt-5.5@1m", "gpt-5.5@272k", "gpt-latest@1m", "gpt-latest@272k"]);
-		expect(models[2].name).toBe("GPT-5.5 (gpt-latest) @ 1m");
-		expect(getCursorModelMetadata("gpt-latest@272k")).toMatchObject({
-			baseModelId: "gpt-5.5",
-			selectionModelId: "gpt-latest",
-			context: "272k",
-		});
-		expect(buildCursorModelSelection("gpt-latest@272k", "medium")).toEqual({
-			id: "gpt-latest",
-			params: [
-				{ id: "context", value: "272k" },
-				{ id: "reasoning", value: "medium" },
-			],
-		});
-	});
 
-	it("skips aliases that multiple Cursor base models share", async () => {
-		process.env.CURSOR_API_KEY = "test-key-123";
-		mockedList.mockResolvedValueOnce([
-			{
-				id: "model-a",
-				displayName: "Model A",
-				aliases: ["model-latest", "model-shared"],
-				variants: [{ params: [], displayName: "Model A", isDefault: true }],
-			},
-			{
-				id: "model-b",
-				displayName: "Model B",
-				aliases: ["model-stable", "model-shared"],
-				variants: [{ params: [], displayName: "Model B", isDefault: true }],
-			},
-		]);
-
-		const models = await discoverModels();
-
-		expect(models.map((model) => model.id)).toEqual(["model-a", "model-latest", "model-b", "model-stable"]);
-		expect(getCursorModelMetadata("model-shared")).toBeUndefined();
-	});
-
-	it("skips aliases that collide with another Cursor base model id", async () => {
-		process.env.CURSOR_API_KEY = "test-key-123";
-		mockedList.mockResolvedValueOnce([
-			{
-				id: "model-a",
-				displayName: "Model A",
-				aliases: ["model-b", "model-a-latest"],
-				variants: [{ params: [], displayName: "Model A", isDefault: true }],
-			},
-			{
-				id: "model-b",
-				displayName: "Model B",
-				variants: [{ params: [], displayName: "Model B", isDefault: true }],
-			},
-		]);
-
-		const models = await discoverModels();
-
-		expect(models.map((model) => model.id)).toEqual(["model-a", "model-a-latest", "model-b"]);
-		expect(getCursorModelMetadata("model-b")?.baseModelId).toBe("model-b");
-	});
-
-	it("uses the aliased base model context-window cache for aliases without context params", async () => {
-		process.env.CURSOR_API_KEY = "test-key-123";
-		mockedList.mockResolvedValueOnce([
-			{
-				id: "gpt-5-mini",
-				displayName: "GPT-5 Mini",
-				aliases: ["gpt-mini-latest"],
-				variants: [{ params: [], displayName: "GPT-5 Mini", isDefault: true }],
-			},
-		]);
-
-		const models = await discoverModels();
-
-		expect(models.map((model) => [model.id, model.contextWindow])).toEqual([
-			["gpt-5-mini", 272000],
-			["gpt-mini-latest", 272000],
-		]);
-	});
-
-	it("registers one pi model per Cursor context value", async () => {
+	it("registers one canonical model with Cursor's default context and fast parameters", async () => {
 		process.env.CURSOR_API_KEY = "test-key-123";
 		mockedList.mockResolvedValueOnce([
 			{
@@ -354,86 +243,43 @@ describe("discoverModels", () => {
 				displayName: "GPT-5.4",
 				parameters: [
 					{ id: "context", displayName: "Context", values: [{ value: "272k" }, { value: "1m" }] },
-					{
-						id: "reasoning",
-						displayName: "Reasoning",
-						values: [{ value: "none" }, { value: "medium" }],
-					},
+					{ id: "reasoning", displayName: "Reasoning", values: [{ value: "none" }, { value: "medium" }] },
 					{ id: "fast", displayName: "Fast", values: [{ value: "false" }, { value: "true" }] },
 				],
-				variants: [
-					{
-						params: [
-							{ id: "context", value: "1m" },
-							{ id: "reasoning", value: "medium" },
-							{ id: "fast", value: "false" },
-						],
-						displayName: "GPT-5.4",
-						isDefault: true,
-					},
-				],
+				variants: [{
+					params: [
+						{ id: "context", value: "1m" },
+						{ id: "reasoning", value: "medium" },
+						{ id: "fast", value: "false" },
+					],
+					displayName: "GPT-5.4",
+					isDefault: true,
+				}],
 			},
 		]);
-		const models = await discoverModels();
-		expect(models.map((model) => model.id)).toEqual([
-			"gpt-5.4@272k",
-			"gpt-5.4@272k:fast",
-			"gpt-5.4@272k:slow",
-			"gpt-5.4@1m",
-			"gpt-5.4@1m:fast",
-			"gpt-5.4@1m:slow",
-		]);
-		expect(models[0].contextWindow).toBe(272000);
-		expect(models[1].contextWindow).toBe(272000);
-		expect(models[3].contextWindow).toBe(1000000);
-		expect(models[0].name).toBe("GPT-5.4 @ 272k");
-		expect(models[1].name).toBe("GPT-5.4 (fast) @ 272k");
-		expect(models[2].name).toBe("GPT-5.4 (slow) @ 272k");
 
-		const metadata = getCursorModelMetadata("gpt-5.4@272k");
-		expect(metadata).toMatchObject({
-			baseModelId: "gpt-5.4",
-			context: "272k",
+		const models = await discoverModels();
+
+		expect(models.map((model) => model.id)).toEqual(["gpt-5.4"]);
+		expect(models[0]).toMatchObject({ name: "GPT-5.4", contextWindow: 1_000_000 });
+		expect(getCursorModelMetadata("gpt-5.4")).toMatchObject({
 			supportsFast: true,
 			defaultFast: false,
 		});
-		expect(metadata?.defaultParams).toEqual([
-			{ id: "context", value: "272k" },
+		expect(getCursorModelMetadata("gpt-5.4")?.defaultParams).toEqual([
+			{ id: "context", value: "1m" },
 			{ id: "reasoning", value: "medium" },
 			{ id: "fast", value: "false" },
 		]);
-		expect(getCursorModelMetadata("gpt-5.4@272k:fast")).toMatchObject({
-			baseModelId: "gpt-5.4",
-			selectionModelId: "gpt-5.4",
-			context: "272k",
-			fastOverride: true,
-			defaultFast: true,
-		});
-		expect(getCursorModelMetadata("gpt-5.4@272k:slow")).toMatchObject({
-			baseModelId: "gpt-5.4",
-			selectionModelId: "gpt-5.4",
-			context: "272k",
-			fastOverride: false,
-			defaultFast: false,
-		});
-		expect(buildCursorModelSelection("gpt-5.4@272k:fast", "medium")).toEqual({
+		expect(buildCursorModelSelection("gpt-5.4", "medium", true)).toEqual({
 			id: "gpt-5.4",
 			params: [
-				{ id: "context", value: "272k" },
+				{ id: "context", value: "1m" },
 				{ id: "reasoning", value: "medium" },
 				{ id: "fast", value: "true" },
 			],
 		});
-		expect(buildCursorModelSelection("gpt-5.4@272k:slow", "medium")).toEqual({
-			id: "gpt-5.4",
-			params: [
-				{ id: "context", value: "272k" },
-				{ id: "reasoning", value: "medium" },
-				{ id: "fast", value: "false" },
-			],
-		});
 	});
-
 	it("does not encode reasoning, effort, or thinking into pi model IDs", async () => {
 		process.env.CURSOR_API_KEY = "test-key-123";
 		mockedList.mockResolvedValueOnce([
@@ -457,7 +303,7 @@ describe("discoverModels", () => {
 			},
 		]);
 		const models = await discoverModels();
-		expect(models.map((model) => model.id)).toEqual(["gpt-5.3-codex", "gpt-5.3-codex:fast", "gpt-5.3-codex:slow"]);
+		expect(models.map((model) => model.id)).toEqual(["gpt-5.3-codex"]);
 		expect(getCursorModelMetadata("gpt-5.3-codex")?.defaultParams).toEqual([
 			{ id: "reasoning", value: "high" },
 			{ id: "fast", value: "true" },
@@ -487,13 +333,20 @@ describe("discoverModels", () => {
 
 			expect(models.map((model) => [model.id, model.contextWindow])).toEqual([
 				["composer-2", 200000],
-				["composer-2:fast", 200000],
-				["composer-2:slow", 200000],
 				["new-sdk-model", 200000],
 			]);
 		} finally {
 			rmSync(tmpAgentDir, { recursive: true, force: true });
 		}
+	});
+
+	it("uses checkpoint evidence migrated from a former alias for its canonical model", () => {
+		const sol = FALLBACK_MODEL_ITEMS.find(({ id }) => id === "gpt-5.6-sol");
+		if (!sol) throw new Error("gpt-5.6-sol fallback fixture missing");
+
+		expect(register([sol]).map(({ id, contextWindow }) => [id, contextWindow])).toEqual([
+			["gpt-5.6-sol", 272000],
+		]);
 	});
 
 	it("loads the context-window cache once while registering a model catalog", async () => {
@@ -518,68 +371,27 @@ describe("discoverModels", () => {
 		}
 	});
 
-	it("lets user cache override context-qualified model IDs", async () => {
+	it("uses legacy default-context evidence for the canonical model", async () => {
 		const tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-context-window-qualified-"));
 		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
 		try {
 			saveCachedContextWindow("gpt-5.5@1m", 950000);
 			process.env.CURSOR_API_KEY = "test-key-123";
-			mockedList.mockResolvedValueOnce([
-				{
-					id: "gpt-5.5",
-					displayName: "GPT-5.5",
-					parameters: [{ id: "context", displayName: "Context", values: [{ value: "1m" }, { value: "272k" }] }],
-					variants: [{ params: [{ id: "context", value: "1m" }], displayName: "GPT-5.5", isDefault: true }],
-				},
-			]);
+			mockedList.mockResolvedValueOnce([{
+				id: "gpt-5.5",
+				displayName: "GPT-5.5",
+				parameters: [{ id: "context", displayName: "Context", values: [{ value: "1m" }, { value: "272k" }] }],
+				variants: [{ params: [{ id: "context", value: "1m" }], displayName: "GPT-5.5", isDefault: true }],
+			}]);
 
 			const models = await discoverModels();
 
-			expect(models.map((model) => [model.id, model.contextWindow])).toEqual([
-				["gpt-5.5@1m", 950000],
-				["gpt-5.5@272k", 272000],
-			]);
+			expect(models.map((model) => [model.id, model.contextWindow])).toEqual([["gpt-5.5", 950000]]);
 		} finally {
 			rmSync(tmpAgentDir, { recursive: true, force: true });
 		}
 	});
 
-	it("uses base context evidence for aliases unless an exact alias observation exists", () => {
-		const opus = FALLBACK_MODEL_ITEMS.find(({ id }) => id === "claude-opus-4-8");
-		if (!opus) throw new Error("claude-opus-4-8 fallback fixture missing");
-		saveCachedContextWindow("opus-4-8@1m", 310000);
-
-		const windowsById = Object.fromEntries(register([opus]).map(({ id, contextWindow }) => [id, contextWindow]));
-
-		expect(windowsById["claude-opus-4-8@1m"]).toBe(300000);
-		expect(windowsById["opus-4.8@1m"]).toBe(300000);
-		expect(windowsById["opus-4-8@1m"]).toBe(310000);
-	});
-
-	it("inherits base context and fast evidence for aliases without exact observations", () => {
-		saveCachedContextWindow("base-context-model@1m", 300000);
-		saveCachedContextWindow("base-context-model@1m:fast", 320000);
-		saveCachedContextWindow("observed-alias@1m", 310000);
-		const windowsById = Object.fromEntries(register([{
-			id: "base-context-model",
-			displayName: "Base Context Model",
-			aliases: ["observed-alias", "unobserved-alias"],
-			parameters: [
-				{ id: "context", displayName: "Context", values: [{ value: "1m" }] },
-				{ id: "fast", displayName: "Fast", values: [{ value: "false" }, { value: "true" }] },
-			],
-			variants: [{
-				displayName: "Default",
-				isDefault: true,
-				params: [{ id: "context", value: "1m" }, { id: "fast", value: "false" }],
-			}],
-		}]).map(({ id, contextWindow }) => [id, contextWindow]));
-
-		expect(windowsById["observed-alias@1m"]).toBe(310000);
-		expect(windowsById["unobserved-alias@1m"]).toBe(300000);
-		expect(windowsById["unobserved-alias@1m:slow"]).toBe(300000);
-		expect(windowsById["unobserved-alias@1m:fast"]).toBe(320000);
-	});
 
 	it("lets user cache override bundled context windows", async () => {
 		const tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-context-window-"));
@@ -598,11 +410,7 @@ describe("discoverModels", () => {
 
 			const models = await discoverModels();
 
-			expect(models.map((model) => [model.id, model.contextWindow])).toEqual([
-				["composer-2", 201000],
-				["composer-2:fast", 201000],
-				["composer-2:slow", 201000],
-			]);
+			expect(models.map((model) => [model.id, model.contextWindow])).toEqual([["composer-2", 201000]]);
 		} finally {
 			rmSync(tmpAgentDir, { recursive: true, force: true });
 		}
@@ -755,9 +563,8 @@ describe("discoverModels", () => {
 			},
 		]);
 		const models = await discoverModels();
-		expect(models.map((model) => model.id)).toEqual(["claude-opus-4-7@300k", "claude-opus-4-7@1m"]);
-		expect(models[0].contextWindow).toBe(300000);
-		expect(models[1].contextWindow).toBe(1000000);
+		expect(models.map((model) => model.id)).toEqual(["claude-opus-4-7"]);
+		expect(models[0].contextWindow).toBe(1000000);
 		expect(models[0].thinkingLevelMap).toEqual({
 			off: "false",
 			minimal: null,
@@ -871,20 +678,11 @@ describe("discoverModels", () => {
 		const models = await discoverModels();
 		const modelIds = models.map((model) => model.id);
 
-		expect(modelIds).toEqual(expect.arrayContaining(["composer-2.5", "composer-2-5", "composer-latest"]));
+		expect(modelIds).toContain("composer-2.5");
+		expect(modelIds).not.toContain("composer-2-5");
+		expect(modelIds).not.toContain("composer-latest");
 		expect(getCursorModelMetadata("composer-2.5")).toEqual(
 			expect.objectContaining({
-				baseModelId: "composer-2.5",
-				selectionModelId: "composer-2.5",
-				contextWindow: 200000,
-				supportsFast: true,
-				defaultFast: true,
-			}),
-		);
-		expect(getCursorModelMetadata("composer-2-5")).toEqual(
-			expect.objectContaining({
-				baseModelId: "composer-2.5",
-				selectionModelId: "composer-2-5",
 				contextWindow: 200000,
 				supportsFast: true,
 				defaultFast: true,
@@ -951,7 +749,7 @@ describe("discoverModels", () => {
 		const issues: CursorModelFallbackIssue[] = [];
 		mockedList.mockResolvedValueOnce([]);
 		const models = await discoverModels({ onFallback: (issue) => issues.push(issue) });
-		expect(models.some((model) => model.id === "claude-opus-4-8@1m")).toBe(true);
+		expect(models.some((model) => model.id === "claude-opus-4-8")).toBe(true);
 		expect(issues).toEqual([
 			expect.objectContaining({
 				reason: "empty-model-list",

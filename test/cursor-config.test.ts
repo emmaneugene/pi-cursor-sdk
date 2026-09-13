@@ -173,13 +173,9 @@ describe("Cursor SDK config resolver", () => {
 	});
 
 	it("preserves current fast precedence through the resolver", () => {
-		expect(resolveCursorFastDefault({ cliForceFast: true, aliasOverride: false, sessionValue: false, userValue: false, modelDefault: false })).toMatchObject({
+		expect(resolveCursorFastDefault({ cliForceFast: true, sessionValue: false, userValue: false, modelDefault: false })).toMatchObject({
 			value: true,
 			source: "cli",
-		});
-		expect(resolveCursorFastDefault({ aliasOverride: false, sessionValue: true, userValue: true, modelDefault: true })).toMatchObject({
-			value: false,
-			source: "model-alias",
 		});
 		expect(resolveCursorFastDefault({ sessionValue: false, userValue: true, modelDefault: true })).toMatchObject({
 			value: false,

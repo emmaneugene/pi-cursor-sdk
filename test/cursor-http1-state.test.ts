@@ -49,7 +49,7 @@ function customEntry(id: string, customType: string, data: Record<string, unknow
 function createHarness(branch: SessionEntry[] = []) {
 	const pi = createPiHarness();
 	const ctx = createExtensionTestContext({
-		model: makeModel("gpt-5.5@1m"),
+		model: makeModel("gpt-5.5"),
 		sessionManager: {
 			getBranch: vi.fn<ExtensionContext["sessionManager"]["getBranch"]>(() => branch),
 		},

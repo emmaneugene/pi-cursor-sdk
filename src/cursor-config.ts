@@ -24,8 +24,8 @@ export const CURSOR_LOCAL_FORCE_ENV = "PI_CURSOR_LOCAL_FORCE";
 export const CURSOR_LOCAL_RESUME_ENV = "PI_CURSOR_LOCAL_RESUME";
 export const CURSOR_HTTP1_ENV = "PI_CURSOR_HTTP_1_1";
 
-export type CursorConfigSource = "cli" | "environment" | "project" | "user" | "session" | "model-alias" | "builtin";
-export type CursorConfigTrustLevel = "one-shot" | "environment" | "trusted-project" | "user" | "session" | "model-catalog" | "builtin";
+export type CursorConfigSource = "cli" | "environment" | "project" | "user" | "session" | "builtin";
+export type CursorConfigTrustLevel = "one-shot" | "environment" | "trusted-project" | "user" | "session" | "builtin";
 
 export interface CursorSdkConfig {
 	fastDefaults?: Record<string, boolean>;
@@ -97,7 +97,6 @@ const TRUST_LEVELS: Record<CursorConfigSource, CursorConfigTrustLevel> = {
 	project: "trusted-project",
 	user: "user",
 	session: "session",
-	"model-alias": "model-catalog",
 	builtin: "builtin",
 };
 
@@ -357,19 +356,18 @@ function resolveOrdinary<T>(layers: Array<CursorResolvedSetting<T> | undefined>)
 // precedence), plus its per-layer values. Sources omitted from a field's order (e.g. local fields skip
 // "session", force skips project/user/session) are the field-specific omissions the review asked to keep
 // explicit; test/cursor-config.test.ts asserts each one.
-type CursorFieldSource = Exclude<CursorConfigSource, "model-alias">;
-type CursorFieldValues<T> = Partial<Record<CursorFieldSource, T>>;
+type CursorFieldValues<T> = Partial<Record<CursorConfigSource, T>>;
 
-const LOCAL_ORDER: CursorFieldSource[] = ["cli", "environment", "project", "user", "builtin"];
-const LOCAL_FORCE_ORDER: CursorFieldSource[] = ["cli", "environment", "builtin"];
-const HTTP1_ORDER: CursorFieldSource[] = ["session", "environment", "user", "builtin"];
-const BRIDGE_ORDER: CursorFieldSource[] = ["project", "user", "builtin"];
+const LOCAL_ORDER: CursorConfigSource[] = ["cli", "environment", "project", "user", "builtin"];
+const LOCAL_FORCE_ORDER: CursorConfigSource[] = ["cli", "environment", "builtin"];
+const HTTP1_ORDER: CursorConfigSource[] = ["session", "environment", "user", "builtin"];
+const BRIDGE_ORDER: CursorConfigSource[] = ["project", "user", "builtin"];
 
-function buildFieldLayers<T>(order: CursorFieldSource[], values: CursorFieldValues<T>): Array<CursorResolvedSetting<T> | undefined> {
+function buildFieldLayers<T>(order: CursorConfigSource[], values: CursorFieldValues<T>): Array<CursorResolvedSetting<T> | undefined> {
 	return order.map((source) => (source === "builtin" ? resolved("builtin", values.builtin as T) : valueFrom(source, values[source])));
 }
 
-function resolveOrdinaryField<T>(order: CursorFieldSource[], values: CursorFieldValues<T>): CursorResolvedSetting<T> {
+function resolveOrdinaryField<T>(order: CursorConfigSource[], values: CursorFieldValues<T>): CursorResolvedSetting<T> {
 	return resolveOrdinary(buildFieldLayers(order, values));
 }
 
@@ -452,14 +450,12 @@ export function buildCursorBridgeExcludeToolNames(resolvedConfig: CursorResolved
 export function resolveCursorFastDefault(options: {
 	cliForceFast?: boolean;
 	cliForceNoFast?: boolean;
-	aliasOverride?: boolean;
 	sessionValue?: boolean;
 	userValue?: boolean;
 	modelDefault: boolean;
 }): CursorResolvedSetting<boolean> {
 	if (options.cliForceNoFast) return resolved("cli", false);
 	if (options.cliForceFast) return resolved("cli", true);
-	if (options.aliasOverride !== undefined) return resolved("model-alias", options.aliasOverride);
 	if (options.sessionValue !== undefined) return resolved("session", options.sessionValue);
 	if (options.userValue !== undefined) return resolved("user", options.userValue);
 	return resolved("builtin", options.modelDefault);

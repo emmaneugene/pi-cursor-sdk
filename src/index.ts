@@ -4,7 +4,6 @@ import { discoverModels, type CursorModelFallbackIssue } from "./model-discovery
 import { registerCursorRuntimeControls } from "./cursor-state.js";
 import { registerCursorNativeToolDisplay } from "./cursor-native-tool-display-registration.js";
 import { registerCursorPiToolBridge, registerNestedCursorPiToolBridge } from "./cursor-pi-tool-bridge.js";
-import { registerCursorQuestionTool } from "./cursor-question-tool.js";
 import { registerCursorSkillTool } from "./cursor-skill-tool.js";
 import { registerCursorSessionScope } from "./cursor-session-scope.js";
 import { registerCursorSessionAgentLifecycle } from "./cursor-session-agent-lifecycle.js";
@@ -34,7 +33,6 @@ type CursorExtensionApi =
 	& Parameters<typeof registerCursorSessionAgentResume>[0]
 	& Parameters<typeof registerCursorRuntimeControls>[0]
 	& Parameters<typeof registerCursorNativeToolDisplay>[0]
-	& Parameters<typeof registerCursorQuestionTool>[0]
 	& Parameters<typeof registerCursorSkillTool>[0]
 	& Parameters<typeof registerCursorPiToolBridge>[0]
 	& Parameters<typeof registerCursorFallbackIssueWarning>[0]
@@ -129,7 +127,6 @@ export default async function (pi: CursorExtensionApi) {
 		});
 		registerCursorRuntimeControls(pi);
 		registerCursorNativeToolDisplay(pi);
-		registerCursorQuestionTool(pi);
 		registerCursorSkillTool(pi);
 		registerCursorPiToolBridge(pi);
 		registerCursorAgentsContextDedup(pi);

@@ -404,7 +404,7 @@ describe("cursor usage accounting", () => {
 		expect(poisonedAssistant?.usage.totalTokens).toBe(1_132_478);
 
 		// Same api/provider/model as the fixture so rejection is only over-window poison.
-		const model = makeModel("cursor/composer-2-5");
+		const model = makeModel("cursor/composer-2.5");
 		expect(poisonedAssistant).toMatchObject({
 			api: model.api,
 			provider: model.provider,

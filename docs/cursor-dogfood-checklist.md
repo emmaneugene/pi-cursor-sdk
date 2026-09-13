@@ -15,7 +15,7 @@ Short maintainer checklist for **minimal-surface** validation after prompt, brid
 ## One-turn exercise
 
 1. **Native Cursor host tool** — one `read` or `shell` call (Cursor SDK host tools; not listed in MCP `listTools`).
-2. **Pi bridge** (if enabled) — one bridged call via exposed `pi__*` MCP name, e.g. `pi__cursor_ask_question` when active.
+2. **Pi bridge** (if enabled) — one bridged call via exposed `pi__*` MCP name, e.g. `pi__cursor_activate_skill` when active.
 3. **Configured MCP** (optional) — only when you intentionally load Cursor MCP via settings; skip for minimal baseline.
 
 `pi --no-tools` is a pi-registry toggle, not a Cursor SDK host-tool kill switch. In dogfood, expect it to remove pi bridge exposure while Cursor host tools can still run.

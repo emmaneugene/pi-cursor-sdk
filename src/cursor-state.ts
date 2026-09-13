@@ -68,6 +68,7 @@ const DEFAULT_CURSOR_AGENT_MODE: AgentModeOption = "agent";
 
 interface CursorFastEntryData {
 	modelId?: string;
+	// Read session entries written before fast preferences adopted the canonical modelId field.
 	baseModelId?: string;
 	fast: boolean;
 }
@@ -191,20 +192,11 @@ function restoreSessionCursorHttp1(branch: readonly SessionEntry[]): void {
 	}
 }
 
-function getFastPreferenceModelId(metadata: NonNullable<ReturnType<typeof getCursorModelMetadata>>): string {
-	return metadata.selectionModelId || metadata.baseModelId;
-}
-
-function getVirtualFastBaseModelId(modelId: string): string {
-	return modelId.replace(/:(?:fast|slow)$/, "");
-}
-
 function getMapFastPreference(
 	map: Map<string, boolean>,
 	metadata: NonNullable<ReturnType<typeof getCursorModelMetadata>>,
 ): boolean | undefined {
-	const preferenceModelId = getFastPreferenceModelId(metadata);
-	return map.get(preferenceModelId) ?? (preferenceModelId !== metadata.baseModelId ? map.get(metadata.baseModelId) : undefined);
+	return map.get(metadata.piModelId);
 }
 
 function getEffectiveFast(modelId: string): boolean | undefined {
@@ -213,8 +205,7 @@ function getEffectiveFast(modelId: string): boolean | undefined {
 	return resolveCursorFastDefault({
 		cliForceNoFast,
 		cliForceFast,
-		aliasOverride: metadata.fastOverride,
-		sessionValue: authoritativeGlobalFastPreferenceIds.has(getFastPreferenceModelId(metadata))
+		sessionValue: authoritativeGlobalFastPreferenceIds.has(metadata.piModelId)
 			? undefined
 			: getMapFastPreference(sessionFastPreferences, metadata),
 		userValue: getMapFastPreference(globalFastPreferences, metadata),
@@ -465,16 +456,7 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 				ctx.ui.notify("Cursor fast is forced by --cursor-fast", "info");
 				return;
 			}
-			if (metadata.fastOverride !== undefined) {
-				const state = metadata.fastOverride ? "enabled" : "disabled";
-				ctx.ui.notify(
-					`Cursor fast is fixed ${state} by selected model ${metadata.piModelId}; choose ${getVirtualFastBaseModelId(metadata.piModelId)} to use /cursor-fast preferences`,
-					"info",
-				);
-				return;
-			}
-
-			const preferenceModelId = getFastPreferenceModelId(metadata);
+			const preferenceModelId = metadata.piModelId;
 			const current = getEffectiveFast(metadata.piModelId) ?? false;
 			const next = !current;
 			let appendError: unknown;

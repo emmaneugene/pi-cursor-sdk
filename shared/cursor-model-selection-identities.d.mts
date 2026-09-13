@@ -2,12 +2,9 @@ import type { ModelListItem } from "@cursor/sdk";
 
 export interface CursorModelSelectionIdentity {
 	model: ModelListItem;
-	selectionModelId: string;
-	context?: string;
-	fastOverride?: boolean;
 	piModelId: string;
+	defaultContext?: string;
 	contextWindowKey: string;
-	baseContextWindowKey: string;
 }
 
 export declare function getCursorModelSelectionIdentities(

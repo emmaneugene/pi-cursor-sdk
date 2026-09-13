@@ -387,10 +387,9 @@ Everything in this section is in scope when using this checklist for Cursor prov
 
 - Long-running bridged tool abort/cancel cleanup.
 - Native replay cards beyond read, especially shell/edit/write cards, when those renderers change.
-- Bridge question UI when `cursor_ask_question` changes.
 - MCP timeout override behavior (3600s `callTool` default, 10s initialize/listTools default, and SDK-default unknown protocol stacks) when timeout code changes.
 - SDK `semSearch` / `recordScreen` activity replay when those formatters change. There is no reliable local prompt that forces Cursor to call these built-in SDK tools on demand; regression is covered by `test/cursor-tool-transcript.test.ts`. Opportunistically confirm neutral `Cursor semantic search` / `Cursor screen recording` cards if a live run surfaces them.
 - Ambient Cursor setting-source behavior when startup filtering or local Cursor settings handling changes.
-- Model discovery aliases/context variants when model-discovery code or Cursor SDK versions change.
+- Canonical model registration and default parameters when model-discovery code or Cursor SDK versions change.
 
 If any changed surface has no adequate focused live check, add that coverage before release instead of assuming mocks cover reality.

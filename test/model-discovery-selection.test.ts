@@ -76,11 +76,11 @@ describe("buildCursorModelSelection", () => {
 		]);
 	});
 
-	it("uses selected context, pi thinking, and fast state", () => {
-		expect(buildCursorModelSelection("gpt-5.4@272k", "xhigh", true)).toEqual({
+	it("uses default context, pi thinking, and fast state", () => {
+		expect(buildCursorModelSelection("gpt-5.4", "xhigh", true)).toEqual({
 			id: "gpt-5.4",
 			params: [
-				{ id: "context", value: "272k" },
+				{ id: "context", value: "1m" },
 				{ id: "reasoning", value: "extra-high" },
 				{ id: "fast", value: "true" },
 			],
@@ -88,17 +88,17 @@ describe("buildCursorModelSelection", () => {
 	});
 
 	it("turns Claude thinking off and omits effort when pi thinking is off", () => {
-		expect(buildCursorModelSelection("claude-opus-4-7@300k", "off")).toEqual({
+		expect(buildCursorModelSelection("claude-opus-4-7", "off")).toEqual({
 			id: "claude-opus-4-7",
 			params: [
 				{ id: "thinking", value: "false" },
-				{ id: "context", value: "300k" },
+				{ id: "context", value: "1m" },
 			],
 		});
 	});
 
 	it("turns Claude thinking on and maps effort when pi thinking is enabled", () => {
-		expect(buildCursorModelSelection("claude-opus-4-7@1m", "high")).toEqual({
+		expect(buildCursorModelSelection("claude-opus-4-7", "high")).toEqual({
 			id: "claude-opus-4-7",
 			params: [
 				{ id: "thinking", value: "true" },
@@ -114,7 +114,7 @@ describe("buildCursorModelSelection", () => {
 
 	it("returns cloned metadata entries", () => {
 		const entries = getCursorModelMetadataEntries();
-		const metadata = entries.find((entry) => entry.piModelId === "gpt-5.4@1m");
+		const metadata = entries.find((entry) => entry.piModelId === "gpt-5.4");
 		expect(metadata?.defaultParams).toEqual([
 			{ id: "context", value: "1m" },
 			{ id: "reasoning", value: "medium" },
@@ -122,7 +122,7 @@ describe("buildCursorModelSelection", () => {
 		]);
 		metadata!.defaultParams[0].value = "mutated";
 		metadata!.thinkingLevelMap!.medium = "mutated";
-		expect(getCursorModelMetadata("gpt-5.4@1m")?.defaultParams[0].value).toBe("1m");
-		expect(getCursorModelMetadata("gpt-5.4@1m")?.thinkingLevelMap?.medium).toBe("medium");
+		expect(getCursorModelMetadata("gpt-5.4")?.defaultParams[0].value).toBe("1m");
+		expect(getCursorModelMetadata("gpt-5.4")?.thinkingLevelMap?.medium).toBe("medium");
 	});
 });

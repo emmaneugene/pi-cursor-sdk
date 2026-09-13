@@ -444,7 +444,6 @@ describe("streamCursor session agent", () => {
 		const firstPrompt = mockSend.mock.calls[0]?.[0] as { text?: string };
 		expect(firstPrompt.text).toContain("Callable tool surfaces this run:");
 		expect(firstPrompt.text).toContain("Cursor host/MCP");
-		expect(firstPrompt.text).not.toContain("pi__cursor_ask_question");
 	});
 
 	it("applies user-config bridge tool filters through the production turn path", async () => {

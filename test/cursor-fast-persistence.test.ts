@@ -140,67 +140,44 @@ describe("Cursor fast preference persistence", () => {
 		expect(vi.mocked(ctx.ui.notify).mock.calls.flat().join("\n")).not.toContain(sentinel);
 	});
 
-	it("uses the selected Cursor SDK alias as the fast preference key", async () => {
-		const { pi, ctx, commandCtx, commands } = createFastHarness({ modelId: "composer-2-5" });
-		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
 
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:on");
-
-		await commands.get("cursor-fast")!.handler("", commandCtx);
-
-		expect(pi.appendEntry).toHaveBeenCalledWith(__testUtils.FAST_ENTRY_TYPE, {
-			modelId: "composer-2-5",
-			fast: false,
-		});
-		expect(getEffectiveFastForModelId("composer-2-5")).toBe(false);
-		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toEqual({
-			fastDefaults: { "composer-2-5": false },
-		});
-	});
-
-	it("restores legacy base-model fast preferences for Cursor SDK aliases", async () => {
+	it("restores legacy baseModelId fast entries for canonical models", async () => {
 		const { pi, ctx } = createFastHarness({
-			modelId: "composer-2-5",
-			branch: [
-				{
-					type: "custom",
-					id: "fast-entry",
-					parentId: null,
-					timestamp: new Date(0).toISOString(),
-					customType: __testUtils.FAST_ENTRY_TYPE,
-					data: { baseModelId: "composer-2.5", fast: false },
-				},
-			],
+			modelId: "composer-2.5",
+			branch: [{
+				type: "custom",
+				id: "fast-entry",
+				parentId: null,
+				timestamp: new Date(0).toISOString(),
+				customType: __testUtils.FAST_ENTRY_TYPE,
+				data: { baseModelId: "composer-2.5", fast: false },
+			}],
 		});
 
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
 
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off");
-		expect(getEffectiveFastForModelId("composer-2-5")).toBe(false);
+		expect(getEffectiveFastForModelId("composer-2.5")).toBe(false);
 	});
-
-	it("keeps legacy session fast preferences above global alias defaults", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2-5": true } }));
+	it("keeps legacy session fast preferences above global canonical defaults", async () => {
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2.5": true } }));
 		const { pi, ctx } = createFastHarness({
-			modelId: "composer-2-5",
-			branch: [
-				{
-					type: "custom",
-					id: "fast-entry",
-					parentId: null,
-					timestamp: new Date(0).toISOString(),
-					customType: __testUtils.FAST_ENTRY_TYPE,
-					data: { baseModelId: "composer-2.5", fast: false },
-				},
-			],
+			modelId: "composer-2.5",
+			branch: [{
+				type: "custom",
+				id: "fast-entry",
+				parentId: null,
+				timestamp: new Date(0).toISOString(),
+				customType: __testUtils.FAST_ENTRY_TYPE,
+				data: { baseModelId: "composer-2.5", fast: false },
+			}],
 		});
 
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
 
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off");
-		expect(getEffectiveFastForModelId("composer-2-5")).toBe(false);
+		expect(getEffectiveFastForModelId("composer-2.5")).toBe(false);
 	});
-
 	it("does not update fast state when the global config cannot be saved", async () => {
 		const blockedAgentDir = join(tmpAgentDir, "not-a-directory");
 		writeFileSync(blockedAgentDir, "x");
@@ -346,26 +323,6 @@ describe("Cursor fast preference persistence", () => {
 		expect(getEffectiveFastForModelId("composer-2")).toBe(true);
 	});
 
-	it("keeps failed alias authority scoped away from legacy base-model preferences", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2-5": false } }));
-		const branch: SessionEntry[] = [{
-			type: "custom",
-			id: "legacy-fast",
-			parentId: null,
-			timestamp: new Date(0).toISOString(),
-			customType: __testUtils.FAST_ENTRY_TYPE,
-			data: { baseModelId: "composer-2.5", fast: false },
-		}];
-		const { pi, ctx, commandCtx, commands } = createFastHarness({ modelId: "composer-2-5", branch });
-		pi.appendEntry.mockImplementationOnce(() => { throw new Error("journal unavailable"); });
-		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
-
-		await commands.get("cursor-fast")!.handler("", commandCtx);
-		await pi.invokeEventWithContext("session_tree", { type: "session_tree", oldLeafId: null, newLeafId: null }, ctx);
-
-		expect(getEffectiveFastForModelId("composer-2-5")).toBe(true);
-		expect(getEffectiveFastForModelId("composer-2.5")).toBe(false);
-	});
 
 	it("contracts Pi append failure as a possible in-memory partial commit", () => {
 		const manager = SessionManager.create(tmpAgentDir, tmpAgentDir, { id: "fast-append-contract" });

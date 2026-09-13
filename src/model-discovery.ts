@@ -49,15 +49,11 @@ async function getDiscoveryApiKey(apiKey?: string): Promise<string | undefined> 
 
 export interface CursorModelMetadata {
 	piModelId: string;
-	baseModelId: string;
-	selectionModelId: string;
 	displayName: string;
 	defaultParams: ModelParameterValue[];
-	context?: string;
 	contextWindow: number;
 	supportsFast: boolean;
 	defaultFast: boolean;
-	fastOverride?: boolean;
 	supportsReasoning: boolean;
 	thinkingLevelMap?: ThinkingLevelMap;
 	parameterIds: {
@@ -158,48 +154,20 @@ function getDefaultParams(item: ModelListItem): ModelParameterValue[] {
 	return cloneParams(defaultVariant?.params ?? []);
 }
 
-function replaceParam(
-	params: ModelParameterValue[],
-	id: string,
-	value: string,
-): ModelParameterValue[] {
-	let replaced = false;
-	const next = params.map((param) => {
-		if (param.id !== id) return { ...param };
-		replaced = true;
-		return { id, value };
-	});
-	if (!replaced) next.push({ id, value });
-	return next;
-}
-
 function getParamValue(params: ModelParameterValue[], id: string): string | undefined {
 	return params.find((param) => param.id === id)?.value;
 }
 
-function getModelName(item: ModelListItem, context?: string, alias?: string, fastOverride?: boolean): string {
-	const displayName = item.displayName || item.id;
-	const qualifiers: string[] = [];
-	if (alias) qualifiers.push(alias);
-	if (fastOverride === true) qualifiers.push("fast");
-	if (fastOverride === false) qualifiers.push("slow");
-	const baseName = qualifiers.length > 0 ? `${displayName} (${qualifiers.join(", ")})` : displayName;
-	return context ? `${baseName} @ ${context}` : baseName;
-}
-
 function getContextWindow(
 	contextWindowCache: Map<string, number>,
-	selectionKeys: readonly string[],
-	context?: string,
-	baseModelId?: string,
+	modelId: string,
+	defaultContext: string | undefined,
+	contextWindowKey: string,
 ): number {
-	for (const key of new Set(selectionKeys)) {
-		const contextWindow = contextWindowCache.get(key);
-		if (contextWindow !== undefined) return contextWindow;
-	}
 	return (
-		(context ? parseContextWindow(context) : undefined) ??
-		(baseModelId ? contextWindowCache.get(baseModelId) : undefined) ??
+		contextWindowCache.get(modelId) ??
+		contextWindowCache.get(contextWindowKey) ??
+		(defaultContext ? parseContextWindow(defaultContext) : undefined) ??
 		contextWindowCache.get("default") ??
 		FALLBACK_CONTEXT_WINDOW
 	);
@@ -207,27 +175,20 @@ function getContextWindow(
 
 function toMetadata(
 	item: ModelListItem,
-	piModelId: string,
-	selectionModelId: string,
 	defaultParams: ModelParameterValue[],
-	context: string | undefined,
+	defaultContext: string | undefined,
 	contextWindowCache: Map<string, number>,
-	contextWindowKeys: readonly string[],
-	fastOverride?: boolean,
+	contextWindowKey: string,
 ): CursorModelMetadata {
 	const thinkingLevelMap = getThinkingLevelMap(item);
 	const fastValue = getParamValue(defaultParams, "fast")?.toLowerCase();
 	return {
-		piModelId,
-		baseModelId: item.id,
-		selectionModelId,
+		piModelId: item.id,
 		displayName: item.displayName || item.id,
 		defaultParams: cloneParams(defaultParams),
-		...(context ? { context } : {}),
-		contextWindow: getContextWindow(contextWindowCache, contextWindowKeys, context, item.id),
+		contextWindow: getContextWindow(contextWindowCache, item.id, defaultContext, contextWindowKey),
 		supportsFast: getParameter(item, "fast") !== undefined,
 		defaultFast: fastValue === "true",
-		...(fastOverride !== undefined ? { fastOverride } : {}),
 		supportsReasoning: thinkingLevelMap !== undefined,
 		...(thinkingLevelMap ? { thinkingLevelMap } : {}),
 		parameterIds: {
@@ -256,23 +217,16 @@ function toModelConfig(metadata: CursorModelMetadata, name: string): ProviderMod
 function registerModelItems(items: ModelListItem[]): ProviderModelConfig[] {
 	metadataByPiModelId.clear();
 	const contextWindowCache = loadContextWindowCache();
-	return getCursorModelSelectionIdentities(items).map(({ model: item, selectionModelId, context, fastOverride, piModelId, contextWindowKey, baseContextWindowKey }) => {
-		const defaultParams = getDefaultParams(item);
-		const contextParams = context ? replaceParam(defaultParams, "context", context) : defaultParams;
-		const params = fastOverride === undefined ? contextParams : replaceParam(contextParams, "fast", fastOverride ? "true" : "false");
+	return getCursorModelSelectionIdentities(items).map(({ model: item, piModelId, defaultContext, contextWindowKey }) => {
 		const metadata = toMetadata(
 			item,
-			piModelId,
-			selectionModelId,
-			params,
-			context,
+			getDefaultParams(item),
+			defaultContext,
 			contextWindowCache,
-			[piModelId, contextWindowKey, baseContextWindowKey],
-			fastOverride,
+			contextWindowKey,
 		);
 		metadataByPiModelId.set(piModelId, metadata);
-		const alias = selectionModelId === item.id ? undefined : selectionModelId;
-		return toModelConfig(metadata, getModelName(item, context, alias, fastOverride));
+		return toModelConfig(metadata, metadata.displayName);
 	});
 }
 
@@ -354,7 +308,7 @@ export function buildCursorModelSelection(
 		setParam(params, "fast", fastEnabled ? "true" : "false");
 	}
 
-	return params.length > 0 ? { id: metadata.selectionModelId, params } : { id: metadata.selectionModelId };
+	return params.length > 0 ? { id: metadata.piModelId, params } : { id: metadata.piModelId };
 }
 
 function sanitizeDiscoveryError(error: unknown, apiKey: string): string | undefined {

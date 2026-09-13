@@ -6,7 +6,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 
 ## Repository map
 
-- `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, question tool, and pi tool bridge hooks. The first in-process factory owns process-global state. Nested child factories register an isolated Cursor provider and bridge without replacing the owner.
+- `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, and pi tool bridge hooks. The first in-process factory owns process-global state. Nested child factories register an isolated Cursor provider and bridge without replacing the owner.
 - `src/cursor-extension-factory-guard.ts` owns the tokenized process-owner claim/release so a child session cannot dispose the parent bridge, rewrite parent session scope, or replace the parent pooled SDK agent.
 - `src/cursor-provider-runtime-context.ts` carries the nested child's explicit scope, cwd, trust, bridge, replay, and resume policy through provider turns.
 - `src/model-discovery.ts` discovers Cursor models, builds pi model metadata, stores per-model metadata, and defines fallback models.
@@ -70,7 +70,6 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-pi-tool-bridge-mcp.ts` owns MCP name/schema conversion and pi-to-MCP content helpers for the bridge.
 - `src/cursor-model-lifecycle.ts` owns the canonical effective Cursor model lifecycle/sync helper for `session_start`, `before_agent_start`, `model_select` with event-model override, and `turn_start`; callers keep Cursor-only filtering explicit.
 - `src/cursor-fallback-warning.ts` owns per-session Cursor fallback catalog warning activation.
-- `src/cursor-question-tool.ts` owns the bridge-exposed `cursor_ask_question` pi UI tool and the `pi-cursor-sdk:ask-question:blocked` wait-state event.
 - `src/cursor-native-tool-display-registration.ts` owns native replay tool registration and model-scoped activation.
 - `src/cursor-native-replay-routing.ts` owns canonical native replay disposition (`queue_replay` / `inactive_trace` / `transcript_trace`) and context-tool partitioning for drain.
 - `src/cursor-native-replay-trace.ts` owns inactive native replay trace formatting (`title: summary`).
@@ -99,7 +98,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 ## Operating rules
 
 - Prefer the smallest change that preserves the current pi user contract.
-- Treat Cursor SDK model metadata as the source of truth for model IDs, parameters, variants, thinking controls, and context variants. Do not hardcode new model-specific behavior unless it is a documented fallback.
+- Treat Cursor SDK model metadata as the source of truth for canonical model IDs, default parameters, and thinking controls. Register one pi model per catalog item; do not expose Cursor aliases, alternate contexts, or fast states as additional model rows.
 - HARD REPO RULE: never guess what the Cursor SDK outputs, expects, or does. Always verify Cursor SDK behavior against the installed `@cursor/sdk` package and/or the official TypeScript SDK docs at `https://cursor.com/docs/sdk/typescript` before making claims or implementation changes.
 - Contract-test external behavior before relying on it: when code depends on Cursor SDK/pi runtime payloads, timing, lifecycle, errors, usage accounting, or tool/event shapes, add or update a focused test that asserts the observed installed-package/docs/captured-fixture contract and fails if that contract drifts. Do not replace this with mocks based on guesses.
 - CODE IS TRUTH: claims about behavior must be backed by current source code, installed dependency code/types, contract tests, or captured command output. If evidence is missing, say `unknown`; do not infer, soften, or fill gaps with assumptions.
@@ -118,6 +117,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - Typecheck src only: `npm run typecheck:src`
 - Typecheck tests/helpers: `npm run typecheck:tests`
 - Package-readiness check: `npm pack --dry-run`
+- Publish a prepared release from pushed `main`: `gh workflow run publish-npm.yml --ref main && gh run watch`. The workflow uses npm Trusted Publishing through GitHub OpenID Connect (OIDC); do not add an npm token. Wait until `npm view @emmaneugene/pi-cursor-sdk@<version> version` succeeds because npm processes publishes asynchronously.
 - Watch tests while developing: `npm run test:watch`
 - Local development run, requires a Cursor key: `CURSOR_API_KEY="your-key" pi -ne --approve -e . --model cursor/grok-4.6`. `-ne` keeps a host `pi install` of this package from colliding with `-e .`.
 - List Cursor models, requires pi and usually a Cursor key: `pi --list-models cursor`
@@ -164,7 +164,7 @@ When plans, reviews, investigations, or generated smoke/debug artifacts are no l
 - `PI_CURSOR_SDK_EVENT_DEBUG=1` and `npm run debug:provider-events` write raw local artifacts that may include prompts, tool args/results, local paths, or secrets; keep them under gitignored `.debug/`, do not print or commit them, and keep run-scoped debug state explicit rather than process-global.
 - Ambient Cursor settings/rules loading is enabled by default through `PI_CURSOR_SETTING_SOURCES=all`; keep SDK startup log filtering intact so settings/skills output does not corrupt pi's TUI. Users can narrow or disable Cursor setting sources explicitly when desired.
 - Live `pi`/Cursor smoke tests may call external services and require Cursor auth in `~/.pi/agent/auth.json` and/or `CURSOR_API_KEY`; run them for Cursor provider/runtime changes. If auth is unavailable, report live smoke as release-blocked instead of skipped-ready. See `docs/cursor-testing-lessons.md` for isolated harness auth seeding.
-- For live runtime evidence, use `cursor/grok-4.6:slow` as much as needed.
+- For live runtime evidence, use `cursor/grok-4.6` as much as needed.
 - For Cursor provider/runtime changes, the current fork release evidence bar is `npm test`, `npm run typecheck`, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'`; see `docs/cursor-live-smoke-checklist.md`. The three-OS Crabbox platform matrix is deferred in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) until the required macOS, Ubuntu, and Windows infrastructure exists. Do not treat `npm run smoke:platform:all` as a release blocker while that issue remains open.
 
 ## PR review workflow (maintainer)

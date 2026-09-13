@@ -100,7 +100,7 @@ describe("resolveCursorToolCompletion", () => {
 		const resolution = resolveCursorToolCompletion({
 			source: "delta",
 			callId: "call-1",
-			toolCall: { toolName: "pi__cursor_ask_question" },
+			toolCall: { toolName: "pi__sem_reindex" },
 			ledger,
 			shellOutput,
 			liveRun: { bridgeRun: { isBridgeMcpToolCall } } as never,
