@@ -99,6 +99,15 @@ export function buildLocalResumeSmokeEnv(
 ) {
 	const agentDir = join(artifactDir, "agent");
 	mkdirSync(agentDir, { recursive: true });
+	const resumeMode =
+		localResumeEnv === true
+			? "on"
+			: localResumeEnv === false
+				? "unset"
+				: localResumeEnv;
+	if (resumeMode !== "on" && resumeMode !== "off" && resumeMode !== "unset") {
+		fail(`unknown localResumeEnv mode: ${String(localResumeEnv)}`);
+	}
 	const env = buildCursorSmokeEnv({
 		baseEnv,
 		settingSources: "none",
@@ -106,19 +115,10 @@ export function buildLocalResumeSmokeEnv(
 		nativeToolDisplay: false,
 		registerNativeTools: false,
 		exposeBuiltinTools,
+		localResume: resumeMode === "unset" ? undefined : resumeMode === "on",
 		eventDebugDir: join(artifactDir, "debug"),
+		agentDir,
 	});
-	const resumeMode =
-		localResumeEnv === true
-			? "on"
-			: localResumeEnv === false
-				? "unset"
-				: localResumeEnv;
-	delete env.PI_CURSOR_LOCAL_RESUME;
-	if (resumeMode === "on") env.PI_CURSOR_LOCAL_RESUME = "1";
-	else if (resumeMode === "off") env.PI_CURSOR_LOCAL_RESUME = "0";
-	else if (resumeMode !== "unset")
-		fail(`unknown localResumeEnv mode: ${String(localResumeEnv)}`);
 	return {
 		...env,
 		PI_CODING_AGENT_DIR: agentDir,

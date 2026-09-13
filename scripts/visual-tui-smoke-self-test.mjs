@@ -88,12 +88,17 @@ export function runVisualSmokeSelfTest(deps) {
 		};
 		const plan = buildLaunchPlan(baseOptions, { pi: fakePi, node: process.execPath, sealedPath: sealedHostilePath }, "/bin/sh");
 		const defaults = envMap(plan.envAssignments);
-		assertSelfTest(defaults.get("PI_CURSOR_NATIVE_TOOL_DISPLAY") === "1", "native display must be forced on");
-		assertSelfTest(defaults.get("PI_CURSOR_REGISTER_NATIVE_TOOLS") === "1", "native tool registration must be forced on");
-		assertSelfTest(defaults.get("PI_CURSOR_SETTING_SOURCES") === "none", "setting sources must default to none");
-		assertSelfTest(defaults.get("PI_CURSOR_PI_TOOL_BRIDGE") === "0", "bridge must default off");
-		assertSelfTest(defaults.get("PI_CURSOR_EXPOSE_BUILTIN_TOOLS") === "0", "built-in exposure must default off");
+		assertSelfTest(!defaults.has("PI_CURSOR_NATIVE_TOOL_DISPLAY"), "native display must not use the removed public env var");
+		assertSelfTest(!defaults.has("PI_CURSOR_REGISTER_NATIVE_TOOLS"), "native registration must not use the removed public env var");
+		assertSelfTest(!defaults.has("PI_CURSOR_SETTING_SOURCES"), "setting sources must not use the removed public env var");
+		assertSelfTest(!defaults.has("PI_CURSOR_PI_TOOL_BRIDGE"), "bridge must not use the removed public env var");
+		assertSelfTest(!defaults.has("PI_CURSOR_EXPOSE_BUILTIN_TOOLS"), "built-in exposure must not use the removed public env var");
 		assertSelfTest(defaults.get("PI_CODING_AGENT_DIR") === join(tempDir, "pi-agent"), "agent dir must be isolated under out-dir");
+		const defaultConfig = JSON.parse(readFileSync(join(tempDir, "pi-agent", "cursor-sdk.json"), "utf8"));
+		assertSelfTest(defaultConfig.tools?.display?.native === "on", "native display must be forced on in isolated user config");
+		assertSelfTest(Array.isArray(defaultConfig.local?.settingSources) && defaultConfig.local.settingSources.length === 0, "setting sources must default to none in isolated user config");
+		assertSelfTest(defaultConfig.tools?.bridge?.enabled === false, "bridge must default off in isolated user config");
+		assertSelfTest(defaultConfig.tools?.bridge?.exposeBuiltins === false, "built-in exposure must default off in isolated user config");
 		assertSelfTest(defaults.get("PI_OFFLINE") === "1", "startup network operations must be off");
 		assertSelfTest(defaults.get("PI_SKIP_VERSION_CHECK") === "1", "pi.dev version check must be off");
 		for (const name of DEBUG_ENV_NAMES) {
@@ -116,11 +121,11 @@ export function runVisualSmokeSelfTest(deps) {
 		const capturedEnv = parseEnvCapture(envCapture);
 		assertSelfTest(!existsSync(fakeNodeMarker), "launch PATH should force the resolved node before hostile fake node");
 		assertSelfTest((capturedEnv.get("PATH") ?? "").split(delimiter)[0] === dirname(process.execPath), "captured PATH should start with resolved node directory");
-		assertSelfTest(capturedEnv.get("PI_CURSOR_NATIVE_TOOL_DISPLAY") === "1", "captured env should force native display on");
-		assertSelfTest(capturedEnv.get("PI_CURSOR_REGISTER_NATIVE_TOOLS") === "1", "captured env should force native registration on");
-		assertSelfTest(capturedEnv.get("PI_CURSOR_SETTING_SOURCES") === "none", "captured env should force settings off");
-		assertSelfTest(capturedEnv.get("PI_CURSOR_PI_TOOL_BRIDGE") === "0", "captured env should force bridge off");
-		assertSelfTest(capturedEnv.get("PI_CURSOR_EXPOSE_BUILTIN_TOOLS") === "0", "captured env should force built-in exposure off");
+		assertSelfTest(!capturedEnv.has("PI_CURSOR_NATIVE_TOOL_DISPLAY"), "captured env should not set removed native display env");
+		assertSelfTest(!capturedEnv.has("PI_CURSOR_REGISTER_NATIVE_TOOLS"), "captured env should not set removed native registration env");
+		assertSelfTest(!capturedEnv.has("PI_CURSOR_SETTING_SOURCES"), "captured env should not set removed setting-source env");
+		assertSelfTest(!capturedEnv.has("PI_CURSOR_PI_TOOL_BRIDGE"), "captured env should not set removed bridge env");
+		assertSelfTest(!capturedEnv.has("PI_CURSOR_EXPOSE_BUILTIN_TOOLS"), "captured env should not set removed built-in exposure env");
 		for (const name of DEBUG_ENV_NAMES) {
 			assertSelfTest(!capturedEnv.has(name), `${name} should be absent from captured env by default`);
 		}
@@ -131,19 +136,25 @@ export function runVisualSmokeSelfTest(deps) {
 			"/bin/sh",
 		);
 		const optIns = envMap(optInPlan.envAssignments);
-		assertSelfTest(optIns.get("PI_CURSOR_SETTING_SOURCES") === "all", "setting source opt-in must be reflected");
-		assertSelfTest(optIns.get("PI_CURSOR_PI_TOOL_BRIDGE") === "1", "bridge opt-in must be reflected");
-		assertSelfTest(optIns.get("PI_CURSOR_EXPOSE_BUILTIN_TOOLS") === "1", "built-in exposure opt-in must be reflected");
-		assertSelfTest(optIns.get("PI_CURSOR_SDK_EVENT_DEBUG") === "1", "event debug opt-in must be reflected");
-		assertSelfTest(optIns.get("PI_CURSOR_SDK_EVENT_DEBUG_DIR") === join(tempDir, "self-test.cursor-sdk-events"), "event debug dir must be deterministic under out-dir");
+		assertSelfTest(!optIns.has("PI_CURSOR_SETTING_SOURCES"), "setting source opt-in must not use the removed public env var");
+		assertSelfTest(!optIns.has("PI_CURSOR_PI_TOOL_BRIDGE"), "bridge opt-in must not use the removed public env var");
+		assertSelfTest(!optIns.has("PI_CURSOR_EXPOSE_BUILTIN_TOOLS"), "built-in exposure opt-in must not use the removed public env var");
+		assertSelfTest(!optIns.has("PI_CURSOR_SDK_EVENT_DEBUG"), "event debug opt-in must not use the removed public env var");
+		assertSelfTest(!optIns.has("PI_CURSOR_SDK_EVENT_DEBUG_DIR"), "event debug dir must not use the removed public env var");
+		const eventDebugConfig = JSON.parse(readFileSync(join(tempDir, "pi-agent", "cursor-sdk.json"), "utf8"));
+		assertSelfTest(eventDebugConfig.local?.settingSources?.[0] === "all", "setting source opt-in must write isolated cursor-sdk.json");
+		assertSelfTest(eventDebugConfig.tools?.bridge?.enabled === true, "bridge opt-in must write isolated cursor-sdk.json");
+		assertSelfTest(eventDebugConfig.tools?.bridge?.exposeBuiltins === true, "built-in exposure opt-in must write isolated cursor-sdk.json");
+		assertSelfTest(eventDebugConfig.debug?.sdkEvents?.enabled === true, "event debug opt-in must write isolated cursor-sdk.json");
+		assertSelfTest(eventDebugConfig.debug?.sdkEvents?.directory === join(tempDir, "self-test.cursor-sdk-events"), "event debug dir must be deterministic under out-dir");
 		for (const name of DEBUG_ENV_NAMES) {
 			assertSelfTest(optInPlan.clearEnvNames.includes(name), `${name} must be cleared even when event debug is explicit`);
 		}
 		const eventDebugProbe = run("/bin/sh", ["-c", optInPlan.script], { env: hostileEnv });
 		assertSelfTest(eventDebugProbe.status === 0, `fake-pi event-debug env capture exited ${eventDebugProbe.status}: ${eventDebugProbe.stderr?.toString() ?? ""}`);
 		const capturedEventDebugEnv = parseEnvCapture(envCapture);
-		assertSelfTest(capturedEventDebugEnv.get("PI_CURSOR_SDK_EVENT_DEBUG") === "1", "event debug should be explicitly enabled");
-		assertSelfTest(capturedEventDebugEnv.get("PI_CURSOR_SDK_EVENT_DEBUG_DIR") === join(tempDir, "self-test.cursor-sdk-events"), "event debug dir should be deterministic under out-dir");
+		assertSelfTest(!capturedEventDebugEnv.has("PI_CURSOR_SDK_EVENT_DEBUG"), "removed public event debug env should stay unset");
+		assertSelfTest(!capturedEventDebugEnv.has("PI_CURSOR_SDK_EVENT_DEBUG_DIR"), "removed public event debug dir should stay unset");
 		assertSelfTest(!capturedEventDebugEnv.has("PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR"), "stale event debug run dir should be cleared");
 		assertSelfTest(!capturedEventDebugEnv.has("PI_CURSOR_SDK_EVENT_DEBUG_SESSION_DIR"), "stale event debug session dir should be cleared");
 		assertSelfTest(!capturedEventDebugEnv.has("PI_CURSOR_SDK_EVENT_DEBUG_STDERR"), "stale event debug stderr flag should be cleared");

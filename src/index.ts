@@ -17,7 +17,7 @@ import { registerCursorOverflowNormalization } from "./cursor-provider-overflow.
 import { registerCursorSdkSessionProcessErrorGuard } from "./cursor-sdk-process-error-guard.js";
 import { prepareCursorSessionForCompaction } from "./cursor-session-compaction-prep.js";
 import { disposeSessionCursorAgent } from "./cursor-session-agent.js";
-import { getCursorSessionCwd, getCursorSessionProjectTrusted } from "./cursor-session-scope.js";
+import { getCursorSessionCwd } from "./cursor-session-scope.js";
 import type { CursorProviderRuntimeContext } from "./cursor-provider-runtime-context.js";
 import {
 	claimCursorExtensionFactory,
@@ -72,7 +72,6 @@ function registerNestedCursorProvider(pi: CursorExtensionApi, models: ProviderMo
 		scopeKey: `__nested_cursor__:${nestedRuntimeId}`,
 		cwd: getCursorSessionCwd(),
 		sessionFile: undefined,
-		projectTrusted: getCursorSessionProjectTrusted(),
 		bridge,
 		localResume: false,
 		nativeToolReplay: false,
@@ -86,7 +85,6 @@ function registerNestedCursorProvider(pi: CursorExtensionApi, models: ProviderMo
 			scopeKey: sessionFile ?? `__nested_cursor__:${sessionId}`,
 			cwd: ctx.cwd,
 			sessionFile,
-			projectTrusted: ctx.isProjectTrusted?.() === true || runtimeContext.projectTrusted,
 		};
 	});
 	pi.on("session_shutdown", async () => {

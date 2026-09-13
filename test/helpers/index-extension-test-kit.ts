@@ -1,4 +1,8 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { vi } from "vitest";
+import type { CursorSdkConfig } from "../../src/cursor-config.js";
 import {
 	createExtensionRegistrationPi,
 	type CursorExtensionRegistrationPi,
@@ -21,6 +25,18 @@ export {
 	cursorSessionResumeTestUtils,
 };
 
+let isolatedAgentDir: string | undefined;
+
+export function writeIndexTestUserConfig(config: CursorSdkConfig): string {
+	if (!isolatedAgentDir) {
+		isolatedAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-index-config-"));
+		process.env.PI_CODING_AGENT_DIR = isolatedAgentDir;
+	}
+	const path = join(isolatedAgentDir, "cursor-sdk.json");
+	writeFileSync(path, `${JSON.stringify(config)}\n`);
+	return path;
+}
+
 export function createExtensionPi(
 	initialTools?: PiHarnessOptions["initialTools"],
 ): PiHarness & CursorExtensionRegistrationPi {
@@ -30,12 +46,9 @@ export function createExtensionPi(
 export async function resetIndexExtensionTestState(): Promise<void> {
 	vi.clearAllMocks();
 	installCursorSessionStoreMock();
-	delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
-	delete process.env.PI_CURSOR_REGISTER_NATIVE_TOOLS;
-	delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
-	delete process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS;
-	delete process.env.PI_CURSOR_AUTO_REVIEW;
-	delete process.env.PI_CURSOR_SANDBOX;
+	if (isolatedAgentDir) rmSync(isolatedAgentDir, { recursive: true, force: true });
+	isolatedAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-index-config-"));
+	process.env.PI_CODING_AGENT_DIR = isolatedAgentDir;
 	await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
 	cursorExtensionFactoryGuardTestUtils.reset();
 	cursorSessionScopeTestUtils.reset();

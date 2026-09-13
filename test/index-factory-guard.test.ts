@@ -11,6 +11,7 @@ import {
 	createExtensionPi,
 	cursorPiToolBridgeTestUtils,
 	resetIndexExtensionTestState,
+	writeIndexTestUserConfig,
 } from "./helpers/index-extension-test-kit.js";
 import { getCursorSessionScopeKey } from "../src/cursor-session-scope.js";
 
@@ -116,7 +117,7 @@ describe("extension factory nested-session guard", () => {
 	});
 
 	it("does not dispose a live parent bridge run when a child factory loads", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
+		writeIndexTestUserConfig({ tools: { bridge: { exposeBuiltins: true } } });
 		mockedDiscover.mockResolvedValue([]);
 		const parentPi = createExtensionRegistrationPi({
 			initialTools: [createTestToolInfo("read", Type.Object({ path: Type.String() }), "Read a file")],

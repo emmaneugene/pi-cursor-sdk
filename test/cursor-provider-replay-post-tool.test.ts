@@ -592,10 +592,10 @@ it("streams post-tool Cursor thinking and text while a native replay run is stil
 	});
 
 	it("does not trim final text when pre-tool text is only a word prefix", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createBuiltinToolInfo("read", Type.Object({ path: Type.String() }), "Read files")],
+			exposeBuiltins: true,
 		});
 
 		let onDelta: CursorDeltaHandler | undefined;

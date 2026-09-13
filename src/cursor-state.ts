@@ -2,7 +2,6 @@ import type { AgentModeOption } from "@cursor/sdk";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
 	buildCursorToolManifestText,
-	CURSOR_TOOL_MANIFEST_ENV,
 	resolveCursorToolManifestEnabled,
 } from "./cursor-tool-manifest.js";
 import { runCursorSessionAgentCleanupCommand } from "./cursor-session-agent-cleanup.js";
@@ -14,17 +13,9 @@ import {
 	setStoredCursorHttp1Enabled,
 	type CursorHttp1EntryData,
 } from "./cursor-http1.js";
-import {
-	buildCursorPiToolBridgeSnapshot,
-	CURSOR_PI_TOOL_BRIDGE_ENV,
-	resolveCursorPiToolBridgeBuiltinsEnabled,
-	resolveCursorPiToolBridgeEnabled,
-} from "./cursor-pi-tool-bridge-snapshot.js";
-import {
-	CURSOR_SETTING_SOURCES_ENV,
-	DEFAULT_CURSOR_SETTING_SOURCES,
-	resolveCursorSettingSources,
-} from "./cursor-setting-sources.js";
+import { buildCursorPiToolBridgeSnapshot } from "./cursor-pi-tool-bridge-snapshot.js";
+import { resolveCursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
+import { getEffectiveCursorSettingSources } from "./cursor-setting-sources.js";
 import { isCursorModel } from "./cursor-model.js";
 import { registerCursorModelLifecycle } from "./cursor-model-lifecycle.js";
 import { asRecord } from "./cursor-record-utils.js";
@@ -39,6 +30,7 @@ import {
 	mergeCursorSdkConfigForUpdate,
 	resolveCursorFastDefault,
 	updateCursorSdkConfig,
+	type CursorSdkConfig,
 } from "./cursor-config.js";
 import {
 	consumeCursorLocalForceOverride,
@@ -132,12 +124,16 @@ function saveGlobalFastPreference(modelId: string, fast: boolean): void {
 	updateCursorSdkConfig(
 		getConfigPath(),
 		(current) => {
-			const fastDefaults = { ...asRecord(current.fastDefaults), [modelId]: fast };
+			const models = asRecord(current.models);
+			const fastDefaults = { ...asRecord(models?.fastDefaults), [modelId]: fast };
 			return {
 				...current,
-				fastDefaults: Object.fromEntries(
-					Object.entries(fastDefaults).sort(([a], [b]) => a.localeCompare(b)),
-				),
+				models: {
+					...models,
+					fastDefaults: Object.fromEntries(
+						Object.entries(fastDefaults).sort(([a], [b]) => a.localeCompare(b)),
+					),
+				},
 			};
 		},
 		{ newFileMode: 0o600 },
@@ -148,7 +144,7 @@ function saveGlobalCursorHttp1Enabled(enabled: boolean): void {
 	updateCursorSdkConfig(
 		getConfigPath(),
 		(current) => mergeCursorSdkConfigForUpdate(current, {
-			local: { useHttp1ForAgent: enabled },
+			local: { transport: enabled ? "http1" : "default" },
 		}),
 		{ newFileMode: 0o600 },
 	);
@@ -260,7 +256,7 @@ function updateCursorStatus(ctx: CursorStatusContext & Pick<ExtensionContext, "m
 	const fast = metadata?.supportsFast ? getEffectiveFast(model.id) : undefined;
 	ctx.ui.setStatus(
 		"cursor",
-		formatCursorStatus(fast, mode, resolution.useHttp1ForAgent.value),
+		formatCursorStatus(fast, mode, resolution.transport.value),
 	);
 }
 
@@ -359,32 +355,30 @@ function notifyInvalidCursorModeIfCursorActive(ctx: Pick<ExtensionContext, "hasU
 	ctx.ui.notify(modeResolution.message, "error");
 }
 
-function formatEffectiveCursorSettingSourcesLabel(raw: string | undefined = process.env[CURSOR_SETTING_SOURCES_ENV]): string {
-	const effective = resolveCursorSettingSources(raw);
-	const effectiveLabel = effective === undefined ? "none" : effective.join(",");
-	const rawLabel = raw?.trim() ? raw.trim() : `(unset → ${DEFAULT_CURSOR_SETTING_SOURCES.join(",")})`;
-	return `${rawLabel} (effective: ${effectiveLabel})`;
+function formatEffectiveCursorSettingSourcesLabel(config: CursorSdkConfig): string {
+	return getEffectiveCursorSettingSources(config).join(",") || "none";
 }
 
 export function formatCursorToolsDebugReport(
 	pi: Pick<ExtensionAPI, "getActiveTools" | "getAllTools">,
-	env: Record<string, string | undefined> = process.env,
 	excludedToolNames?: ReadonlySet<string>,
+	config: CursorSdkConfig = loadCursorSdkUserConfig(),
 ): string {
-	const bridgeEnabled = resolveCursorPiToolBridgeEnabled(env);
-	const manifestEnabled = resolveCursorToolManifestEnabled(env);
+	const bridgeConfig = resolveCursorPiToolBridgeConfig(config);
+	const bridgeEnabled = bridgeConfig.enabled;
+	const manifestEnabled = resolveCursorToolManifestEnabled(config);
 	const lines = [
 		"Cursor tool surfaces (current session):",
-		`${CURSOR_PI_TOOL_BRIDGE_ENV}: ${bridgeEnabled ? "enabled" : "disabled"}`,
-		`${CURSOR_TOOL_MANIFEST_ENV}: ${manifestEnabled ? "enabled" : "disabled"}`,
-		`${CURSOR_SETTING_SOURCES_ENV}: ${formatEffectiveCursorSettingSourcesLabel(env[CURSOR_SETTING_SOURCES_ENV])}`,
+		`tools.bridge.enabled: ${bridgeEnabled ? "enabled" : "disabled"}`,
+		`tools.manifest: ${manifestEnabled ? "enabled" : "disabled"}`,
+		`local.settingSources: ${formatEffectiveCursorSettingSourcesLabel(config)}`,
 	];
 
 	let bridgeSnapshot;
 	if (bridgeEnabled) {
 		try {
 			bridgeSnapshot = buildCursorPiToolBridgeSnapshot(pi, {
-				exposeOverlappingBuiltins: resolveCursorPiToolBridgeBuiltinsEnabled(env),
+				exposeOverlappingBuiltins: bridgeConfig.exposeBuiltins,
 				excludedToolNames,
 			});
 		} catch {
@@ -406,7 +400,7 @@ function emitCursorToolsDebugReport(
 	} catch {
 		// Config load failure must not break the debug report; fall back to the unfiltered snapshot.
 	}
-	const report = formatCursorToolsDebugReport(pi, process.env, excludedToolNames);
+	const report = formatCursorToolsDebugReport(pi, excludedToolNames);
 	if (ctx.hasUI) {
 		ctx.ui.notify(report, "info");
 		return;
@@ -496,10 +490,11 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 				ctx.ui.notify(resolution.message, "error");
 				return;
 			}
-			const setting = resolution.useHttp1ForAgent;
+			const setting = resolution.transport;
+			const enabled = setting.value === "http1";
 			if (!normalized) {
 				ctx.ui.notify(
-					`Cursor HTTP/1.1/SSE transport is ${setting.value ? "enabled" : "disabled"} (source: ${setting.source}). ${usage}`,
+					`Cursor HTTP/1.1/SSE transport is ${enabled ? "enabled" : "disabled"} (source: ${setting.source}). ${usage}`,
 					"info",
 				);
 				return;
@@ -509,7 +504,7 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 				: normalized === "off"
 					? false
 					: normalized === "toggle"
-						? !setting.value
+						? !enabled
 						: undefined;
 			if (next === undefined) {
 				ctx.ui.notify(

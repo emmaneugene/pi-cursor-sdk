@@ -34,7 +34,7 @@ export declare function parseArgv<TDefaults extends Record<string, unknown>>(
 	argv: readonly string[],
 	options: { defaults: TDefaults; flags: CursorCliFlagSpecMap<TDefaults>; fail: (message: string) => never },
 ): ParsedCursorCliArgs<TDefaults>;
-export declare function defaultSettingSourcesFromEnv(env?: NodeJS.ProcessEnv): string[] | undefined;
+export declare function defaultSettingSourcesFromEnv(env?: NodeJS.ProcessEnv): string[];
 export declare function defaultApiKeyFromEnv(env?: NodeJS.ProcessEnv): string | undefined;
 export declare function readArgvApiKey(argv: readonly string[]): string | undefined;
 export declare function apiKeySecretsFromProcess(

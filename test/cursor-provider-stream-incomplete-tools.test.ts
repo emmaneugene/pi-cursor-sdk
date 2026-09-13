@@ -17,6 +17,7 @@ import type { SendOptions } from "@cursor/sdk";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { installCursorSdkEventDebugUserConfig } from "./helpers/cursor-sdk-event-debug.js";
 
 type CursorOnStepPayload = Parameters<NonNullable<SendOptions["onStep"]>>[0];
 
@@ -141,10 +142,9 @@ describe("streamCursor incomplete tools", () => {
 			expect(collectThinkingDeltas(events)).toContain("Cursor MCP did not complete");
 		});
 
-		it("records discarded incomplete started tool calls to coordinator-events.jsonl when PI_CURSOR_SDK_EVENT_DEBUG is enabled", async () => {
+		it("records discarded incomplete started tool calls to coordinator-events.jsonl when debug.sdkEvents is enabled", async () => {
 			const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-provider-discarded-debug-"));
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = artifactDir;
+			const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: artifactDir });
 			const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 				opts.onDelta({ update: { type: "tool-call-started", toolCall: { name: "read", args: { path: "README.md" } }, callId: "c1" } });
 				return asMockCursorRun({
@@ -170,16 +170,14 @@ describe("streamCursor incomplete tools", () => {
 				expect(coordinatorEvents).toContain('"reason":"no-completion-at-run-end"');
 				expect(coordinatorEvents).not.toContain("c1");
 			} finally {
-				delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-				delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
+				restore();
 				rmSync(artifactDir, { recursive: true, force: true });
 			}
 		});
 
 		it("suppresses incomplete missing-file reads with final error text while keeping debug evidence", async () => {
 			const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-provider-missing-read-debug-"));
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = artifactDir;
+			const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: artifactDir });
 			const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 				opts.onDelta({ update: { type: "tool-call-started", toolCall: { name: "read", args: { path: "missing.txt" } }, callId: "c-missing" } });
 				return asMockCursorRun({
@@ -213,8 +211,7 @@ describe("streamCursor incomplete tools", () => {
 				expect(displayDecisions).toContain('"action":"skip-incomplete-successful-run"');
 				expect(displayDecisions).toContain('"toolName":"read"');
 			} finally {
-				delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-				delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
+				restore();
 				rmSync(artifactDir, { recursive: true, force: true });
 			}
 		});

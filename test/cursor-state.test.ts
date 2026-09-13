@@ -15,7 +15,6 @@ import {
 import { __testUtils as modelDiscoveryTestUtils } from "../src/model-discovery.js";
 import type { ModelListItem } from "@cursor/sdk";
 import type { ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
-import { CURSOR_HTTP1_ENV } from "../src/cursor-config.js";
 import {
 	createExtensionCommandContext,
 	createExtensionTestContext,
@@ -129,12 +128,10 @@ function createCursorRuntimeHarness(options: {
 describe("Cursor runtime state", () => {
 	let tmpAgentDir: string;
 	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-	const originalHttp1Env = process.env[CURSOR_HTTP1_ENV];
 
 	beforeEach(() => {
 		tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-state-"));
 		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
-		delete process.env[CURSOR_HTTP1_ENV];
 		__testUtils.sessionFastPreferences.clear();
 		__testUtils.resetCursorModeStateForTests();
 		modelDiscoveryTestUtils.registerModelItems(modelItems);
@@ -146,8 +143,6 @@ describe("Cursor runtime state", () => {
 		} else {
 			process.env.PI_CODING_AGENT_DIR = originalAgentDir;
 		}
-		if (originalHttp1Env === undefined) delete process.env[CURSOR_HTTP1_ENV];
-		else process.env[CURSOR_HTTP1_ENV] = originalHttp1Env;
 		rmSync(tmpAgentDir, { recursive: true, force: true });
 		vi.clearAllMocks();
 	});
@@ -464,7 +459,7 @@ describe("Cursor runtime state", () => {
 	});
 
 	it("uses global fast defaults for new sessions", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "gpt-5.5": true } }));
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "gpt-5.5": true } } }));
 		const { pi, ctx } = createCursorRuntimeHarness({ modelId: "gpt-5.5" });
 
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
@@ -581,7 +576,7 @@ describe("Cursor runtime state", () => {
 
 		expect(getEffectiveFastForModelId("gpt-5.5")).toBe(true);
 		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toEqual({
-			fastDefaults: { "gpt-5.5": true },
+			models: { fastDefaults: { "gpt-5.5": true } },
 		});
 	});
 
@@ -617,7 +612,7 @@ describe("Cursor runtime state", () => {
 	});
 
 	it("filters global config entries with invalid fast default values", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "gpt-5.5": true, "composer-2": "true" } }));
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "gpt-5.5": true, "composer-2": "true" } } }));
 		expect(__testUtils.loadGlobalFastPreferences()).toEqual(new Map([["gpt-5.5", true]]));
 		const { pi, ctx } = createCursorRuntimeHarness({ modelId: "gpt-5.5" });
 
@@ -673,10 +668,12 @@ describe("Cursor runtime state", () => {
 	});
 
 	it("registers /cursor-tools and reports bridge and setting sources", async () => {
-		const originalBridgeEnv = process.env.PI_CURSOR_PI_TOOL_BRIDGE;
-		const originalSettingSourcesEnv = process.env.PI_CURSOR_SETTING_SOURCES;
-		process.env.PI_CURSOR_PI_TOOL_BRIDGE = "1";
-		process.env.PI_CURSOR_SETTING_SOURCES = "none";
+		const agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-tools-config-"));
+		const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = agentDir;
+		writeFileSync(join(agentDir, "cursor-sdk.json"), JSON.stringify({
+			local: { settingSources: [] },
+		}));
 		try {
 			const pi = createPiHarness({
 				activeTools: ["custom_bridge_tool"],
@@ -686,38 +683,35 @@ describe("Cursor runtime state", () => {
 			const ctx = createExtensionTestContext();
 			await pi.runCommand("cursor-tools", "", { ui: ctx.ui, hasUI: true });
 
-			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("PI_CURSOR_PI_TOOL_BRIDGE: enabled"), "info");
-			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("PI_CURSOR_SETTING_SOURCES: none (effective: none)"), "info");
+			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("tools.bridge.enabled: enabled"), "info");
+			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("local.settingSources: none"), "info");
 			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Callable tool surfaces this run:"), "info");
 			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("pi__custom_bridge_tool"), "info");
-			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Cursor host/MCP"), "info");
-			expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Pi tool toggles affect pi tools/bridge exposure only"), "info");
 		} finally {
-			if (originalBridgeEnv === undefined) delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
-			else process.env.PI_CURSOR_PI_TOOL_BRIDGE = originalBridgeEnv;
-			if (originalSettingSourcesEnv === undefined) delete process.env.PI_CURSOR_SETTING_SOURCES;
-			else process.env.PI_CURSOR_SETTING_SOURCES = originalSettingSourcesEnv;
+			if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+			else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+			rmSync(agentDir, { recursive: true, force: true });
 		}
 	});
 
 	it("formatCursorToolsDebugReport notes disabled bridge", () => {
-		const pi = createPiHarness();
-		const report = formatCursorToolsDebugReport(pi, {
-			PI_CURSOR_PI_TOOL_BRIDGE: "0",
-			PI_CURSOR_SETTING_SOURCES: "project",
-		});
-		expect(report).toContain("PI_CURSOR_PI_TOOL_BRIDGE: disabled");
-		expect(report).toContain("Pi bridge: disabled (PI_CURSOR_PI_TOOL_BRIDGE=0).");
-		expect(report).toContain("PI_CURSOR_SETTING_SOURCES: project (effective: project)");
-		expect(report).toContain("Callable tool surfaces this run:");
+		const report = formatCursorToolsDebugReport(
+			createPiHarness(),
+			undefined,
+			{ local: { settingSources: ["project"] }, tools: { bridge: { enabled: false } } },
+		);
+		expect(report).toContain("tools.bridge.enabled: disabled");
+		expect(report).toContain("Pi bridge: disabled (tools.bridge.enabled=false).");
+		expect(report).toContain("local.settingSources: project");
 	});
 
 	it("formatCursorToolsDebugReport notes disabled manifest", () => {
-		const pi = createPiHarness();
-		const report = formatCursorToolsDebugReport(pi, {
-			PI_CURSOR_TOOL_MANIFEST: "0",
-		});
-		expect(report).toContain("PI_CURSOR_TOOL_MANIFEST: disabled");
+		const report = formatCursorToolsDebugReport(
+			createPiHarness(),
+			undefined,
+			{ tools: { manifest: false } },
+		);
+		expect(report).toContain("tools.manifest: disabled");
 	});
 
 	it("formatCursorToolsDebugReport hides denylisted tools from the reported bridge surface", () => {
@@ -725,36 +719,28 @@ describe("Cursor runtime state", () => {
 			activeTools: ["custom_bridge_tool"],
 			initialTools: [createTestToolInfo("custom_bridge_tool", undefined, "Custom bridge tool")],
 		});
-		const unfiltered = formatCursorToolsDebugReport(pi, { PI_CURSOR_PI_TOOL_BRIDGE: "1" });
-		expect(unfiltered).toContain("pi__custom_bridge_tool");
-
-		const denied = formatCursorToolsDebugReport(
-			pi,
-			{ PI_CURSOR_PI_TOOL_BRIDGE: "1" },
-			new Set(["custom_bridge_tool"]),
-		);
-		expect(denied).not.toContain("pi__custom_bridge_tool");
+		expect(formatCursorToolsDebugReport(pi, undefined, {})).toContain("pi__custom_bridge_tool");
+		expect(formatCursorToolsDebugReport(pi, new Set(["custom_bridge_tool"]), {})).not.toContain("pi__custom_bridge_tool");
 	});
 
-	it("formatCursorToolsDebugReport honors PI_CURSOR_EXPOSE_BUILTIN_TOOLS", () => {
+	it("formatCursorToolsDebugReport honors tools.bridge.exposeBuiltins", () => {
 		const pi = createPiHarness({
 			activeTools: ["grep"],
 			initialTools: [createTestToolInfo("grep", undefined, "Search files")],
 		});
-		const env = { PI_CURSOR_PI_TOOL_BRIDGE: "1" };
-		expect(formatCursorToolsDebugReport(pi, env)).not.toContain("pi__grep");
-		expect(formatCursorToolsDebugReport(pi, { ...env, PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" })).toContain("pi__grep");
+		expect(formatCursorToolsDebugReport(pi, undefined, {})).not.toContain("pi__grep");
+		expect(formatCursorToolsDebugReport(pi, undefined, {
+			tools: { bridge: { exposeBuiltins: true } },
+		})).toContain("pi__grep");
 	});
 
 	it("/cursor-tools applies user-config bridge denylist and falls back when config is unreadable", async () => {
 		const tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-tools-deny-"));
 		const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-		const originalBridgeEnv = process.env.PI_CURSOR_PI_TOOL_BRIDGE;
 		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
-		process.env.PI_CURSOR_PI_TOOL_BRIDGE = "1";
 		try {
 			writeFileSync(join(tmpAgentDir, "cursor-sdk.json"), JSON.stringify({
-				bridge: { excludeTools: ["custom_bridge_tool"] },
+				tools: { bridge: { exclude: ["custom_bridge_tool"] } },
 			}));
 			const pi = createPiHarness({
 				activeTools: ["custom_bridge_tool"],
@@ -779,8 +765,6 @@ describe("Cursor runtime state", () => {
 		} finally {
 			if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 			else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
-			if (originalBridgeEnv === undefined) delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
-			else process.env.PI_CURSOR_PI_TOOL_BRIDGE = originalBridgeEnv;
 			rmSync(tmpAgentDir, { recursive: true, force: true });
 		}
 	});

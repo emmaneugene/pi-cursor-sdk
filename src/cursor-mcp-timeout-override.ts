@@ -1,17 +1,16 @@
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
+
 const CURSOR_SDK_MCP_DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_CURSOR_MCP_TOOL_TIMEOUT_MS = 3_600_000;
 const DEFAULT_CURSOR_MCP_CONNECT_TIMEOUT_MS = 10_000;
 const MIN_CURSOR_MCP_CONNECT_TIMEOUT_MS = 1_000;
 const MAX_NODE_TIMER_DELAY_MS = 2_147_483_647;
-const CURSOR_MCP_TOOL_TIMEOUT_MS_ENV = "PI_CURSOR_MCP_TOOL_TIMEOUT_MS";
-const CURSOR_MCP_TOOL_TIMEOUT_SECONDS_ENV = "PI_CURSOR_MCP_TOOL_TIMEOUT_SECONDS";
-const CURSOR_MCP_CONNECT_TIMEOUT_MS_ENV = "PI_CURSOR_MCP_CONNECT_TIMEOUT_MS";
-const CURSOR_MCP_CONNECT_TIMEOUT_SECONDS_ENV = "PI_CURSOR_MCP_CONNECT_TIMEOUT_SECONDS";
+
 
 interface CursorMcpToolTimeoutOverrideOptions {
 	timeoutMs?: number;
 	connectTimeoutMs?: number;
-	env?: Record<string, string | undefined>;
+	config?: CursorSdkConfig;
 }
 
 interface CursorMcpToolTimeoutOverrideState {
@@ -29,28 +28,15 @@ let originalSetTimeout: GlobalSetTimeout | undefined;
 let installedToolTimeoutMs = DEFAULT_CURSOR_MCP_TOOL_TIMEOUT_MS;
 let installedConnectTimeoutMs = DEFAULT_CURSOR_MCP_CONNECT_TIMEOUT_MS;
 
-function parsePositiveNumber(value: string | undefined): number | undefined {
-	const trimmed = value?.trim();
-	if (!trimmed) return undefined;
-	const parsed = Number(trimmed);
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
 
 function normalizeOverrideTimeoutMs(timeoutMs: number): number {
 	if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return DEFAULT_CURSOR_MCP_TOOL_TIMEOUT_MS;
 	return Math.min(Math.max(Math.trunc(timeoutMs), CURSOR_SDK_MCP_DEFAULT_TIMEOUT_MS), MAX_NODE_TIMER_DELAY_MS);
 }
 
-export function resolveCursorMcpToolTimeoutMs(
-	env: Record<string, string | undefined> = process.env,
-): number {
-	const explicitMs = parsePositiveNumber(env[CURSOR_MCP_TOOL_TIMEOUT_MS_ENV]);
-	if (explicitMs !== undefined) return normalizeOverrideTimeoutMs(explicitMs);
-
-	const explicitSeconds = parsePositiveNumber(env[CURSOR_MCP_TOOL_TIMEOUT_SECONDS_ENV]);
-	if (explicitSeconds !== undefined) return normalizeOverrideTimeoutMs(explicitSeconds * 1000);
-
-	return DEFAULT_CURSOR_MCP_TOOL_TIMEOUT_MS;
+export function resolveCursorMcpToolTimeoutMs(config: CursorSdkConfig = loadCursorSdkUserConfig()): number {
+	const timeoutMs = config.tools?.mcp?.callTimeoutMs;
+	return normalizeOverrideTimeoutMs(timeoutMs ?? DEFAULT_CURSOR_MCP_TOOL_TIMEOUT_MS);
 }
 
 function normalizeConnectTimeoutMs(timeoutMs: number): number {
@@ -61,16 +47,9 @@ function normalizeConnectTimeoutMs(timeoutMs: number): number {
 	);
 }
 
-export function resolveCursorMcpConnectTimeoutMs(
-	env: Record<string, string | undefined> = process.env,
-): number {
-	const explicitMs = parsePositiveNumber(env[CURSOR_MCP_CONNECT_TIMEOUT_MS_ENV]);
-	if (explicitMs !== undefined) return normalizeConnectTimeoutMs(explicitMs);
-
-	const explicitSeconds = parsePositiveNumber(env[CURSOR_MCP_CONNECT_TIMEOUT_SECONDS_ENV]);
-	if (explicitSeconds !== undefined) return normalizeConnectTimeoutMs(explicitSeconds * 1000);
-
-	return DEFAULT_CURSOR_MCP_CONNECT_TIMEOUT_MS;
+export function resolveCursorMcpConnectTimeoutMs(config: CursorSdkConfig = loadCursorSdkUserConfig()): number {
+	const timeoutMs = config.tools?.mcp?.connectTimeoutMs;
+	return normalizeConnectTimeoutMs(timeoutMs ?? DEFAULT_CURSOR_MCP_CONNECT_TIMEOUT_MS);
 }
 
 function isCursorSdkMcpProtocolTimeoutStack(stack: string | undefined): boolean {
@@ -123,10 +102,10 @@ export function installCursorMcpToolTimeoutOverride(
 	options: CursorMcpToolTimeoutOverrideOptions = {},
 ): CursorMcpToolTimeoutOverrideState {
 	installedToolTimeoutMs = normalizeOverrideTimeoutMs(
-		options.timeoutMs ?? resolveCursorMcpToolTimeoutMs(options.env),
+		options.timeoutMs ?? resolveCursorMcpToolTimeoutMs(options.config),
 	);
 	installedConnectTimeoutMs = normalizeConnectTimeoutMs(
-		options.connectTimeoutMs ?? resolveCursorMcpConnectTimeoutMs(options.env),
+		options.connectTimeoutMs ?? resolveCursorMcpConnectTimeoutMs(options.config),
 	);
 
 	if (!originalSetTimeout) {
@@ -157,8 +136,4 @@ export const cursorMcpToolTimeoutOverrideDefaults = {
 	defaultConnectTimeoutMs: DEFAULT_CURSOR_MCP_CONNECT_TIMEOUT_MS,
 	minConnectTimeoutMs: MIN_CURSOR_MCP_CONNECT_TIMEOUT_MS,
 	maxNodeTimerDelayMs: MAX_NODE_TIMER_DELAY_MS,
-	timeoutMsEnv: CURSOR_MCP_TOOL_TIMEOUT_MS_ENV,
-	timeoutSecondsEnv: CURSOR_MCP_TOOL_TIMEOUT_SECONDS_ENV,
-	connectTimeoutMsEnv: CURSOR_MCP_CONNECT_TIMEOUT_MS_ENV,
-	connectTimeoutSecondsEnv: CURSOR_MCP_CONNECT_TIMEOUT_SECONDS_ENV,
 } as const;

@@ -1,7 +1,5 @@
-import { parseEnvBoolean } from "./cursor-env-boolean.js";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 import type { CursorPiToolBridgeSnapshot } from "./cursor-pi-tool-bridge-types.js";
-
-export const CURSOR_TOOL_MANIFEST_ENV = "PI_CURSOR_TOOL_MANIFEST";
 
 /**
  * Representative @cursor/sdk@1.0.30 local-agent ToolType values; actual exposure can vary by run.
@@ -10,15 +8,13 @@ export const CURSOR_TOOL_MANIFEST_ENV = "PI_CURSOR_TOOL_MANIFEST";
 export const CURSOR_HOST_TOOL_MANIFEST_SUMMARY =
 	"read/shell/search/edit/write and other host tools when Cursor exposes them";
 
-export function resolveCursorToolManifestEnabled(
-	env: Record<string, string | undefined> = process.env,
-): boolean {
-	return parseEnvBoolean(env[CURSOR_TOOL_MANIFEST_ENV], true);
+export function resolveCursorToolManifestEnabled(config: CursorSdkConfig = loadCursorSdkUserConfig()): boolean {
+	return config.tools?.manifest ?? true;
 }
 
 export function buildCursorToolManifestText(options: {
 	bridgeSnapshot?: CursorPiToolBridgeSnapshot;
-	/** When false, bridge is off via PI_CURSOR_PI_TOOL_BRIDGE=0 (not merely empty). */
+	/** When false, bridge is off via tools.bridge.enabled=false (not merely empty). */
 	piBridgeEnabled?: boolean;
 	includePiBridgeGuidance?: boolean;
 } = {}): string {
@@ -32,7 +28,7 @@ export function buildCursorToolManifestText(options: {
 	const bridgeTools = includePiBridgeGuidance ? options.bridgeSnapshot?.tools ?? [] : [];
 	if (includePiBridgeGuidance) {
 		if (!piBridgeEnabled) {
-			lines.push("- Pi bridge: disabled (PI_CURSOR_PI_TOOL_BRIDGE=0).");
+			lines.push("- Pi bridge: disabled (tools.bridge.enabled=false).");
 		} else if (bridgeTools.length === 0) {
 			lines.push("- Pi bridge: no pi__* tools exposed this run.");
 		} else {

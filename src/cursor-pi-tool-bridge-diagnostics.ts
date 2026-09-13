@@ -1,15 +1,9 @@
 import { appendFileSync } from "node:fs";
 import { stableNameHash } from "./cursor-pi-tool-bridge-mcp.js";
-import { parseEnvBoolean } from "./cursor-env-boolean.js";
 import type { CursorSdkEventDebugRecorder } from "./cursor-sdk-event-debug.js";
+import type { CursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
 
-export const CURSOR_PI_TOOL_BRIDGE_DEBUG_ENV = "PI_CURSOR_PI_TOOL_BRIDGE_DEBUG";
-export const CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE_ENV = "PI_CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE";
 export const CURSOR_PI_TOOL_BRIDGE_DIAGNOSTIC_PREFIX = "[pi-cursor-sdk:bridge]";
-
-export function resolveCursorPiToolBridgeDebugEnabled(env: Record<string, string | undefined> = process.env): boolean {
-	return parseEnvBoolean(env[CURSOR_PI_TOOL_BRIDGE_DEBUG_ENV], false);
-}
 
 function createCursorMcpCallDiagnosticId(cursorMcpCallId: string | undefined): string | undefined {
 	return cursorMcpCallId ? `cursor-mcp-call-${stableNameHash(cursorMcpCallId)}` : undefined;
@@ -173,7 +167,7 @@ export function serializeCursorPiToolBridgeDiagnostic(event: CursorPiToolBridgeD
 }
 
 export function writeCursorPiToolBridgeDiagnostic(
-	env: Record<string, string | undefined>,
+	debug: CursorPiToolBridgeConfig["debug"],
 	event: CursorPiToolBridgeDiagnosticEvent,
 	debugRecorder?: CursorSdkEventDebugRecorder,
 ): void {
@@ -183,7 +177,7 @@ export function writeCursorPiToolBridgeDiagnostic(
 		// Diagnostics must never affect bridge execution.
 	}
 	const serialized = serializeCursorPiToolBridgeDiagnostic(event);
-	const debugFile = env[CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE_ENV];
+	const debugFile = debug.file;
 	if (debugFile) {
 		try {
 			appendFileSync(debugFile, `${JSON.stringify(serialized)}\n`);
@@ -191,7 +185,7 @@ export function writeCursorPiToolBridgeDiagnostic(
 			// Diagnostics must never affect bridge execution.
 		}
 	}
-	if (!resolveCursorPiToolBridgeDebugEnabled(env)) return;
+	if (!debug.stderr) return;
 	try {
 		process.stderr.write(`${CURSOR_PI_TOOL_BRIDGE_DIAGNOSTIC_PREFIX} ${JSON.stringify(serialized)}\n`);
 	} catch {

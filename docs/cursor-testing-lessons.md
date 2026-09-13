@@ -237,7 +237,9 @@ npm pack --dry-run
 # Live print-mode evidence. Keep the key in the environment, never in this file.
 # -ne keeps a host `pi install` of this package from colliding with -e .
 SMOKE_DIR="$(mktemp -d /tmp/pi-cursor-sdk-release.XXXXXX)"
-PI_CURSOR_SETTING_SOURCES=none \
+export PI_CODING_AGENT_DIR="$SMOKE_DIR/agent"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '%s\n' '{"local":{"settingSources":[]}}' > "$PI_CODING_AGENT_DIR/cursor-sdk.json"
 pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/session" --no-tools \
   -p 'Reply exactly: LIVE_PRINT_OK'
@@ -336,10 +338,10 @@ Artifacts under `--out` (default `.debug/cursor-sdk-events/<timestamp>/` under `
 - `conversation.json` — `run.conversation()` when supported
 - `summary.json` — counts and artifact paths
 
-During any normal pi session you can also opt in with:
+During any normal pi session you can also opt in with `debug.sdkEvents.enabled` in `~/.pi/agent/cursor-sdk.json`:
 
-```bash
-PI_CURSOR_SDK_EVENT_DEBUG=1 pi -ne --approve -e . --model cursor/grok-4.6
+```json
+{ "debug": { "sdkEvents": { "enabled": true } } }
 ```
 
 Multi-turn sessions group automatically by pi session file:
@@ -354,26 +356,29 @@ Multi-turn sessions group automatically by pi session file:
 
 Each turn still gets the full per-turn artifact bundle above. Use `session.json` to jump between turns while debugging incremental send, bridge resolution, or native replay continuation across pi messages. For tool-heavy turns, trace/thinking replay often drains on the **next** pi message — check turn N+1 `drain-events.jsonl` and `pi-stream-events.jsonl` alongside turn N `display-decisions.jsonl`.
 
-Optional env:
+User JSON `debug.sdkEvents`:
 
-- `PI_CURSOR_SDK_EVENT_DEBUG_DIR` — base directory (default `.debug/cursor-sdk-events`)
+- `directory` — base directory (default `.debug/cursor-sdk-events`)
+- `stderr` — also print the summary line to stderr (off by default so the pi TUI stays normal)
+
+Internal script coordination env (not user-facing enable switches):
+
 - `PI_CURSOR_SDK_EVENT_DEBUG_SESSION_DIR` — exact session root for all turns in the current pi session
 - `PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR` — exact artifact directory for one isolated turn (the maintainer script sets this via `--out`; bypasses session grouping)
-- `PI_CURSOR_SDK_EVENT_DEBUG_STDERR=1` — also print the summary line to stderr (off by default so the pi TUI stays normal)
 
-Capture is file-only by default: no stderr markers, and bridge diagnostics during SDK event debug go to `bridge-events.jsonl` instead of `[pi-cursor-sdk:bridge]` unless you separately set `PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1`. Raw payloads stay on disk and may contain secrets — do not commit or share them.
+Capture is file-only by default: no stderr markers, and bridge diagnostics during SDK event debug go to `bridge-events.jsonl` instead of `[pi-cursor-sdk:bridge]` unless you separately set `tools.bridge.debug.stderr` to true. Raw payloads stay on disk and may contain secrets — do not commit or share them.
 
 ### Discarded incomplete SDK tool calls
 
 When Cursor emits `tool-call-started` without a matching completion/step result, the provider surfaces a bounded neutral **Cursor … did not complete** activity card or thinking trace at run end for failed/aborted runs and runs with no assistant text. After a successful text-producing run, missing-completion starts are debug-only for all tools: verified against installed `@cursor/sdk` 1.0.30 (hook-deny reproduction, 2026-09-04), a permission-policy or hook denial emits `tool-call-started` and then nothing on any public SDK surface — no `tool-call-completed` delta, no `toolCall` step, and no conversation entry — and the SDK gives no way to tell such denials apart from lost completions, so suppression on successful runs is a deliberate trade-off against false error cards. pi bridge MCP calls (`pi__*`) are excluded because pi already shows the real pi tool execution path.
 
-With `PI_CURSOR_SDK_EVENT_DEBUG=1`, each discarded started call is also recorded in `coordinator-events.jsonl` under phase `discarded-incomplete-started-tool-call` with:
+With `debug.sdkEvents.enabled`, each discarded started call is also recorded in `coordinator-events.jsonl` under phase `discarded-incomplete-started-tool-call` with:
 
 - normalized SDK tool name
 - scrubbed call-id hash (raw call IDs are not written)
 - reason such as `no-completion-at-run-end`, `abort`, or `sdk-failure`
 
-Stderr output for these records requires `PI_CURSOR_SDK_EVENT_DEBUG_STDERR=1`. This complements the standalone `npm run debug:sdk-events` probe by interpreting a specific provider discard path during normal pi runs. User-visible incomplete cards explain actionable gaps in the TUI; debug artifacts remain maintainer-only (**#52**) and are the source of truth for starts suppressed after successful runs.
+Stderr output for these records requires `debug.sdkEvents.stderr`. This complements the standalone `npm run debug:sdk-events` probe by interpreting a specific provider discard path during normal pi runs. User-visible incomplete cards explain actionable gaps in the TUI; debug artifacts remain maintainer-only (**#52**) and are the source of truth for starts suppressed after successful runs.
 
 ## Tool calls listed as plain text (#40 triage)
 
@@ -392,7 +397,7 @@ Ask the reporter (or capture yourself) for:
 | `pi --version` and installed `pi-cursor-sdk` version | Confirms extension/runtime in use |
 | Model ID (for example `cursor/grok-4.6`) | Routing/replay behavior is model-scoped |
 | Exact repro prompt and prior turns | Multi-turn replay history affects prompt text |
-| Flags: `--cursor-no-fast`, `PI_CURSOR_PI_TOOL_BRIDGE`, `PI_CURSOR_EXPOSE_BUILTIN_TOOLS`, `PI_CURSOR_SETTING_SOURCES`, `PI_CURSOR_TOOL_MANIFEST` | Bridge vs native-only vs narrowed settings; bootstrap callable-surface manifest |
+| Flags/config: `--cursor-no-fast`, `tools.bridge.enabled`, `tools.bridge.exposeBuiltins`, `local.settingSources`, `tools.manifest` | Bridge vs native-only vs narrowed settings; bootstrap callable-surface manifest |
 | Whether the listed names are `pi__*` bridge MCP, Cursor-native (`browser_navigate`, `WebSearch`), or `cursor-replay-*` replay IDs | Three different surfaces (see [Cursor native tool replay](./cursor-native-tool-replay.md#live-bridge-vs-replay)) |
 | Red toast / `errorMessage` text, if any | Distinguishes #55 failure surfacing from silent text echo |
 | Process exit / uncaught `ConnectError` / `ETIMEDOUT` stack trace, if any | Hard network crash (**#43**), not #40 model text echo |
@@ -408,9 +413,9 @@ mkdir -p "$SMOKE_DIR/home/.pi/agent"
 cp "$HOME/.pi/agent/auth.json" "$SMOKE_DIR/home/.pi/agent/auth.json"
 chmod 600 "$SMOKE_DIR/home/.pi/agent/auth.json"
 
+printf '%s\n' '{"tools":{"bridge":{"debug":{"stderr":true}}}}' > "$SMOKE_DIR/home/.pi/agent/cursor-sdk.json"
 env -i HOME="$SMOKE_DIR/home" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" \
   MISE_DISABLE=1 \
-  PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1 \
   pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/session" \
   -p '<exact reporter prompt>'
@@ -428,7 +433,7 @@ npm run debug:provider-events -- \
   --out "$SMOKE_DIR/provider-events"
 ```
 
-Or add `PI_CURSOR_SDK_EVENT_DEBUG=1` to the pi run above (writes under `.debug/cursor-sdk-events/`).
+Or set `debug.sdkEvents.enabled` in `cursor-sdk.json` for the pi run above (writes under `.debug/cursor-sdk-events/`).
 
 For raw Cursor SDK surfaces only:
 
@@ -448,12 +453,12 @@ Start with whether pi stayed alive:
 
 Then inspect the failing assistant turn in `$SMOKE_DIR/session/*.jsonl`:
 
-1. **Error `toolResult` (`isError: true`) or error assistant message contains `Tool grep/cursor/find/ls not found`** — stale `context.tools` snapshot or plan-strip resync gap after plan-mode execute stripped active tools. Run `node scripts/validate-smoke-jsonl.mjs --replay-errors-only "$SMOKE_DIR/session"`. Optional: `display-decisions.jsonl` from `PI_CURSOR_SDK_EVENT_DEBUG=1` shows `inactive_trace` routing. Route to **#52** — not model text echo (those strings appear in persisted error records, not narrated `Tool call (` lines). See [Dual-check invariant](#dual-check-invariant-contexttools-vs-pi-active-tools).
+1. **Error `toolResult` (`isError: true`) or error assistant message contains `Tool grep/cursor/find/ls not found`** — stale `context.tools` snapshot or plan-strip resync gap after plan-mode execute stripped active tools. Run `node scripts/validate-smoke-jsonl.mjs --replay-errors-only "$SMOKE_DIR/session"`. Optional: `display-decisions.jsonl` from `debug.sdkEvents.enabled` shows `inactive_trace` routing. Route to **#52** — not model text echo (those strings appear in persisted error records, not narrated `Tool call (` lines). See [Dual-check invariant](#dual-check-invariant-contexttools-vs-pi-active-tools).
 2. **`content` has `type: "toolCall"` blocks and matching `toolResult` rows** — pi executed or replayed tools; if the TUI still looked like plain text, capture a screenshot and pi version (possible pi TUI/display issue, not provider dispatch).
 3. **`content` is only `type: "text"` and text contains `Tool call (` / `cursor-replay-` / serialized arg keys** — model text echo of prompt transcript format; not #55, not #52 stale routing. Compare with `buildCursorPrompt()` output in the prior turn.
 4. **No `toolCall` blocks, no error toast, user expected real execution** — check whether names are replay-only (`cursor-replay-*`) or Cursor-native MCP; replay never re-runs work ([replay doc](./cursor-native-tool-replay.md)).
 5. **`stopReason: "error"` or scrubbed `errorMessage`** — classify under **#55**; check whether incomplete started tools were discarded (`discardIncompleteStartedToolCalls()`). Discarded starts with no completion and no model text echo: see `coordinator-events.jsonl` phase `discarded-incomplete-started-tool-call` ([Discarded incomplete SDK tool calls](#discarded-incomplete-sdk-tool-calls) above); route broader stale/inactive replay gaps to **#52**.
-6. **Bridge expected (`pi__*` in Cursor MCP)** — inspect stderr `[pi-cursor-sdk:bridge]` JSONL with `PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1` for pending/unresolved bridge requests.
+6. **Bridge expected (`pi__*` in Cursor MCP)** — inspect stderr `[pi-cursor-sdk:bridge]` JSONL with `tools.bridge.debug.stderr: true` for pending/unresolved bridge requests.
 
 Quick structural scan (no secrets):
 

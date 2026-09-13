@@ -28,8 +28,6 @@ describe("model-list-cache", () => {
 
 	beforeEach(() => {
 		process.env = { ...originalEnv };
-		delete process.env[__testUtils.DISABLE_ENV_VAR];
-		delete process.env[__testUtils.TTL_ENV_VAR];
 		tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-model-cache-"));
 		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
 	});
@@ -121,28 +119,26 @@ describe("model-list-cache", () => {
 		expect(loadAnyCachedModelCatalog(fp)).toBeUndefined();
 	});
 
-	it("disables read and write when the disable env flag is set", () => {
-		process.env[__testUtils.DISABLE_ENV_VAR] = "1";
-		saveModelListCache(fp, MODELS);
-		expect(loadFreshCachedModels(fp)).toBeUndefined();
-		expect(loadAnyCachedModelCatalog(fp)).toBeUndefined();
+	it("disables reads and writes through user config", () => {
+		const config = { models: { cache: { enabled: false } } };
+		expect(saveModelListCache(fp, MODELS, config)).toBe(false);
+		expect(loadFreshCachedModels(fp, Date.now(), config)).toBeUndefined();
+		expect(loadAnyCachedModelCatalog(fp, config)).toBeUndefined();
 	});
 
-	it("honors a custom TTL from the environment", () => {
-		process.env[__testUtils.TTL_ENV_VAR] = "1000";
-		expect(getModelCacheTtlMs()).toBe(1000);
-		saveModelListCache(fp, MODELS);
-		expect(loadFreshCachedModels(fp, Date.now() + 2000)).toBeUndefined();
+	it("honors a custom TTL from user config", () => {
+		const config = { models: { cache: { ttlMs: 1000 } } };
+		expect(getModelCacheTtlMs(config)).toBe(1000);
+		saveModelListCache(fp, MODELS, config);
+		expect(loadFreshCachedModels(fp, Date.now() + 2000, config)).toBeUndefined();
 	});
 
-	it("falls back to the default TTL for invalid env values", () => {
-		process.env[__testUtils.TTL_ENV_VAR] = "not-a-number";
-		expect(getModelCacheTtlMs()).toBe(__testUtils.DEFAULT_TTL_MS);
+	it("falls back to the default TTL for invalid config values", () => {
+		expect(getModelCacheTtlMs({ models: { cache: { ttlMs: Number.NaN } } })).toBe(__testUtils.DEFAULT_TTL_MS);
 	});
 
-	it.each(["1", "true", "on", "yes", "enabled"])("reports disabled state from truthy env flag %s", (value) => {
-		expect(isModelCacheDisabled()).toBe(false);
-		process.env[__testUtils.DISABLE_ENV_VAR] = value;
-		expect(isModelCacheDisabled()).toBe(true);
+	it("defaults model caching to enabled", () => {
+		expect(isModelCacheDisabled({})).toBe(false);
+		expect(isModelCacheDisabled({ models: { cache: { enabled: false } } })).toBe(true);
 	});
 });

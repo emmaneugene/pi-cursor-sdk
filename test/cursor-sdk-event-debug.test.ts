@@ -3,9 +3,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
-	CURSOR_SDK_EVENT_DEBUG_ENV,
+	CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV,
 	CURSOR_SDK_EVENT_DEBUG_LOG_PREFIX,
-	CURSOR_SDK_EVENT_DEBUG_STDERR_ENV,
 	DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
 	CursorSdkEventDebugSink,
 	attachCursorSdkEventDebugPiStreamTap,
@@ -16,6 +15,29 @@ import {
 	serializeDiscardedIncompleteStartedToolCall,
 	__testUtils as sdkEventDebugTestUtils,
 } from "../src/cursor-sdk-event-debug.js";
+import {
+	ENABLED_CURSOR_SDK_EVENT_DEBUG_CONFIG,
+	installCursorSdkEventDebugUserConfig,
+} from "./helpers/cursor-sdk-event-debug.js";
+import type { CursorSdkConfig } from "../src/cursor-config.js";
+
+const ENABLED_STDERR_CONFIG: CursorSdkConfig = {
+	debug: { sdkEvents: { enabled: true, stderr: true } },
+};
+
+function debugSinkOptions(
+	artifactDir: string,
+	config: CursorSdkConfig = ENABLED_CURSOR_SDK_EVENT_DEBUG_CONFIG,
+	extra?: { cwd?: string; directory?: string },
+) {
+	return {
+		cwd: extra?.cwd ?? "/repo",
+		modelId: "composer-2.5",
+		provider: "cursor",
+		config: extra?.directory === undefined ? config : { debug: { sdkEvents: { ...config.debug?.sdkEvents, directory: extra.directory } } },
+		env: { [CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV]: artifactDir },
+	};
+}
 import { backfillPiSessionSnapshot, parseDebugProviderEventsArgs } from "../scripts/debug-provider-events.mjs";
 import {
 	resolveCursorSettingSources,
@@ -25,12 +47,22 @@ import {
 describe("cursor sdk event debug sink", () => {
 	it("is disabled by default", () => {
 		expect(resolveCursorSdkEventDebugEnabled({})).toBe(false);
-		expect(resolveCursorSdkEventDebugEnabled({ PI_CURSOR_SDK_EVENT_DEBUG: "1" })).toBe(true);
+		expect(resolveCursorSdkEventDebugEnabled({ debug: { sdkEvents: { enabled: true } } })).toBe(true);
+		expect(resolveCursorSdkEventDebugEnabled({ debug: { sdkEvents: { enabled: false } } })).toBe(false);
+		expect(
+			CursorSdkEventDebugSink.maybeCreate({
+				cwd: "/repo",
+				modelId: "composer-2.5",
+				provider: "cursor",
+				config: {},
+				env: { PI_CURSOR_SDK_EVENT_DEBUG: "1" },
+			}),
+		).toBeUndefined();
 	});
 
 	it("defaults artifact base dir to .debug/cursor-sdk-events", () => {
 		expect(resolveCursorSdkEventDebugBaseDir("/repo", {})).toBe(resolve("/repo", ".debug/cursor-sdk-events"));
-		expect(resolveCursorSdkEventDebugBaseDir("/repo", { PI_CURSOR_SDK_EVENT_DEBUG_DIR: "tmp/events" })).toBe(
+		expect(resolveCursorSdkEventDebugBaseDir("/repo", { debug: { sdkEvents: { directory: "tmp/events" } } })).toBe(
 			resolve("/repo", "tmp/events"),
 		);
 	});
@@ -45,15 +77,7 @@ describe("cursor sdk event debug sink", () => {
 		}) as typeof process.stderr.write;
 
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(artifactDir));
 			expect(sink?.artifactDir).toBe(artifactDir);
 			sink?.recordSendMeta({
 				mode: "bootstrap",
@@ -124,15 +148,7 @@ describe("cursor sdk event debug sink", () => {
 		const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-event-debug-snapshot-"));
 
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(artifactDir));
 			const partial = { role: "assistant" as const, content: [{ type: "text" as const, text: "before" }] };
 			const event = { type: "text_delta", delta: "before", partial };
 
@@ -164,15 +180,7 @@ describe("cursor sdk event debug sink", () => {
 		const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-event-debug-nonthrowing-"));
 
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(artifactDir));
 			const circular: Record<string, unknown> = { value: 123n };
 			circular.self = circular;
 
@@ -188,8 +196,7 @@ describe("cursor sdk event debug sink", () => {
 	});
 
 	it("never blocks the pi stream when debug recording throws", () => {
-		const originalDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
+		const restore = installCursorSdkEventDebugUserConfig({ enabled: true });
 		try {
 			const originalPush = vi.fn();
 			const stream = { push: originalPush };
@@ -199,8 +206,7 @@ describe("cursor sdk event debug sink", () => {
 			expect(() => stream.push({ type: "text_delta", delta: "still delivered" })).not.toThrow();
 			expect(originalPush).toHaveBeenCalledWith({ type: "text_delta", delta: "still delivered" });
 		} finally {
-			if (originalDebug === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-			else process.env.PI_CURSOR_SDK_EVENT_DEBUG = originalDebug;
+			restore();
 		}
 	});
 
@@ -208,15 +214,7 @@ describe("cursor sdk event debug sink", () => {
 		const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-event-debug-bounded-"));
 
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(artifactDir));
 			const partial = { role: "assistant", content: [{ type: "text", text: "x".repeat(1024 * 1024) }] };
 			for (let index = 0; index < 3; index += 1) {
 				sink?.recordPiStreamEvent({ type: "text_delta", delta: "x", partial });
@@ -248,16 +246,7 @@ describe("cursor sdk event debug sink", () => {
 		}) as typeof process.stderr.write;
 
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-					PI_CURSOR_SDK_EVENT_DEBUG_STDERR: "1",
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(artifactDir, ENABLED_STDERR_CONFIG));
 			await sink?.finalize();
 			expect(stderrLines.some((line) => line.includes(CURSOR_SDK_EVENT_DEBUG_LOG_PREFIX))).toBe(true);
 		} finally {
@@ -277,15 +266,7 @@ describe("cursor sdk event debug session grouping", () => {
 		scopeTestUtils.set(baseDir, missingSessionFile);
 
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: baseDir,
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: join(baseDir, "run"),
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(join(baseDir, "run"), ENABLED_CURSOR_SDK_EVENT_DEBUG_CONFIG, { cwd: baseDir }));
 			await sink?.finalize();
 
 			const summary = JSON.parse(readFileSync(join(sink!.artifactDir, sdkEventDebugTestUtils.ARTIFACTS.summary), "utf8"));
@@ -311,22 +292,19 @@ describe("cursor sdk event debug session grouping", () => {
 		scopeTestUtils.set(baseDir, sessionFile);
 
 		try {
-			const env = {
-				PI_CURSOR_SDK_EVENT_DEBUG: "1",
-				PI_CURSOR_SDK_EVENT_DEBUG_DIR: join(baseDir, "events"),
-			};
+			const config: CursorSdkConfig = { debug: { sdkEvents: { enabled: true, directory: join(baseDir, "events") } } };
 			const sink1 = CursorSdkEventDebugSink.maybeCreate({
 				cwd: baseDir,
 				modelId: "composer-2.5",
 				provider: "cursor",
-				env,
+				config,
 			});
 			await sink1?.finalize();
 			const sink2 = CursorSdkEventDebugSink.maybeCreate({
 				cwd: baseDir,
 				modelId: "composer-2.5",
 				provider: "cursor",
-				env,
+				config,
 			});
 			await sink2?.finalize();
 
@@ -353,15 +331,7 @@ describe("cursor sdk event debug session grouping", () => {
 		const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-event-debug-pinned-"));
 		sdkEventDebugTestUtils.resetSessionDebugState();
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(artifactDir));
 			expect(sink?.pinnedRun).toBe(true);
 			expect(sink?.sessionDir).toBeUndefined();
 			expect(sink?.turn).toBeUndefined();
@@ -380,15 +350,12 @@ describe("cursor sdk event debug session grouping", () => {
 		scopeTestUtils.set(baseDir, sessionFile);
 
 		try {
-			const env = {
-				PI_CURSOR_SDK_EVENT_DEBUG: "1",
-				PI_CURSOR_SDK_EVENT_DEBUG_DIR: join(baseDir, "events"),
-			};
+			const config: CursorSdkConfig = { debug: { sdkEvents: { enabled: true, directory: join(baseDir, "events") } } };
 			const sink1 = CursorSdkEventDebugSink.maybeCreate({
 				cwd: baseDir,
 				modelId: "composer-2.5",
 				provider: "cursor",
-				env,
+				config,
 			});
 			sink1?.recordSendMeta({
 				mode: "bootstrap",
@@ -411,7 +378,7 @@ describe("cursor sdk event debug session grouping", () => {
 				cwd: baseDir,
 				modelId: "composer-2.5",
 				provider: "cursor",
-				env,
+				config,
 			});
 			sink2?.recordSendMeta({
 				mode: "incremental",
@@ -466,28 +433,15 @@ describe("cursor sdk event debug session grouping", () => {
 		sdkEventDebugTestUtils.resetSessionDebugState();
 
 		try {
-			const env = {
-				PI_CURSOR_SDK_EVENT_DEBUG: "1",
-				PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-			};
-			const sink1 = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env,
-			});
+			const options = debugSinkOptions(artifactDir);
+			const sink1 = CursorSdkEventDebugSink.maybeCreate(options);
 			sink1?.recordPiStreamEvent({ type: "text_delta", delta: "first-run" });
 			await sink1?.finalize();
 			expect(readFileSync(join(artifactDir, sdkEventDebugTestUtils.ARTIFACTS.piStreamEvents), "utf8")).toContain(
 				"first-run",
 			);
 
-			const sink2 = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env,
-			});
+			const sink2 = CursorSdkEventDebugSink.maybeCreate(options);
 			sink2?.recordPiStreamEvent({ type: "text_delta", delta: "second-run" });
 			await sink2?.finalize();
 
@@ -535,18 +489,10 @@ describe("discarded incomplete started tool calls", () => {
 		}) as typeof process.stderr.write;
 
 		try {
-			const sink = CursorSdkEventDebugSink.maybeCreate({
-				cwd: "/repo",
-				modelId: "composer-2.5",
-				provider: "cursor",
-				env: {
-					PI_CURSOR_SDK_EVENT_DEBUG: "1",
-					PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-				},
-			});
+			const sink = CursorSdkEventDebugSink.maybeCreate(debugSinkOptions(artifactDir));
 			recordDiscardedIncompleteStartedToolCall(
 				sink,
-				{ [CURSOR_SDK_EVENT_DEBUG_ENV]: "1" },
+				ENABLED_CURSOR_SDK_EVENT_DEBUG_CONFIG,
 				{ toolName: "read", callId: "call-abc" },
 			);
 			await sink?.finalize();
@@ -572,7 +518,7 @@ describe("discarded incomplete started tool calls", () => {
 
 			recordDiscardedIncompleteStartedToolCall(
 				undefined,
-				{ [CURSOR_SDK_EVENT_DEBUG_ENV]: "1", [CURSOR_SDK_EVENT_DEBUG_STDERR_ENV]: "1" },
+				ENABLED_STDERR_CONFIG,
 				{ toolName: "read", callId: "call-abc" },
 			);
 			expect(stderr).toHaveBeenCalledOnce();
@@ -674,7 +620,7 @@ describe("debug-provider-events maintainer probe", () => {
 			["--prompt", "hello", "--setting-sources", "none"],
 			{ CURSOR_API_KEY: "key" },
 		);
-		expect(args.settingSources).toBeUndefined();
+		expect(args.settingSources).toEqual([]);
 		expect(serializeCursorSettingSources(args.settingSources)).toBe("none");
 	});
 
@@ -683,9 +629,9 @@ describe("debug-provider-events maintainer probe", () => {
 			["--prompt", "hello", "--setting-sources", "  ,  "],
 			{ CURSOR_API_KEY: "key" },
 		);
-		expect(args.settingSources).toBeUndefined();
+		expect(args.settingSources).toEqual([]);
 		const forwarded = serializeCursorSettingSources(args.settingSources);
 		expect(forwarded).toBe("none");
-		expect(resolveCursorSettingSources(forwarded)).toBeUndefined();
+		expect(resolveCursorSettingSources(forwarded)).toEqual([]);
 	});
 });

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	CURSOR_SETTING_SOURCES_ENV,
 	DEFAULT_CURSOR_SETTING_SOURCES,
 	cursorSettingSourcesIncludes,
 	getEffectiveCursorSettingSources,
@@ -14,9 +13,9 @@ describe("resolveCursorSettingSources", () => {
 		expect(resolveCursorSettingSources("")).toEqual(DEFAULT_CURSOR_SETTING_SOURCES);
 	});
 
-	it("maps disable aliases to undefined", () => {
+	it("maps disable aliases to an empty list", () => {
 		for (const raw of ["none", "0", "false", "off", "omit", "disabled"]) {
-			expect(resolveCursorSettingSources(raw)).toBeUndefined();
+			expect(resolveCursorSettingSources(raw)).toEqual([]);
 		}
 	});
 
@@ -32,7 +31,7 @@ describe("resolveCursorSettingSources", () => {
 
 	it("treats comma-only and blank-list input as disabled", () => {
 		for (const raw of [",", ",,", "  ,  ,  "]) {
-			expect(resolveCursorSettingSources(raw)).toBeUndefined();
+			expect(resolveCursorSettingSources(raw)).toEqual([]);
 		}
 	});
 });
@@ -54,18 +53,9 @@ describe("cursorSettingSourcesIncludes", () => {
 });
 
 describe("getEffectiveCursorSettingSources", () => {
-	it("exports the provider env var name", () => {
-		expect(CURSOR_SETTING_SOURCES_ENV).toBe("PI_CURSOR_SETTING_SOURCES");
-	});
-
-	it("reads from process env by default", () => {
-		const previous = process.env[CURSOR_SETTING_SOURCES_ENV];
-		try {
-			process.env[CURSOR_SETTING_SOURCES_ENV] = "plugins";
-			expect(getEffectiveCursorSettingSources()).toEqual(["plugins"]);
-		} finally {
-			if (previous === undefined) delete process.env[CURSOR_SETTING_SOURCES_ENV];
-			else process.env[CURSOR_SETTING_SOURCES_ENV] = previous;
-		}
+	it("reads user config and defaults to all", () => {
+		expect(getEffectiveCursorSettingSources({})).toEqual(["all"]);
+		expect(getEffectiveCursorSettingSources({ local: { settingSources: ["plugins"] } })).toEqual(["plugins"]);
+		expect(getEffectiveCursorSettingSources({ local: { settingSources: [] } })).toEqual([]);
 	});
 });

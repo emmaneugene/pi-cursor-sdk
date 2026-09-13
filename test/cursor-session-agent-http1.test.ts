@@ -39,7 +39,7 @@ describe("Cursor session agent HTTP/1.1 pooling", () => {
 		cursorSessionScopeTestUtils.set("/tmp/project", "/tmp/sessions/test.jsonl");
 		configureCursorSdkHttp1(
 			{ Cursor: { configure } },
-			{ value: true, source: "environment", trustLevel: "environment" },
+			{ value: "http1", source: "user" },
 		);
 		await acquireSessionCursorAgent({
 			apiKey: "test-key",

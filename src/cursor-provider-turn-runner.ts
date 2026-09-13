@@ -71,7 +71,7 @@ export class CursorProviderTurnRunner {
 			});
 			sdkEventDebugRef.current = this.sdkEventDebug;
 			this.sdkEventDebug?.recordContextSnapshot(context);
-			const resolvedConfig = resolveCursorProviderTurnConfig(cwd, runtimeContext?.projectTrusted);
+			const resolvedConfig = resolveCursorProviderTurnConfig();
 			const localScopeKey = runtimeContext?.scopeKey ?? getCursorSessionScopeKey();
 			sdkProcessErrorGuard.containLocalTransportClosedPipe(() =>
 				invalidateSessionAgent(localScopeKey, { deadTransport: true }),

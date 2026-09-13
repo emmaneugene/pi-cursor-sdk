@@ -1,22 +1,22 @@
 import type { SettingSource } from "@cursor/sdk";
-/** Provider-facing wrapper; canonical parsing lives in shared/cursor-setting-sources.mjs. */
-import {
-	CURSOR_SETTING_SOURCES_ENV as CURSOR_SETTING_SOURCES_ENV_JS,
-	DEFAULT_CURSOR_SETTING_SOURCES as DEFAULT_CURSOR_SETTING_SOURCES_JS,
-	resolveCursorSettingSources as resolveCursorSettingSourcesJs,
-} from "../shared/cursor-setting-sources.mjs";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 
-export const CURSOR_SETTING_SOURCES_ENV = CURSOR_SETTING_SOURCES_ENV_JS;
-export const DEFAULT_CURSOR_SETTING_SOURCES = DEFAULT_CURSOR_SETTING_SOURCES_JS as readonly SettingSource[];
+export const DEFAULT_CURSOR_SETTING_SOURCES = ["all"] as const satisfies readonly SettingSource[];
+/** Retained for script compatibility. Runtime configuration does not read this variable. */
+export const CURSOR_SETTING_SOURCES_ENV = "PI_CURSOR_SETTING_SOURCES";
 
-export function resolveCursorSettingSources(raw?: string): SettingSource[] | undefined {
-	return resolveCursorSettingSourcesJs(raw) as SettingSource[] | undefined;
+export function resolveCursorSettingSources(raw?: string): SettingSource[] {
+	const trimmed = raw?.trim();
+	if (!trimmed) return [...DEFAULT_CURSOR_SETTING_SOURCES];
+	const normalized = trimmed.toLowerCase();
+	if (["0", "false", "off", "none", "omit", "disabled"].includes(normalized)) return [];
+	if (["1", "true", "on", "all"].includes(normalized)) return ["all"];
+	return trimmed.split(",").map((entry) => entry.trim()).filter(Boolean) as SettingSource[];
 }
 
-export function getEffectiveCursorSettingSources(
-	raw: string | undefined = process.env[CURSOR_SETTING_SOURCES_ENV],
-): SettingSource[] | undefined {
-	return resolveCursorSettingSources(raw);
+export function getEffectiveCursorSettingSources(config: CursorSdkConfig = loadCursorSdkUserConfig()): SettingSource[] {
+	const configured = config.local?.settingSources;
+	return configured === undefined ? [...DEFAULT_CURSOR_SETTING_SOURCES] : [...configured] as SettingSource[];
 }
 
 export function cursorSettingSourcesIncludes(

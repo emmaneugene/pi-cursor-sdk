@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commonBooleanFlag, commonRepeatStringFlag, parseArgv } from "./lib/cursor-cli-args.mjs";
-import { buildCursorSmokeEnvPlan, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES, sealedNodePath } from "./lib/cursor-smoke-env.mjs";
+import { buildCursorSmokeEnvPlan, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES, sealedNodePath, writeCursorSdkEventDebugUserConfig } from "./lib/cursor-smoke-env.mjs";
 import { writeVisualManifest } from "./lib/cursor-visual-manifest.mjs";
 import { runVisualSmokeSelfTest } from "./visual-tui-smoke-self-test.mjs";
 import { buildTerminalHtml, writeTerminalScreenshot } from "./lib/cursor-visual-render.mjs";
@@ -52,24 +52,24 @@ Common options:
   --setting-sources VALUE       Cursor setting sources. Default: ${DEFAULT_SETTING_SOURCES}.
   --bridge                      Opt in to the pi tool bridge for bridge-specific visual audits.
   --expose-builtin-tools        Opt in to exposing overlapping built-in pi tools to Cursor. Requires --bridge.
-  --event-debug                 Set PI_CURSOR_SDK_EVENT_DEBUG=1 and write debug artifacts under <out-dir>.
+  --event-debug                 Write debug.sdkEvents into the isolated cursor-sdk.json and store artifacts under <out-dir>.
   --leftover-pattern REGEX      After capture, fail if a process command still matches REGEX. Repeatable.
   --no-screenshot               Write .ansi/.txt/.html/.jsonl.path only; use agent_browser manually.
   --self-test                   Run the fake-PATH/env isolation probe without launching pi.
   -h, --help                    Show this help.
 
 Native replay isolation defaults:
-  PI_CURSOR_NATIVE_TOOL_DISPLAY=1
-  PI_CURSOR_REGISTER_NATIVE_TOOLS=1
-  PI_CURSOR_SETTING_SOURCES=none
-  PI_CURSOR_PI_TOOL_BRIDGE=0
-  PI_CURSOR_EXPOSE_BUILTIN_TOOLS=0
+  Isolated <out-dir>/pi-agent/cursor-sdk.json:
+    tools.display.native=on
+    local.settingSources=[]
+    tools.bridge.enabled=false
+    tools.bridge.exposeBuiltins=false
   PI_CODING_AGENT_DIR=<out-dir>/pi-agent  (seeded auth.json + quietStartup; host extensions stay out)
   PI_OFFLINE=1
   PI_SKIP_VERSION_CHECK=1
   TERM=xterm-256color
   tmux starts in --cwd with a non-login shell so a stale tmux-server cwd cannot print getcwd errors
-  Debug artifact env is cleared before each run; --event-debug sets a deterministic debug dir.
+  Debug artifact env is cleared before each run; --event-debug writes isolated user JSON for a deterministic debug dir.
 
 Artifacts written:
   <label>.ansi                  Raw tmux ANSI capture.
@@ -217,6 +217,10 @@ function seedVisualAgentDir(agentDir) {
 		join(agentDir, "settings.json"),
 		`${JSON.stringify({ quietStartup: true, enableInstallTelemetry: false })}\n`,
 	);
+}
+
+function seedVisualEventDebugConfig(agentDir, directory) {
+	writeCursorSdkEventDebugUserConfig(agentDir, { enabled: true, directory });
 }
 
 function sanitizeLabel(label) {
@@ -402,7 +406,14 @@ function checkLeftovers(patterns) {
 	}
 }
 
+function visualEventDebugDir(options) {
+	return resolve(options.outDir, `${options.safeLabel ?? "visual-smoke"}.cursor-sdk-events`);
+}
+
 function buildLaunchPlan(options, commands, shell) {
+	const agentDir = options.agentDir ?? resolve(options.outDir, "pi-agent");
+	const eventDebugDir = options.eventDebug ? visualEventDebugDir(options) : undefined;
+	if (eventDebugDir) seedVisualEventDebugConfig(agentDir, eventDebugDir);
 	const smokeEnvPlan = buildCursorSmokeEnvPlan({
 		baseEnv: process.env,
 		nodePath: commands.node,
@@ -412,10 +423,10 @@ function buildLaunchPlan(options, commands, shell) {
 		bridge: options.bridge,
 		exposeBuiltinTools: options.exposeBuiltinTools,
 		term: "xterm-256color",
-		eventDebugDir: options.eventDebug ? resolve(options.outDir, `${options.safeLabel ?? "visual-smoke"}.cursor-sdk-events`) : undefined,
+		eventDebugDir,
+		agentDir,
 	});
 	const sealedPath = commands.sealedPath ?? smokeEnvPlan.sealedPath;
-	const agentDir = options.agentDir ?? resolve(options.outDir, "pi-agent");
 	const envAssignments = [
 		...smokeEnvPlan.envEntries,
 		["PI_CODING_AGENT_DIR", agentDir],

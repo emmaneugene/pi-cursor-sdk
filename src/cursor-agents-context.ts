@@ -3,15 +3,10 @@ import type {
 	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { parseEnvBoolean } from "./cursor-env-boolean.js";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 import { isCursorModel } from "./cursor-model.js";
-import {
-	cursorSettingSourcesIncludes,
-	getEffectiveCursorSettingSources,
-	resolveCursorSettingSources,
-} from "./cursor-setting-sources.js";
+import { cursorSettingSourcesIncludes, getEffectiveCursorSettingSources, resolveCursorSettingSources } from "./cursor-setting-sources.js";
 import type { SettingSource } from "@cursor/sdk";
-export const CURSOR_PRESERVE_PI_AGENTS_MD_ENV = "PI_CURSOR_PRESERVE_PI_AGENTS_MD";
 
 /** Opening tag prefix pi `buildSystemPrompt()` uses for each context file (path attribute only). */
 export const PI_PROJECT_INSTRUCTIONS_OPEN_PREFIX = '<project_instructions path="';
@@ -101,9 +96,10 @@ export function shouldSuppressPiAgentsContext(
 	contextFiles: readonly PiAgentsContextFile[],
 	settingSources: SettingSource[] | undefined,
 	agentDir?: string,
+	config: CursorSdkConfig = loadCursorSdkUserConfig(),
 ): boolean {
 	if (!isCursorModel(model)) return false;
-	if (parseEnvBoolean(process.env[CURSOR_PRESERVE_PI_AGENTS_MD_ENV], false)) return false;
+	if (config.local?.preservePiAgentsContext === true) return false;
 	if (contextFiles.length === 0) return false;
 	return contextFiles.some((file) => shouldRemovePiAgentsContextFile(file, settingSources, agentDir));
 }
@@ -151,14 +147,14 @@ export function resolveCursorFacingSystemPrompt(
 	systemPromptOptions?: BuildSystemPromptOptions,
 	settingSourcesRaw?: string,
 	agentDir?: string,
+	config: CursorSdkConfig = loadCursorSdkUserConfig(),
 ): string {
 	if (!systemPromptOptions) return systemPrompt;
 	const contextFiles = systemPromptOptions.contextFiles ?? [];
-	const settingSources =
-		settingSourcesRaw === undefined
-			? getEffectiveCursorSettingSources()
-			: resolveCursorSettingSources(settingSourcesRaw);
-	if (!shouldSuppressPiAgentsContext(model, contextFiles, settingSources, agentDir)) {
+	const settingSources = settingSourcesRaw === undefined
+		? getEffectiveCursorSettingSources(config)
+		: resolveCursorSettingSources(settingSourcesRaw);
+	if (!shouldSuppressPiAgentsContext(model, contextFiles, settingSources, agentDir, config)) {
 		return systemPrompt;
 	}
 	return removePiAgentsContextFromSystemPrompt(systemPrompt, contextFiles, settingSources, agentDir);

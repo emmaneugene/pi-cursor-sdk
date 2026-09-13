@@ -11,7 +11,7 @@ import { Type } from "typebox";
 import { arePiToolsDisabled } from "./cursor-active-tools.js";
 import { isCursorModel } from "./cursor-model.js";
 import { registerCursorModelLifecycle, type CursorModelLifecycleExtensionApi } from "./cursor-model-lifecycle.js";
-import { resolveCursorPiToolBridgeEnabled } from "./cursor-pi-tool-bridge-env.js";
+import { resolveCursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
 
 export const CURSOR_ACTIVATE_SKILL_TOOL_NAME = "cursor_activate_skill";
 export const CURSOR_ACTIVATE_SKILL_MCP_NAME = "pi__cursor_activate_skill";
@@ -58,7 +58,7 @@ function getAvailableSkillNames(): string[] {
 }
 
 function shouldExposeSkillTool(model: ExtensionContext["model"]): boolean {
-	return isCursorModel(model) && resolveCursorPiToolBridgeEnabled() && currentSkillsByName.size > 0;
+	return isCursorModel(model) && resolveCursorPiToolBridgeConfig().enabled && currentSkillsByName.size > 0;
 }
 
 function syncCursorSkillToolForModel(

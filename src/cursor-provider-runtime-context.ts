@@ -5,7 +5,6 @@ export interface CursorProviderRuntimeContext {
 	readonly scopeKey: string;
 	readonly cwd: string;
 	readonly sessionFile: string | undefined;
-	readonly projectTrusted: boolean;
 	readonly bridge: CursorPiToolBridge;
 	readonly localResume: false;
 	readonly nativeToolReplay: false;

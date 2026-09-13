@@ -2,7 +2,7 @@
 
 Status: **Superseded historical plan**. Historical reconciliation baseline: `a2d574b` on 2026-07-18. Implementation status refreshed 2026-07-29 against `@cursor/sdk@1.0.23`.
 
-The extension later removed all Cursor Cloud support and now runs local agents only. Cloud references below record the superseded design and are not current product documentation. Current source, tests, and the main [README](../../README.md) are authoritative.
+The extension later removed all Cursor Cloud support and now runs local agents only. Cloud references below record the superseded design and are not current product documentation. Later user-only `~/.pi/agent/cursor-sdk.json` also superseded the environment-variable and project-config rows below. Current source, tests, and the main [README](../../README.md) are authoritative.
 
 ## Status taxonomy
 

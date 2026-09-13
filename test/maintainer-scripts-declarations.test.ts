@@ -97,6 +97,9 @@ const DECLARATION_TYPE_ONLY_EXPORTS: Record<string, readonly string[]> = {
 		"CursorSdkEventTimingSnapshot",
 		"CursorSdkEventJsonlSink",
 	],
+	"scripts/lib/cursor-smoke-env.d.mts": [
+		"CursorSmokeUserConfigOptions",
+	],
 	"scripts/lib/cursor-cli-args.d.mts": [
 		"CursorCliBooleanFlagSpec",
 		"CursorCliFlagSpec",
@@ -199,7 +202,7 @@ type _providerSnapshotShape = AssertEqual<CursorPiSessionSnapshotState["copied"]
 type _providerCaptureCountsShape = AssertEqual<CursorDebugCaptureCounts, Record<string, number | Record<string, number>>>;
 type _sdkTimingSnapshotShape = AssertEqual<CursorSdkEventTimingSnapshot["eventCount"], number>;
 
-const _settingSourcesReturn: AssertEqual<ReturnType<typeof defaultSettingSourcesFromEnv>, string[] | undefined> = true;
+const _settingSourcesReturn: AssertEqual<ReturnType<typeof defaultSettingSourcesFromEnv>, string[]> = true;
 const _waitForChildCloseReturn: AssertEqual<Awaited<ReturnType<typeof waitForChildClose>>, number> = true;
 const _startupNoisePatterns: AssertEqual<typeof CURSOR_SDK_STARTUP_NOISE_PATTERNS, readonly string[]> = true;
 const _parseDebugSdkEventsArgs: (argv: string[], env?: NodeJS.ProcessEnv) => CursorDebugSdkEventsArgs = parseDebugSdkEventsArgs;

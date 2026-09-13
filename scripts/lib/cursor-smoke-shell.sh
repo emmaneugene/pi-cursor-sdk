@@ -5,6 +5,8 @@
 SMOKE_KILL_GRACE_SECS="${SMOKE_KILL_GRACE_SECS:-2}"
 SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES=()
 SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS=()
+SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES=()
+SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS=()
 
 smoke_log() {
 	printf '[%s] %s\n' "$SMOKE_LOG_PREFIX" "$*"
@@ -78,6 +80,54 @@ smoke_build_cursor_sdk_event_debug_unsets() {
 	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}"; do
 		SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS+=( -u "$name" )
 	done
+}
+
+smoke_load_cursor_sdk_stale_public_env_names() {
+	local node_bin="$1"
+	local module_path="$2"
+	local name
+	SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES=()
+	while IFS= read -r name; do
+		[[ -n "$name" ]] || continue
+		SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES+=( "$name" )
+	done < <("$node_bin" --input-type=module -e 'import { pathToFileURL } from "node:url"; const mod = await import(pathToFileURL(process.argv[1]).href); for (const name of mod.CURSOR_SDK_STALE_PUBLIC_ENV_NAMES) console.log(name);' "$module_path")
+	if [[ "${#SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]}" -eq 0 ]]; then
+		smoke_fail "failed to load stale public Cursor env names from $module_path"
+	fi
+}
+
+smoke_build_cursor_sdk_cleared_env_unsets() {
+	local name
+	smoke_build_cursor_sdk_event_debug_unsets
+	SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS=( "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS[@]}" )
+	for name in "${SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]}"; do
+		SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS+=( -u "$name" )
+	done
+}
+
+smoke_write_cursor_sdk_user_config() {
+	local node_bin="$1"
+	local module_path="$2"
+	local agent_dir="$3"
+	local patch_json="$4"
+	"$node_bin" --input-type=module -e 'import { pathToFileURL } from "node:url"; const { writeCursorSdkUserConfig } = await import(pathToFileURL(process.argv[1]).href); writeCursorSdkUserConfig(process.argv[2], JSON.parse(process.argv[3]));' "$module_path" "$agent_dir" "$patch_json"
+}
+
+smoke_seed_pi_agent_dir() {
+	local agent_dir="$1"
+	local auth_json="${2:-${AUTH_JSON:-${REAL_HOME:-$HOME}/.pi/agent/auth.json}}"
+	local models_src="${3:-${PI_AGENT_DIR:-${REAL_HOME:-$HOME}/.pi/agent}/models.json}"
+	mkdir -p "$agent_dir"
+	if [[ -f "$auth_json" ]]; then
+		cp "$auth_json" "$agent_dir/auth.json"
+		chmod 600 "$agent_dir/auth.json"
+		smoke_log "seeded $agent_dir/auth.json"
+	else
+		smoke_log "WARN: no auth.json at $auth_json"
+	fi
+	if [[ -f "$models_src" ]]; then
+		cp "$models_src" "$agent_dir/models.json"
+	fi
 }
 
 # Run a command with a wall-clock timeout. Prefer GNU/BSD timeout; fall back to a

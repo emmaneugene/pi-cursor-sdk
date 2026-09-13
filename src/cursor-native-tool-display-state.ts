@@ -1,13 +1,10 @@
 import type { CursorPiToolDisplay } from "./cursor-transcript-utils.js";
-import { parseOptionalEnvBoolean } from "./cursor-env-boolean.js";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 
 export interface CursorNativeToolDisplayItem extends CursorPiToolDisplay {
 	id: string;
 	terminate?: boolean;
 }
-
-export const NATIVE_CURSOR_TOOL_DISPLAY_ENV = "PI_CURSOR_NATIVE_TOOL_DISPLAY";
-export const NATIVE_CURSOR_TOOL_REGISTRATION_ENV = "PI_CURSOR_REGISTER_NATIVE_TOOLS";
 
 export const registeredNativeToolNames = new Set<string>();
 export const skippedNativeToolNames = new Set<string>();
@@ -15,19 +12,16 @@ export const nativeToolResults = new Map<string, CursorNativeToolDisplayItem>();
 
 let nativeToolDisplayRuntimeRequested = false;
 
-export function readBooleanEnv(name: string, env: Record<string, string | undefined> = process.env): boolean | undefined {
-	return parseOptionalEnvBoolean(env[name]);
-}
-
-export function isCursorNativeToolDisplayRequested(mode?: string): boolean {
-	const override = readBooleanEnv(NATIVE_CURSOR_TOOL_DISPLAY_ENV);
-	if (override !== undefined) return override;
+export function isCursorNativeToolDisplayRequested(mode?: string, config: CursorSdkConfig = loadCursorSdkUserConfig()): boolean {
+	const setting = config.tools?.display?.native ?? "auto";
+	if (setting === "on") return true;
+	if (setting === "off") return false;
 	if (mode) return mode === "tui" || mode === "json" || mode === "rpc";
 	return process.stdout.isTTY === true;
 }
 
-export function isCursorNativeToolRegistrationRequested(mode?: string): boolean {
-	return mode !== "print" && readBooleanEnv(NATIVE_CURSOR_TOOL_REGISTRATION_ENV) !== false && isCursorNativeToolDisplayRequested(mode);
+export function isCursorNativeToolRegistrationRequested(mode?: string, config?: CursorSdkConfig): boolean {
+	return mode !== "print" && isCursorNativeToolDisplayRequested(mode, config);
 }
 
 export function setCursorNativeToolDisplayRuntimeRequested(requested: boolean): void {
@@ -39,7 +33,7 @@ export function isCursorNativeToolDisplayEnabled(): boolean {
 }
 
 export function isCursorNativeToolDisplayRuntimeEnabled(): boolean {
-	return nativeToolDisplayRuntimeRequested && readBooleanEnv(NATIVE_CURSOR_TOOL_DISPLAY_ENV) !== false && registeredNativeToolNames.size > 0;
+	return nativeToolDisplayRuntimeRequested && registeredNativeToolNames.size > 0;
 }
 
 export function canRenderCursorToolNatively(toolName: string): boolean {

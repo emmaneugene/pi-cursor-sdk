@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
@@ -15,7 +15,6 @@ import type { BeforeAgentStartEvent, BuildSystemPromptOptions, ExtensionContext 
 import type { Context } from "@earendil-works/pi-ai";
 import {
 	classifyContextFileOverlap,
-	CURSOR_PRESERVE_PI_AGENTS_MD_ENV,
 	getAgentsContextFileBaseName,
 	isPiAgentDirAgentsMdPath,
 	PI_PROJECT_INSTRUCTIONS_OPEN_PREFIX,
@@ -28,7 +27,6 @@ import {
 } from "../src/cursor-agents-context.js";
 import { registerCursorAgentsContextDedup } from "../src/cursor-agents-context-registration.js";
 import { buildCursorPrompt } from "../src/context.js";
-import { CURSOR_SETTING_SOURCES_ENV } from "../src/cursor-setting-sources.js";
 import { createEventHarness, makeModel } from "./helpers/pi-harness.js";
 import { buildPiSystemPromptWithContextFiles, makeSystemPromptOptions } from "./helpers/pi-system-prompt.js";
 
@@ -64,11 +62,6 @@ function getProjectContextSection(systemPrompt: string): string {
 	const end = systemPrompt.indexOf(close, start) + close.length;
 	return systemPrompt.slice(start, end);
 }
-
-beforeEach(() => {
-	delete process.env[CURSOR_PRESERVE_PI_AGENTS_MD_ENV];
-	delete process.env[CURSOR_SETTING_SOURCES_ENV];
-});
 
 describe("classifyContextFileOverlap", () => {
 	it("classifies AGENTS.md and project CLAUDE.md overlaps", () => {
@@ -295,12 +288,16 @@ describe("resolveCursorFacingSystemPrompt", () => {
 		expect(resolved).not.toContain("Global guidance");
 	});
 
-	it("honors PI_CURSOR_PRESERVE_PI_AGENTS_MD=1", () => {
-		process.env[CURSOR_PRESERVE_PI_AGENTS_MD_ENV] = "1";
+	it("honors local.preservePiAgentsContext", () => {
 		const prompt = buildPiSystemPromptWithContextFiles([PROJECT_FILE]);
-		expect(
-			resolveCursorFacingSystemPrompt(prompt, cursorModel, makeSystemPromptOptions([PROJECT_FILE]), "all"),
-		).toBe(prompt);
+		expect(resolveCursorFacingSystemPrompt(
+			prompt,
+			cursorModel,
+			makeSystemPromptOptions([PROJECT_FILE]),
+			"all",
+			undefined,
+			{ local: { preservePiAgentsContext: true } },
+		)).toBe(prompt);
 	});
 });
 
@@ -322,7 +319,6 @@ describe("registerCursorAgentsContextDedup", () => {
 	const cursorModelOverrides = { model: makeModel("composer-2.5") };
 
 	it("strips via before_agent_start for cursor models with overlapping setting sources", async () => {
-		process.env[CURSOR_SETTING_SOURCES_ENV] = "all";
 		const pi = createEventHarness();
 		registerCursorAgentsContextDedup(pi);
 
@@ -361,9 +357,8 @@ describe("registerCursorAgentsContextDedup", () => {
 	});
 
 	it("does not modify project prompt when setting sources omit project", async () => {
-		process.env[CURSOR_SETTING_SOURCES_ENV] = "plugins,user";
 		const pi = createEventHarness();
-		registerCursorAgentsContextDedup(pi);
+		registerCursorAgentsContextDedup(pi, { local: { settingSources: ["plugins", "user"] } });
 
 		const prompt = buildPiSystemPromptWithContextFiles([PROJECT_FILE]);
 		const result = await pi.invokeEvent(
@@ -381,9 +376,8 @@ describe("registerCursorAgentsContextDedup", () => {
 	});
 
 	it("does not modify prompt when setting sources are none", async () => {
-		process.env[CURSOR_SETTING_SOURCES_ENV] = "none";
 		const pi = createEventHarness();
-		registerCursorAgentsContextDedup(pi);
+		registerCursorAgentsContextDedup(pi, { local: { settingSources: [] } });
 
 		const prompt = buildPiSystemPromptWithContextFiles([PROJECT_FILE]);
 		const result = await pi.invokeEvent(
@@ -401,7 +395,6 @@ describe("registerCursorAgentsContextDedup", () => {
 	});
 
 	it("feeds deduped system prompt from before_agent_start into buildCursorPrompt", async () => {
-		process.env[CURSOR_SETTING_SOURCES_ENV] = "all";
 		const pi = createEventHarness();
 		registerCursorAgentsContextDedup(pi);
 

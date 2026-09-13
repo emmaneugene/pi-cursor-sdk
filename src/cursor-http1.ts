@@ -44,12 +44,13 @@ export function clearCursorSdkHttp1(): void {
 
 export function configureCursorSdkHttp1(
 	sdk: CursorHttp1Sdk,
-	setting: CursorResolvedSetting<boolean>,
+	setting: CursorResolvedSetting<"default" | "http1">,
 ): boolean | undefined {
 	if (setting.source !== "builtin") {
-		sdk.Cursor.configure({ local: { useHttp1ForAgent: setting.value } });
+		const enabled = setting.value === "http1";
+		sdk.Cursor.configure({ local: { useHttp1ForAgent: enabled } });
 		configuredCursor = sdk.Cursor;
-		return setting.value;
+		return enabled;
 	}
 	if (configuredCursor === sdk.Cursor) clearCursorSdkHttp1();
 	else configuredCursor = undefined;

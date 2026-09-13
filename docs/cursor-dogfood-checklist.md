@@ -8,9 +8,9 @@ Short maintainer checklist for **minimal-surface** validation after prompt, brid
 - Extension only: `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6`
 - Fresh session dir: `--session-dir /tmp/pi-cursor-dogfood-<id>`
 - Baseline surface (no ambient Cursor MCP/rules):
-  - `PI_CURSOR_SETTING_SOURCES=none`, **or**
+  - `local.settingSources: []` in the isolated or user `cursor-sdk.json`, **or**
   - empty / minimal `~/.cursor/mcp.json` when you need to verify user MCP config separately
-- Optional: `PI_CURSOR_TOOL_MANIFEST=0` to confirm bootstrap behavior without the manifest block
+- Optional: `tools.manifest: false` to confirm bootstrap behavior without the manifest block
 
 ## One-turn exercise
 
@@ -20,7 +20,7 @@ Short maintainer checklist for **minimal-surface** validation after prompt, brid
 
 `pi --no-tools` is a pi-registry toggle, not a Cursor SDK host-tool kill switch. In dogfood, expect it to remove pi bridge exposure while Cursor host tools can still run.
 
-In-session debug: `/cursor-tools` prints bridge enablement, bootstrap manifest enablement, effective `PI_CURSOR_SETTING_SOURCES`, and the callable-surface manifest snapshot for the current session.
+In-session debug: `/cursor-tools` prints `tools.bridge.enabled`, `tools.manifest`, `local.settingSources`, and the callable-surface manifest snapshot for the current session.
 
 ## CLI spot-check
 
@@ -43,7 +43,7 @@ Common mistake: treating `cursor-replay-*` IDs or pi transcript tool labels as t
 First send (bootstrap) should include:
 
 - Short **Cursor SDK tool boundary** block
-- **Callable tool surfaces this run** manifest (unless `PI_CURSOR_TOOL_MANIFEST=0`)
+- **Callable tool surfaces this run** manifest (unless `tools.manifest` is false)
 - Tail guard with shell `cd` hint
 
 Incremental sends omit the full boundary; tail guard remains.

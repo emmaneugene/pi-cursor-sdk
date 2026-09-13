@@ -30,8 +30,7 @@ import { resolveEffectiveCursorConfig } from "./cursor-runtime-state.js";
 import { buildCursorBridgeExcludeToolNames, type CursorResolvedSdkConfig } from "./cursor-config.js";
 import { buildCursorModelSelection } from "./model-discovery.js";
 import { getEffectiveCursorSettingSources } from "./cursor-setting-sources.js";
-import { getCursorSessionProjectTrusted } from "./cursor-session-scope.js";
-import { resolveCursorPiToolBridgeEnabled } from "./cursor-pi-tool-bridge-env.js";
+import { resolveCursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
 import {
 	buildCursorToolManifestText,
 	resolveCursorToolManifestEnabled,
@@ -65,8 +64,8 @@ interface PrepareCursorProviderTurnContext extends PrepareCursorProviderTurnPara
 	fastEnabled: boolean | undefined;
 }
 
-export function resolveCursorProviderTurnConfig(cwd: string, projectTrusted = getCursorSessionProjectTrusted()) {
-	return resolveEffectiveCursorConfig({ cwd, projectTrusted });
+export function resolveCursorProviderTurnConfig() {
+	return resolveEffectiveCursorConfig();
 }
 
 function buildLocalCursorProviderTurnLifecycle(
@@ -106,7 +105,7 @@ async function prepareCursorLocalProviderTurn(
 		const { Agent } = sdk;
 		const useHttp1ForAgent = configureCursorSdkHttp1(
 			sdk,
-			resolvedConfig.local.useHttp1ForAgent,
+			resolvedConfig.local.transport,
 		);
 
 		installCursorMcpToolTimeoutOverride();
@@ -161,7 +160,7 @@ async function prepareCursorLocalProviderTurn(
 				...promptOptions,
 				toolManifest: buildCursorToolManifestText({
 					bridgeSnapshot: sessionAgentLease.bridgeRun?.snapshot,
-					piBridgeEnabled: resolveCursorPiToolBridgeEnabled(),
+					piBridgeEnabled: resolveCursorPiToolBridgeConfig().enabled,
 					includePiBridgeGuidance,
 				}),
 			};

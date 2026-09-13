@@ -18,7 +18,7 @@ import {
 	type CursorPiToolBridgeRequestDiagnosticFields,
 	writeCursorPiToolBridgeDiagnostic,
 } from "./cursor-pi-tool-bridge-diagnostics.js";
-import { resolveCursorPiToolBridgeCallTimeoutMs } from "./cursor-pi-tool-bridge-env.js";
+import type { CursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
 import type {
 	CursorPiBridgeToolRequest,
 	CursorPiToolBridgeRun,
@@ -59,7 +59,7 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 	mcpServers?: Record<string, McpServerConfig>;
 
 	private readonly registry: CursorPiToolBridgeRunHost;
-	private readonly env: Record<string, string | undefined>;
+	private readonly config: CursorPiToolBridgeConfig;
 	private readonly endpointPath: string;
 	private readonly callTimeoutMs: number;
 	private readonly knownMcpToolNames: ReadonlySet<string>;
@@ -78,20 +78,20 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 
 	constructor(
 		registry: CursorPiToolBridgeRunHost,
-		env: Record<string, string | undefined>,
+		config: CursorPiToolBridgeConfig,
 		snapshot: CursorPiToolBridgeSnapshot,
 		enabled: boolean,
 		options: CursorPiToolBridgeRunOptions = {},
 	) {
 		this.registry = registry;
-		this.env = env;
+		this.config = config;
 		this.snapshot = snapshot;
 		this.enabled = enabled;
 		this.onToolRequest = options.onToolRequest;
 		this.debugRecorder = options.debugRecorder;
 		this.id = `cursor-pi-bridge-run-${randomUUID()}`;
 		this.endpointPath = `${MCP_ENDPOINT_ROOT}/${randomUUID()}/mcp`;
-		this.callTimeoutMs = resolveCursorPiToolBridgeCallTimeoutMs(env);
+		this.callTimeoutMs = config.callTimeoutMs;
 		this.knownMcpToolNames = new Set(snapshot.tools.map((tool) => tool.mcpToolName));
 	}
 
@@ -418,7 +418,7 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 	}
 
 	private emitDiagnostic(event: CursorPiToolBridgeDiagnosticEvent): void {
-		writeCursorPiToolBridgeDiagnostic(this.env, event, this.debugRecorder);
+		writeCursorPiToolBridgeDiagnostic(this.config.debug, event, this.debugRecorder);
 	}
 
 	private pendingCount(): number {

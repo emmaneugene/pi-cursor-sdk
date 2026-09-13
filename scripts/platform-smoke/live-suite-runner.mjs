@@ -16,6 +16,12 @@ import { setTimeout as delay } from "node:timers/promises";
 import { redactSecrets, writePlatformArtifactBundle } from "./artifacts.mjs";
 import { extractContentText, jsonlHasAssistantFinalTextMarker } from "./jsonl-text.mjs";
 import { getScenario, renderPrompt } from "./scenarios.mjs";
+import {
+	clearCursorSdkEventDebugEnv,
+	clearCursorSdkStalePublicEnv,
+	writeCursorSdkEventDebugUserConfig,
+	writeCursorSdkUserConfig,
+} from "../lib/cursor-smoke-env.mjs";
 
 const DEFAULT_MODEL = "cursor/grok-4.6";
 const DEFAULT_WAIT_MS = 240_000;
@@ -517,7 +523,11 @@ async function main() {
 	try {
 		console.log(`[platform-live] suite=${args.suite} target=${args.target} model=${args.model}`);
 		copyFixtureWorkspace(workspaceDir);
-		const piEnv = { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" };
+		const piEnv = clearCursorSdkStalePublicEnv(clearCursorSdkEventDebugEnv({
+			...process.env,
+			PI_CODING_AGENT_DIR: agentDir,
+			PI_OFFLINE: "1",
+		}));
 		let installPath = `./node_modules/${packageName}`;
 		if (args.prepDir) {
 			const prep = prepareSharedPackedInstall(args.prepDir, logDir, artifactDir, packageName);
@@ -544,16 +554,21 @@ async function main() {
 		const list = runLogged(logDir, "pi-list", piCli, ["list", "--approve"], { cwd: workspaceDir, env: piEnv, timeout: 60_000 });
 		requireOk(list, "pi list --approve");
 
-		const suiteEnv = {
+		writeCursorSdkEventDebugUserConfig(agentDir, { enabled: true, directory: debugDir });
+		if (scenario.userConfig) writeCursorSdkUserConfig(agentDir, scenario.userConfig);
+		if (scenario.requiredBridgeDiagnostics) {
+			writeCursorSdkUserConfig(agentDir, {
+				tools: { bridge: { debug: { stderr: true, file: join(artifactDir, "bridge-diagnostics.jsonl") } } },
+			});
+		}
+		copyFileSync(join(agentDir, "cursor-sdk.json"), join(artifactDir, "cursor-sdk.json"));
+		const suiteEnv = clearCursorSdkStalePublicEnv(clearCursorSdkEventDebugEnv({
 			...process.env,
-			...scenario.env,
 			PI_OFFLINE: "1",
 			...(args.suite === "cursor-abort-cleanup" ? { PLATFORM_ABORT_MARKER: "SHOULD_NOT_PRINT" } : {}),
 			PI_CODING_AGENT_DIR: agentDir,
-			PI_CURSOR_SDK_EVENT_DEBUG_DIR: debugDir,
-			PI_CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE: join(artifactDir, "bridge-diagnostics.jsonl"),
 			TERM: "xterm-256color",
-		};
+		}));
 		if (args.suite === "cursor-abort-cleanup") writeProcessSnapshot(logDir, "process-before", platform);
 		const prompt = renderPrompt(scenario, platform);
 		writeFileSync(join(artifactDir, "prompt.txt"), prompt);

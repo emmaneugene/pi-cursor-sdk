@@ -84,11 +84,7 @@ Automatic PNG capture uses Playwright's Chromium or a system Chrome installation
 
 - fixed-size tmux PTY execution of the parent-resolved `pi --approve -e <extension-dir> --model cursor/grok-4.6`
 - parent-resolved `pi` and `tmux` command paths reused in tmux-launched runs, with `process.execPath`'s directory prepended for prereq checks and tmux launches so Node shims use the validated Node
-- `PI_CURSOR_NATIVE_TOOL_DISPLAY=1`
-- `PI_CURSOR_REGISTER_NATIVE_TOOLS=1` by default
-- `PI_CURSOR_SETTING_SOURCES=none` by default
-- `PI_CURSOR_PI_TOOL_BRIDGE=0` by default
-- `PI_CURSOR_EXPOSE_BUILTIN_TOOLS=0` by default
+- Isolated `<out-dir>/pi-agent/cursor-sdk.json` with `tools.display.native=on`, `local.settingSources=[]`, `tools.bridge.enabled=false`, and `tools.bridge.exposeBuiltins=false`
 - Cursor SDK event-debug artifact env cleared before each run; `--event-debug` sets a deterministic debug directory under `--out-dir`
 - `PI_CODING_AGENT_DIR` isolated to `<out-dir>/pi-agent`, seeded with the host `auth.json` (0600) plus `quietStartup`/telemetry-off settings, so host extensions, skills, themes, and MCP config cannot leak into captures
 - `PI_OFFLINE=1` and `PI_SKIP_VERSION_CHECK=1`, so update banners and package-update notices cannot appear in captures

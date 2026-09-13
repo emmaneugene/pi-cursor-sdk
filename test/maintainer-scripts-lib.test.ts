@@ -1,5 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { delimiter, resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { resolveCursorSettingSources as resolveProviderSettingSources } from "../src/cursor-setting-sources.js";
 import {
@@ -25,6 +27,7 @@ import {
 	buildCursorSmokeEnvPlan,
 	CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as scriptSdkEventDebugEnvNames,
 	sealedNodePath,
+	writeCursorSdkEventDebugUserConfig,
 } from "../scripts/lib/cursor-smoke-env.mjs";
 import { CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as sharedSdkEventDebugEnvNames } from "../shared/cursor-sdk-event-debug-env.mjs";
 import {
@@ -113,29 +116,73 @@ describe("maintainer scripts shared lib", () => {
 		expect(scriptSdkEventDebugEnvNames).toEqual(sharedSdkEventDebugEnvNames);
 		expect(sealedNodePath("/opt/node/bin/node", `/tmp/bin${delimiter}/usr/bin`)).toBe(`/opt/node/bin${delimiter}/tmp/bin${delimiter}/usr/bin`);
 		expect(sealedNodePath("/opt/node/bin/node", "")).toBe("/opt/node/bin");
-		const env = buildCursorSmokeEnv({
-			baseEnv: {
-				PATH: "/tmp/fake:/usr/bin",
-				PI_CURSOR_SETTING_SOURCES: "all",
-				PI_CURSOR_SDK_EVENT_DEBUG: "1",
-				PI_CURSOR_SDK_EVENT_DEBUG_DIR: "/tmp/stale",
-			},
-			nodePath: "/opt/node/bin/node",
-			settingSources: "none",
-			nativeToolDisplay: true,
-			registerNativeTools: true,
-			bridge: false,
-			exposeBuiltinTools: false,
-		});
-		expect(env.PATH).toBe(`/opt/node/bin${delimiter}/tmp/fake:/usr/bin`);
-		expect(env.PI_CURSOR_SETTING_SOURCES).toBe("none");
-		expect(env.PI_CURSOR_NATIVE_TOOL_DISPLAY).toBe("1");
-		expect(env.PI_CURSOR_REGISTER_NATIVE_TOOLS).toBe("1");
-		expect(env.PI_CURSOR_PI_TOOL_BRIDGE).toBe("0");
-		expect(env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS).toBe("0");
-		expect(env.PI_CURSOR_SDK_EVENT_DEBUG).toBeUndefined();
-		expect(env.PI_CURSOR_SDK_EVENT_DEBUG_DIR).toBeUndefined();
-		expect(() => (sharedSdkEventDebugEnvNames as unknown as string[]).push("MUTATED")).toThrow(TypeError);
+		const agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-smoke-event-debug-"));
+		try {
+			const env = buildCursorSmokeEnv({
+				baseEnv: {
+					PATH: "/tmp/fake:/usr/bin",
+					PI_CURSOR_SETTING_SOURCES: "all",
+					PI_CURSOR_SDK_EVENT_DEBUG: "1",
+					PI_CURSOR_SDK_EVENT_DEBUG_DIR: "/tmp/stale",
+				},
+				nodePath: "/opt/node/bin/node",
+				settingSources: "none",
+				nativeToolDisplay: true,
+				registerNativeTools: true,
+				bridge: false,
+				exposeBuiltinTools: false,
+				agentDir,
+			});
+			expect(env.PATH).toBe(`/opt/node/bin${delimiter}/tmp/fake:/usr/bin`);
+			expect(env.PI_CURSOR_SETTING_SOURCES).toBeUndefined();
+			expect(env.PI_CURSOR_NATIVE_TOOL_DISPLAY).toBeUndefined();
+			expect(env.PI_CURSOR_REGISTER_NATIVE_TOOLS).toBeUndefined();
+			expect(env.PI_CURSOR_PI_TOOL_BRIDGE).toBeUndefined();
+			expect(env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS).toBeUndefined();
+			expect(env.PI_CURSOR_SDK_EVENT_DEBUG).toBeUndefined();
+			expect(env.PI_CURSOR_SDK_EVENT_DEBUG_DIR).toBeUndefined();
+			expect(env.PI_CURSOR_SDK_EVENT_DEBUG_STDERR).toBeUndefined();
+			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8"))).toEqual({
+				local: { settingSources: [] },
+				tools: {
+					display: { native: "on" },
+					bridge: { enabled: false, exposeBuiltins: false },
+				},
+			});
+			const withBridgeDebug = buildCursorSmokeEnv({
+				baseEnv: { PATH: "/usr/bin" },
+				nodePath: "/opt/node/bin/node",
+				bridge: true,
+				exposeBuiltinTools: true,
+				bridgeDebug: true,
+				bridgeDebugFile: "/tmp/bridge.jsonl",
+				agentDir,
+			});
+			expect(withBridgeDebug.PI_CURSOR_PI_TOOL_BRIDGE_DEBUG).toBeUndefined();
+			expect(withBridgeDebug.PI_CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE).toBeUndefined();
+			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8")).tools.bridge).toEqual({
+				enabled: true,
+				exposeBuiltins: true,
+				debug: { stderr: true, file: "/tmp/bridge.jsonl" },
+			});
+			expect(() => (sharedSdkEventDebugEnvNames as unknown as string[]).push("MUTATED")).toThrow(TypeError);
+
+			const withDebug = buildCursorSmokeEnv({
+				baseEnv: { PATH: "/usr/bin" },
+				nodePath: "/opt/node/bin/node",
+				eventDebugDir: "/tmp/events",
+				agentDir,
+			});
+			expect(withDebug.PI_CURSOR_SDK_EVENT_DEBUG).toBeUndefined();
+			expect(withDebug.PI_CURSOR_SDK_EVENT_DEBUG_DIR).toBeUndefined();
+			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8"))).toMatchObject({
+				debug: { sdkEvents: { enabled: true, directory: "/tmp/events" } },
+			});
+			writeCursorSdkEventDebugUserConfig(agentDir, { stderr: true });
+			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8")).debug.sdkEvents.stderr).toBe(true);
+		} finally {
+			rmSync(agentDir, { recursive: true, force: true });
+		}
 
 		const defaultSettingsEnv = buildCursorSmokeEnv({
 			baseEnv: { PATH: "/usr/bin", PI_CURSOR_SETTING_SOURCES: "none" },
@@ -149,7 +196,7 @@ describe("maintainer scripts shared lib", () => {
 			nodePath: "/opt/node/bin/node",
 		});
 		expect(plan.envEntries).toEqual([]);
-		expect(plan.env.PI_CURSOR_NATIVE_TOOL_DISPLAY).toBe("0");
+		expect(plan.env.PI_CURSOR_NATIVE_TOOL_DISPLAY).toBeUndefined();
 	});
 
 	it("keeps setting-source parsing aligned with provider runtime", () => {
@@ -157,7 +204,7 @@ describe("maintainer scripts shared lib", () => {
 		for (const raw of [undefined, "", "all", "none", "project,user", "OFF", "0"]) {
 			expect(resolveCursorSettingSources(raw)).toEqual(resolveProviderSettingSources(raw));
 		}
-		expect(defaultSettingSourcesFromEnv({ PI_CURSOR_SETTING_SOURCES: "none" })).toBeUndefined();
+		expect(defaultSettingSourcesFromEnv({ PI_CURSOR_SETTING_SOURCES: "none" })).toEqual([]);
 	});
 
 	it("scrubs secrets and bridge endpoints", () => {
@@ -181,10 +228,10 @@ describe("maintainer scripts shared lib", () => {
 			{ raw: undefined, expected: ["all"] },
 			{ raw: "", expected: ["all"] },
 			{ raw: "all", expected: ["all"] },
-			{ raw: "none", expected: undefined },
+			{ raw: "none", expected: [] },
 			{ raw: "project,user", expected: ["project", "user"] },
-			{ raw: ",", expected: undefined },
-			{ raw: "  ,  ", expected: undefined },
+			{ raw: ",", expected: [] },
+			{ raw: "  ,  ", expected: [] },
 		];
 		for (const { raw, expected } of cases) {
 			const resolved = resolveCursorSettingSources(raw);
@@ -228,7 +275,7 @@ describe("maintainer scripts shared lib", () => {
 			cwd: resolve("/tmp/work"),
 			model: "composer-2.5",
 			prompt: "hi",
-			settingSources: undefined,
+			settingSources: [],
 			apiKey: "from-env",
 		});
 		const flagArgs = parseArgv(["--self-test", "--leftover-pattern", "one", "--leftover-pattern=two", "--prompt", "--starts-with-dash"], {

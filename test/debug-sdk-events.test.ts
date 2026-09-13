@@ -68,7 +68,7 @@ describe("debug-sdk-events maintainer probe", () => {
 		});
 
 		expect(parseDebugSdkEventsArgs(["--setting-sources", "none", "--prompt", "x"], {})).toMatchObject({
-			settingSources: undefined,
+			settingSources: [],
 		});
 	});
 

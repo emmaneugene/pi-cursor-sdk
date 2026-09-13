@@ -13,6 +13,7 @@ import {
 	createExtensionPi,
 	resetIndexExtensionTestState,
 	cursorPiToolBridgeTestUtils,
+	writeIndexTestUserConfig,
 } from "./helpers/index-extension-test-kit.js";
 
 vi.mock("../src/model-discovery.js", () => ({
@@ -336,9 +337,10 @@ describe("extension registration and discovery", () => {
 		expect(pi.on).toHaveBeenCalledWith("session_shutdown", expect.any(Function));
 	});
 
-	it("honors PI_CURSOR_PI_TOOL_BRIDGE=0 at the extension registration path", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
-		process.env.PI_CURSOR_PI_TOOL_BRIDGE = "0";
+	it("honors tools.bridge.enabled=false at the extension registration path", async () => {
+		writeIndexTestUserConfig({
+			tools: { bridge: { enabled: false }, display: { native: "off" } },
+		});
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 

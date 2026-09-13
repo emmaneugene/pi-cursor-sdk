@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+Durable settings move to user-only `~/.pi/agent/cursor-sdk.json`. Public `PI_CURSOR_*` behavior variables and project `.pi/cursor-sdk.json` are ignored.
+
+### Changed
+
+- Read models, local runtime, bridge, MCP timeouts, native display, and SDK event debug from the user JSON schema (`models` / `local` / `tools` / `debug`).
+- Keep one-shot CLI flags and `/cursor-*` session commands. Local force remains `--cursor-local-force` only.
+- Keep `CURSOR_API_KEY`, `CURSOR_RIPGREP_PATH`, and `CURSOR_TREE_SITTER_VENDOR_DIR` as the only user-facing env vars.
+- Keep `PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR` and `PI_CURSOR_SDK_EVENT_DEBUG_SESSION_DIR` as internal maintainer script coordination only.
+
 ## 0.5.0 - 2026-09-13
 
 ### Breaking changes

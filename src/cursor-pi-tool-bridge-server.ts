@@ -12,16 +12,15 @@ import {
 	buildCursorPiToolBridgeSnapshot,
 	buildCursorPiToolBridgeSurfaceSignature,
 	createEmptySnapshot,
-	resolveCursorPiToolBridgeBuiltinsEnabled,
-	resolveCursorPiToolBridgeEnabled,
 } from "./cursor-pi-tool-bridge-snapshot.js";
+import type { CursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
 
 export const LOOPBACK_HOST = "127.0.0.1";
 const HTTP_SERVER_CLOSE_GRACE_MS = 250;
 
 export class CursorPiToolBridgeRegistry implements CursorPiToolBridge {
 	private readonly pi: CursorPiToolBridgeSnapshotApi;
-	private readonly env: Record<string, string | undefined>;
+	private readonly config: CursorPiToolBridgeConfig;
 	private readonly runs = new Set<CursorPiToolBridgeRunImpl>();
 	private readonly routes = new Map<string, CursorPiToolBridgeRunImpl>();
 	private httpServer?: HttpServer;
@@ -29,20 +28,20 @@ export class CursorPiToolBridgeRegistry implements CursorPiToolBridge {
 
 	constructor(
 		pi: CursorPiToolBridgeSnapshotApi,
-		env: Record<string, string | undefined> = process.env,
+		config: CursorPiToolBridgeConfig,
 	) {
 		this.pi = pi;
-		this.env = env;
+		this.config = config;
 	}
 
 	isEnabled(): boolean {
-		return resolveCursorPiToolBridgeEnabled(this.env);
+		return this.config.enabled;
 	}
 
 	getToolSurfaceSignature(excludedToolNames?: ReadonlySet<string>): string {
 		if (!this.isEnabled()) return "bridge:off";
 		const snapshot = buildCursorPiToolBridgeSnapshot(this.pi, {
-			exposeOverlappingBuiltins: resolveCursorPiToolBridgeBuiltinsEnabled(this.env),
+			exposeOverlappingBuiltins: this.config.exposeBuiltins,
 			excludedToolNames,
 		});
 		return buildCursorPiToolBridgeSurfaceSignature(snapshot);
@@ -52,12 +51,12 @@ export class CursorPiToolBridgeRegistry implements CursorPiToolBridge {
 		const bridgeEnabled = this.isEnabled();
 		const snapshot = bridgeEnabled
 			? buildCursorPiToolBridgeSnapshot(this.pi, {
-				exposeOverlappingBuiltins: resolveCursorPiToolBridgeBuiltinsEnabled(this.env),
+				exposeOverlappingBuiltins: this.config.exposeBuiltins,
 				excludedToolNames: options.excludeToolNames,
 			})
 			: createEmptySnapshot();
 		const { CursorPiToolBridgeRunImpl } = await import("./cursor-pi-tool-bridge-run.js");
-		const run = new CursorPiToolBridgeRunImpl(this, this.env, snapshot, bridgeEnabled && snapshot.tools.length > 0, options);
+		const run = new CursorPiToolBridgeRunImpl(this, this.config, snapshot, bridgeEnabled && snapshot.tools.length > 0, options);
 		this.runs.add(run);
 		await run.start();
 		run.emitStartDiagnostics(bridgeEnabled);

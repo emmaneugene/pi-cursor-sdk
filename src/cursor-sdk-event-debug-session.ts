@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 import {
-	CURSOR_SDK_EVENT_DEBUG_RUN_DIR_ENV,
-	CURSOR_SDK_EVENT_DEBUG_SESSION_DIR_ENV,
+	CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV,
+	CURSOR_SDK_EVENT_DEBUG_INTERNAL_SESSION_DIR_ENV,
 	SESSION_MANIFEST,
 	resolveCursorSdkEventDebugBaseDir,
 } from "./cursor-sdk-event-debug-constants.js";
@@ -84,23 +85,25 @@ function resolveSessionDebugDir(
 	cwd: string,
 	env: Record<string, string | undefined>,
 	scopeKey: string,
+	config: CursorSdkConfig,
 ): string {
-	const pinned = env[CURSOR_SDK_EVENT_DEBUG_SESSION_DIR_ENV]?.trim();
+	const pinned = env[CURSOR_SDK_EVENT_DEBUG_INTERNAL_SESSION_DIR_ENV]?.trim();
 	if (pinned) return resolve(pinned);
-	return join(resolveCursorSdkEventDebugBaseDir(cwd, env), "sessions", slugSessionKey(scopeKey));
+	return join(resolveCursorSdkEventDebugBaseDir(cwd, config), "sessions", slugSessionKey(scopeKey));
 }
 
 export function allocateCursorSdkEventDebugTurn(
 	cwd: string,
 	env: Record<string, string | undefined>,
+	config: CursorSdkConfig = loadCursorSdkUserConfig(),
 ): CursorSdkEventDebugTurnAllocation {
-	const pinnedRunDir = resolvePinnedRunArtifactDir(env[CURSOR_SDK_EVENT_DEBUG_RUN_DIR_ENV]);
+	const pinnedRunDir = resolvePinnedRunArtifactDir(env[CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV]);
 	if (pinnedRunDir) {
 		return { artifactDir: pinnedRunDir, pinnedRun: true };
 	}
 
 	const scopeKey = getCursorSessionScopeKey();
-	const sessionDir = resolveSessionDebugDir(cwd, env, scopeKey);
+	const sessionDir = resolveSessionDebugDir(cwd, env, scopeKey, config);
 	mkdirSync(sessionDir, { recursive: true });
 
 	let state = sessionDebugStates.get(scopeKey);

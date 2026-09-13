@@ -7,14 +7,12 @@ import type { CursorPiToolBridgeDiagnosticEvent } from "./cursor-pi-tool-bridge-
 import { serializeCursorPiToolBridgeDiagnostic } from "./cursor-pi-tool-bridge-diagnostics.js";
 import type { CursorPiBridgeToolRequest } from "./cursor-pi-tool-bridge-types.js";
 import type { CursorLiveQueuedEvent } from "./cursor-live-run-coordinator.js";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 import { asRecord } from "./cursor-record-utils.js";
 import { getCursorSessionFile } from "./cursor-session-scope.js";
-import { parseEnvBoolean } from "./cursor-env-boolean.js";
 import {
 	ARTIFACTS,
-	CURSOR_SDK_EVENT_DEBUG_ENV,
 	CURSOR_SDK_EVENT_DEBUG_LOG_PREFIX,
-	CURSOR_SDK_EVENT_DEBUG_STDERR_ENV,
 	SESSION_MANIFEST,
 	SESSION_PI_SESSION_SNAPSHOT,
 } from "./cursor-sdk-event-debug-constants.js";
@@ -27,12 +25,12 @@ import {
 } from "./cursor-sdk-event-debug-session.js";
 
 export {
-	CURSOR_SDK_EVENT_DEBUG_DIR_ENV,
-	CURSOR_SDK_EVENT_DEBUG_ENV,
+	CURSOR_SDK_EVENT_DEBUG_INTERNAL_ENV_NAMES,
+	CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV,
+	CURSOR_SDK_EVENT_DEBUG_INTERNAL_SESSION_DIR_ENV,
 	CURSOR_SDK_EVENT_DEBUG_LOG_PREFIX,
 	CURSOR_SDK_EVENT_DEBUG_RUN_DIR_ENV,
 	CURSOR_SDK_EVENT_DEBUG_SESSION_DIR_ENV,
-	CURSOR_SDK_EVENT_DEBUG_STDERR_ENV,
 	resolveCursorSdkEventDebugBaseDir,
 } from "./cursor-sdk-event-debug-constants.js";
 
@@ -62,6 +60,7 @@ export interface CursorSdkEventDebugSinkOptions {
 	modelId: string;
 	provider: string;
 	env?: Record<string, string | undefined>;
+	config?: CursorSdkConfig;
 }
 
 export interface CursorSdkEventDebugSendMeta {
@@ -105,8 +104,8 @@ function eventType(value: unknown): string {
 	return "unknown";
 }
 
-function resolveCursorSdkEventDebugStderrEnabled(env: Record<string, string | undefined> = process.env): boolean {
-	return parseEnvBoolean(env[CURSOR_SDK_EVENT_DEBUG_STDERR_ENV], false);
+function resolveCursorSdkEventDebugStderrEnabled(config: CursorSdkConfig = loadCursorSdkUserConfig()): boolean {
+	return config.debug?.sdkEvents?.stderr === true;
 }
 
 function isNodeErrorWithCode(error: unknown, code: string): boolean {
@@ -141,8 +140,8 @@ function serializeCursorSdkEventDebugRecord(record: unknown): string {
 	}
 }
 
-export function resolveCursorSdkEventDebugEnabled(env: Record<string, string | undefined> = process.env): boolean {
-	return parseEnvBoolean(env[CURSOR_SDK_EVENT_DEBUG_ENV], false);
+export function resolveCursorSdkEventDebugEnabled(config: CursorSdkConfig = loadCursorSdkUserConfig()): boolean {
+	return config.debug?.sdkEvents?.enabled === true;
 }
 
 export interface CursorSdkEventDebugRecorder {
@@ -196,14 +195,14 @@ export function serializeDiscardedIncompleteStartedToolCall(record: {
 
 export function recordDiscardedIncompleteStartedToolCall(
 	recorder: CursorSdkEventDebugRecorder | undefined,
-	env: Record<string, string | undefined>,
+	config: CursorSdkConfig,
 	record: { toolName: string; callId: string; reason?: DiscardedIncompleteStartedToolCallReason },
 ): void {
-	if (!recorder && !resolveCursorSdkEventDebugEnabled(env)) return;
+	if (!recorder && !resolveCursorSdkEventDebugEnabled(config)) return;
 	try {
 		const payload = serializeDiscardedIncompleteStartedToolCall(record);
 		recorder?.recordCoordinatorEvent("discarded-incomplete-started-tool-call", payload);
-		if (resolveCursorSdkEventDebugStderrEnabled(env) && resolveCursorSdkEventDebugEnabled(env)) {
+		if (resolveCursorSdkEventDebugStderrEnabled(config) && resolveCursorSdkEventDebugEnabled(config)) {
 			process.stderr.write(`${CURSOR_SDK_EVENT_DEBUG_LOG_PREFIX} ${JSON.stringify(payload)}\n`);
 		}
 	} catch {
@@ -233,7 +232,7 @@ export class CursorSdkEventDebugSink {
 	readonly turn?: number;
 	readonly sessionKey?: string;
 	readonly pinnedRun: boolean;
-	private readonly env: Record<string, string | undefined>;
+	private readonly config: CursorSdkConfig;
 	private readonly startedAt = Date.now();
 	private readonly counts = {
 		onDelta: {} as Record<string, number>,
@@ -262,22 +261,23 @@ export class CursorSdkEventDebugSink {
 
 	static maybeCreate(options: CursorSdkEventDebugSinkOptions): CursorSdkEventDebugSink | undefined {
 		const env = options.env ?? process.env;
-		if (!resolveCursorSdkEventDebugEnabled(env)) return undefined;
-		const allocation = allocateCursorSdkEventDebugTurn(options.cwd, env);
-		return new CursorSdkEventDebugSink(allocation, options, env);
+		const config = options.config ?? loadCursorSdkUserConfig();
+		if (!resolveCursorSdkEventDebugEnabled(config)) return undefined;
+		const allocation = allocateCursorSdkEventDebugTurn(options.cwd, env, config);
+		return new CursorSdkEventDebugSink(allocation, options, config);
 	}
 
 	private constructor(
 		allocation: CursorSdkEventDebugTurnAllocation,
 		options: CursorSdkEventDebugSinkOptions,
-		env: Record<string, string | undefined>,
+		config: CursorSdkConfig,
 	) {
 		this.artifactDir = allocation.artifactDir;
 		this.sessionDir = allocation.sessionDir;
 		this.turn = allocation.turn;
 		this.sessionKey = allocation.sessionKey;
 		this.pinnedRun = allocation.pinnedRun;
-		this.env = env;
+		this.config = config;
 		this.metadata = {
 			capturedAt: new Date().toISOString(),
 			modelId: options.modelId,
@@ -541,7 +541,7 @@ export class CursorSdkEventDebugSink {
 		this.flushJsonlBuffers();
 		writeFileSync(join(this.artifactDir, ARTIFACTS.summary), `${JSON.stringify(summary, null, 2)}\n`);
 		this.updateSessionManifest(summary);
-		if (resolveCursorSdkEventDebugStderrEnabled(this.env)) {
+		if (resolveCursorSdkEventDebugStderrEnabled(this.config)) {
 			process.stderr.write(`${CURSOR_SDK_EVENT_DEBUG_LOG_PREFIX} ${JSON.stringify(summary)}\n`);
 		}
 		this.finalized = true;

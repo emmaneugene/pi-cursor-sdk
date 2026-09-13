@@ -24,6 +24,7 @@ import {
 } from "./helpers/cursor-provider-harness.js";
 import { streamCursor, __testUtils as cursorProviderTestUtils } from "../src/cursor-provider.js";
 import { CursorSdkEventDebugSink } from "../src/cursor-sdk-event-debug.js";
+import { installCursorSdkEventDebugUserConfig } from "./helpers/cursor-sdk-event-debug.js";
 import { __testUtils as sessionAgentTestUtils } from "../src/cursor-session-agent.js";
 import { CURSOR_TOOL_LIFECYCLE_DEFER_MS } from "../src/cursor-tool-lifecycle.js";
 
@@ -436,8 +437,7 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("does not append deferred lifecycle progress after non-live run.wait resolves before slow debug capture", async () => {
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = "/tmp/pi-cursor-sdk-lifecycle-wait-finished";
+		const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: "/tmp/pi-cursor-sdk-lifecycle-wait-finished" });
 		const captureSpy = mockSlowDebugCapture();
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({
@@ -471,14 +471,12 @@ describe("streamCursor Cursor tool lifecycle", () => {
 
 		expect(collectThinkingDeltas(events)).not.toMatch(lifecycleShellProgressPattern);
 		captureSpy.mockRestore();
-		delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-		delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
+		restore();
 	});
 
 	it("does not append deferred lifecycle progress after live background run.wait resolves before slow debug capture", async () => {
 		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = "/tmp/pi-cursor-sdk-lifecycle-live-wait-finished";
+		const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: "/tmp/pi-cursor-sdk-lifecycle-live-wait-finished" });
 		const captureSpy = mockSlowDebugCapture();
 		await registerNativeToolDisplayForTest([]);
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
@@ -519,14 +517,12 @@ describe("streamCursor Cursor tool lifecycle", () => {
 
 		expect(collectThinkingDeltas(events)).not.toMatch(lifecycleShellProgressPattern);
 		captureSpy.mockRestore();
-		delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-		delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
+		restore();
 	});
 
 	it("does not append deferred lifecycle progress after live background run.wait rejection", async () => {
 		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = "/tmp/pi-cursor-sdk-lifecycle-wait-fail";
+		const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: "/tmp/pi-cursor-sdk-lifecycle-wait-fail" });
 		const captureSpy = mockSlowDebugCapture();
 		await registerNativeToolDisplayForTest([]);
 		const waitError = new Error("run wait failed");
@@ -586,7 +582,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 		expect(collectThinkingDeltas(firstEvents)).not.toMatch(lifecycleShellProgressPattern);
 		expect(collectThinkingDeltas(secondEvents)).not.toMatch(lifecycleShellProgressPattern);
 		captureSpy.mockRestore();
-		delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-		delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
+		restore();
 	});
 });

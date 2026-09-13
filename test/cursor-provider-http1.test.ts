@@ -1,5 +1,7 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CURSOR_HTTP1_ENV } from "../src/cursor-config.js";
 import { streamCursor } from "../src/cursor-provider.js";
 import {
 	collectEvents,
@@ -32,13 +34,22 @@ describe("Cursor provider HTTP/1.1 transport", () => {
 	beforeEach(resetCursorProviderTestState);
 
 	it.each([
-		["true", true],
-		["false", false],
-	] as const)("configures explicit PI_CURSOR_HTTP_1_1=%s before creating a local agent", async (raw, value) => {
-		process.env[CURSOR_HTTP1_ENV] = raw;
+		["http1", true],
+		["default", false],
+	] as const)("configures explicit local.transport=%s before creating a local agent", async (transport, value) => {
+		const agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-http-config-"));
+		const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = agentDir;
+		writeFileSync(join(agentDir, "cursor-sdk.json"), JSON.stringify({ local: { transport } }));
 		const send = mockSuccessfulAgent();
 
-		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
+		try {
+			await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
+		} finally {
+			if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+			else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+			rmSync(agentDir, { recursive: true, force: true });
+		}
 
 		expect(mockedConfigureCursor).toHaveBeenCalledWith({ local: { useHttp1ForAgent: value } });
 		expect(mockedConfigureCursor.mock.invocationCallOrder[0]).toBeLessThan(

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Type } from "typebox";
 import {
 	resetCursorProviderTestState,
@@ -45,8 +45,25 @@ import { join } from "node:path";
 
 
 
+const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+let agentDir: string;
+
+function setSettingSources(settingSources: string[]) {
+	writeFileSync(join(agentDir, "cursor-sdk.json"), JSON.stringify({ local: { settingSources } }));
+}
+
 describe("streamCursor bridge settings", () => {
-	beforeEach(resetCursorProviderTestState);
+	beforeEach(async () => {
+		await resetCursorProviderTestState();
+		agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-bridge-settings-"));
+		process.env.PI_CODING_AGENT_DIR = agentDir;
+	});
+
+	afterEach(() => {
+		if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+		else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+		rmSync(agentDir, { recursive: true, force: true });
+	});
 
 	it("loads all Cursor setting sources by default for ambient MCP/tools", async () => {
 		const mockSend = vi.fn().mockResolvedValue({
@@ -74,7 +91,7 @@ describe("streamCursor bridge settings", () => {
 	});
 
 	it("allows Cursor setting sources to be disabled", async () => {
-		process.env.PI_CURSOR_SETTING_SOURCES = "none";
+		setSettingSources([]);
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
 			agentId: "agent-1",
@@ -100,7 +117,7 @@ describe("streamCursor bridge settings", () => {
 	});
 
 	it("allows Cursor setting sources to be explicitly enabled", async () => {
-		process.env.PI_CURSOR_SETTING_SOURCES = "all";
+		setSettingSources(["all"]);
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
 			agentId: "agent-1",
@@ -126,7 +143,7 @@ describe("streamCursor bridge settings", () => {
 	});
 
 	it("suppresses all direct Cursor SDK startup writes when setting sources are enabled", async () => {
-		process.env.PI_CURSOR_SETTING_SOURCES = "all";
+		setSettingSources(["all"]);
 		const stdoutChunks: string[] = [];
 		const stderrChunks: string[] = [];
 		const originalStdoutWrite = process.stdout.write;
@@ -222,7 +239,7 @@ describe("streamCursor bridge settings", () => {
 	});
 
 	it("allows Cursor setting sources to be narrowed", async () => {
-		process.env.PI_CURSOR_SETTING_SOURCES = "project,user";
+		setSettingSources(["project", "user"]);
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
 			agentId: "agent-1",

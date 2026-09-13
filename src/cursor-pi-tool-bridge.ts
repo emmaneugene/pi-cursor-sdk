@@ -1,15 +1,10 @@
 import { spawnSync } from "node:child_process";
 import {
-	CURSOR_PI_TOOL_BRIDGE_DEBUG_ENV,
 	CURSOR_PI_TOOL_BRIDGE_DIAGNOSTIC_PREFIX,
 	type CursorPiToolBridgeDiagnosticEvent,
 	serializeCursorPiToolBridgeDiagnostic,
 } from "./cursor-pi-tool-bridge-diagnostics.js";
-import {
-	CURSOR_PI_TOOL_BRIDGE_BUILTINS_ENV,
-	CURSOR_PI_TOOL_BRIDGE_CALL_TIMEOUT_MS_ENV,
-	CURSOR_PI_TOOL_BRIDGE_ENV,
-} from "./cursor-pi-tool-bridge-env.js";
+import { resolveCursorPiToolBridgeConfig, type CursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
 import { bridgeToolExecutionAbortTracker } from "./cursor-pi-tool-bridge-abort.js";
 import { isCursorPiBridgeToolCallId, MCP_SERVER_NAME } from "./cursor-pi-tool-bridge-constants.js";
 import { LOOPBACK_HOST, CursorPiToolBridgeRegistry } from "./cursor-pi-tool-bridge-server.js";
@@ -32,15 +27,7 @@ export type {
 	CursorPiToolBridgeSnapshotOptions,
 } from "./cursor-pi-tool-bridge-types.js";
 export type { CursorPiToolBridgeDiagnosticEvent } from "./cursor-pi-tool-bridge-diagnostics.js";
-export { resolveCursorPiToolBridgeDebugEnabled } from "./cursor-pi-tool-bridge-diagnostics.js";
-export {
-	CURSOR_PI_TOOL_BRIDGE_BUILTINS_ENV,
-	CURSOR_PI_TOOL_BRIDGE_CALL_TIMEOUT_MS_ENV,
-	CURSOR_PI_TOOL_BRIDGE_ENV,
-	resolveCursorPiToolBridgeBuiltinsEnabled,
-	resolveCursorPiToolBridgeCallTimeoutMs,
-	resolveCursorPiToolBridgeEnabled,
-} from "./cursor-pi-tool-bridge-env.js";
+export { resolveCursorPiToolBridgeConfig } from "./cursor-pi-tool-bridge-config.js";
 export {
 	buildCursorPiToolBridgeSnapshot,
 	buildCursorPiToolBridgeSurfaceSignature,
@@ -124,7 +111,10 @@ function attachCursorPiToolBridgeHandlers(
 	});
 }
 
-export function registerCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): CursorPiToolBridge {
+export function registerCursorPiToolBridge(
+	pi: CursorPiToolBridgeExtensionApi,
+	config: CursorPiToolBridgeConfig = resolveCursorPiToolBridgeConfig(),
+): CursorPiToolBridge {
 	// Replacing a bridge during a live MCP run cancels its pending pi tool
 	// calls. Keep the active registry as a final safety belt.
 	if (registeredCursorPiToolBridge?.hasLiveRuns()) {
@@ -132,7 +122,7 @@ export function registerCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): 
 	}
 	bridgeToolExecutionAbortTracker.abortAll("Cursor pi tool bridge extension reloaded");
 	void registeredCursorPiToolBridge?.disposeAll("Cursor pi tool bridge extension reloaded");
-	const bridge = new CursorPiToolBridgeRegistry(pi);
+	const bridge = new CursorPiToolBridgeRegistry(pi, config);
 	registeredCursorPiToolBridge = bridge;
 	attachCursorPiToolBridgeHandlers(pi, bridge, {
 		abortAllOnShutdown: true,
@@ -142,8 +132,11 @@ export function registerCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): 
 }
 
 /** Register a bridge owned only by one nested in-process child session. */
-export function registerNestedCursorPiToolBridge(pi: CursorPiToolBridgeExtensionApi): CursorPiToolBridge {
-	const bridge = new CursorPiToolBridgeRegistry(pi);
+export function registerNestedCursorPiToolBridge(
+	pi: CursorPiToolBridgeExtensionApi,
+	config: CursorPiToolBridgeConfig = resolveCursorPiToolBridgeConfig(),
+): CursorPiToolBridge {
+	const bridge = new CursorPiToolBridgeRegistry(pi, config);
 	attachCursorPiToolBridgeHandlers(pi, bridge, {
 		abortAllOnShutdown: false,
 		isActive: () => true,
@@ -156,18 +149,19 @@ export function getRegisteredCursorPiToolBridge(): CursorPiToolBridge | undefine
 }
 
 export const __testUtils = {
-	CURSOR_PI_TOOL_BRIDGE_ENV,
-	CURSOR_PI_TOOL_BRIDGE_BUILTINS_ENV,
-	CURSOR_PI_TOOL_BRIDGE_CALL_TIMEOUT_MS_ENV,
-	CURSOR_PI_TOOL_BRIDGE_DEBUG_ENV,
 	CURSOR_PI_TOOL_BRIDGE_DIAGNOSTIC_PREFIX,
 	LOOPBACK_HOST,
 	MCP_SERVER_NAME,
 	createRegistry(
 		pi: CursorPiToolBridgeSnapshotApi,
-		env: Record<string, string | undefined> = process.env,
+		overrides: Partial<CursorPiToolBridgeConfig> = {},
 	) {
-		return new CursorPiToolBridgeRegistry(pi, env);
+		const defaults = resolveCursorPiToolBridgeConfig({});
+		return new CursorPiToolBridgeRegistry(pi, {
+			...defaults,
+			...overrides,
+			debug: { ...defaults.debug, ...overrides.debug },
+		});
 	},
 	getRegisteredBridgeForTests() {
 		return registeredCursorPiToolBridge;

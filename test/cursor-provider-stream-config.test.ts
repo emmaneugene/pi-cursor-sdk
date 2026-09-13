@@ -93,33 +93,13 @@ describe("streamCursor prompt and model config", () => {
 		expect(vendorAtCreate!.replaceAll("\\", "/")).toMatch(/\/vendor$/);
 	});
 
-	it("passes enabled local safety controls from env into Agent.create", async () => {
-		process.env.PI_CURSOR_AUTO_REVIEW = "1";
-		process.env.PI_CURSOR_SANDBOX = "true";
-		mockCreatedAgent({
-			send: vi.fn().mockResolvedValue({
-				id: "run-1",
-				agentId: "agent-1",
-				status: "finished",
-				wait: vi.fn().mockResolvedValue({ id: "run-1", status: "finished" }),
-				cancel: vi.fn(),
-				supports: () => true,
-				unsupportedReason: () => undefined,
-			}),
-		});
-
-		await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
-
-		expect(mockedCreate.mock.calls[0][0].local).toMatchObject({ autoReview: true, sandboxOptions: { enabled: true } });
-	});
-
-	it("passes trusted project local safety config into Agent.create", async () => {
-		const root = mkdtempSync(join(tmpdir(), "pi-cursor-local-safety-"));
-		const cwd = join(root, "repo");
-		mkdirSync(join(cwd, ".pi"), { recursive: true });
-		writeFileSync(join(cwd, ".pi", "settings.json"), "{}\n");
-		writeFileSync(join(cwd, ".pi", "cursor-sdk.json"), JSON.stringify({ local: { autoReview: true, sandboxOptions: { enabled: true } } }));
-		cursorSessionScopeTestUtils.set(cwd, "/tmp/session-local-safety.jsonl", "test-session", true);
+	it("passes enabled local safety controls from user config into Agent.create", async () => {
+		const agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-user-config-"));
+		const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = agentDir;
+		writeFileSync(join(agentDir, "cursor-sdk.json"), JSON.stringify({
+			local: { autoReview: true, sandbox: true },
+		}));
 		mockCreatedAgent({
 			send: vi.fn().mockResolvedValue({
 				id: "run-1",
@@ -135,15 +115,15 @@ describe("streamCursor prompt and model config", () => {
 		try {
 			await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 		} finally {
-			rmSync(root, { recursive: true, force: true });
+			if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+			else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+			rmSync(agentDir, { recursive: true, force: true });
 		}
 
-		expect(mockedCreate.mock.calls[0][0].local).toMatchObject({ cwd, autoReview: true, sandboxOptions: { enabled: true } });
+		expect(mockedCreate.mock.calls[0][0].local).toMatchObject({ autoReview: true, sandboxOptions: { enabled: true } });
 	});
 
-	it("lets CLI local safety flags override disabled env/config", async () => {
-		process.env.PI_CURSOR_AUTO_REVIEW = "0";
-		process.env.PI_CURSOR_SANDBOX = "0";
+	it("lets CLI local safety flags override disabled user config", async () => {
 		const pi = createPiHarness({ flagValues: { "cursor-auto-review": true, "cursor-sandbox": true } });
 		registerCursorRuntimeControls(pi);
 		await pi.runSessionStart({ model: makeModel("gpt-5.5") });

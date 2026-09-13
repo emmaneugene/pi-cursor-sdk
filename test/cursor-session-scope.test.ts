@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +6,6 @@ import {
 	__testUtils as cursorSessionScopeTestUtils,
 	getCursorSessionCwd,
 	getCursorSessionName,
-	getCursorSessionProjectTrusted,
 	MAX_CURSOR_SESSION_NAME_LENGTH,
 	registerCursorSessionScope,
 } from "../src/cursor-session-scope.js";
@@ -34,36 +33,6 @@ describe("cursor-session-scope cwd", () => {
 		}
 	});
 
-	it("snapshots trust only from Pi trust-resolution provenance", async () => {
-		const cwd = mkdtempSync(join(tmpdir(), "pi-cursor-session-trust-"));
-		try {
-			mkdirSync(join(cwd, ".pi"));
-			writeFileSync(join(cwd, ".pi", "cursor-sdk.json"), "{}\n");
-			const pi = createEventHarness();
-			registerCursorSessionScope(pi);
-
-			await pi.runSessionStart({ cwd, isProjectTrusted: vi.fn(() => true) });
-			expect(getCursorSessionProjectTrusted()).toBe(false);
-
-			writeFileSync(join(cwd, ".pi", "settings.json"), "{}\n");
-			expect(getCursorSessionProjectTrusted()).toBe(false);
-
-			cursorSessionScopeTestUtils.recordProjectTrustResolution(cwd);
-			await pi.runSessionStart({ cwd, isProjectTrusted: vi.fn(() => true) });
-			expect(getCursorSessionProjectTrusted()).toBe(true);
-		} finally {
-			rmSync(cwd, { recursive: true, force: true });
-		}
-	});
-
-	it("uses Pi argument-consumption semantics for explicit CLI trust", () => {
-		expect(cursorSessionScopeTestUtils.isCliProjectTrustApproved(["--approve"])).toBe(true);
-		expect(cursorSessionScopeTestUtils.isCliProjectTrustApproved(["-a", "--no-approve"])).toBe(false);
-		expect(cursorSessionScopeTestUtils.isCliProjectTrustApproved(["--no-approve", "-a"])).toBe(true);
-		expect(cursorSessionScopeTestUtils.isCliProjectTrustApproved(["--name", "-a"])).toBe(false);
-		expect(cursorSessionScopeTestUtils.isCliProjectTrustApproved(["--model", "--approve"])).toBe(false);
-		expect(cursorSessionScopeTestUtils.isCliProjectTrustApproved([])).toBe(false);
-	});
 
 	it("syncs the normalized session name from session_start", async () => {
 		const pi = createEventHarness();

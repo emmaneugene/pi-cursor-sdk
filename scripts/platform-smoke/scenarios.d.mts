@@ -1,7 +1,7 @@
 interface PlatformSmokeScenario {
 	description: string;
 	cursorCalls: number;
-	env?: Record<string, string>;
+	userConfig?: Record<string, unknown>;
 	commands?: Record<string, { posix?: string; powershell?: string }>;
 	promptTemplate?: string;
 	finalMarker?: string | null;

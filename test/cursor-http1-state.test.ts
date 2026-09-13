@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelListItem } from "@cursor/sdk";
 import type { ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
-import { CURSOR_HTTP1_ENV } from "../src/cursor-config.js";
 import {
 	CURSOR_HTTP1_ENTRY_TYPE,
 	getStoredCursorHttp1Enabled,
@@ -71,7 +70,6 @@ describe("Cursor HTTP/1.1 state", () => {
 	beforeEach(() => {
 		agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-http1-state-"));
 		process.env.PI_CODING_AGENT_DIR = agentDir;
-		delete process.env[CURSOR_HTTP1_ENV];
 		__testUtils.resetCursorModeStateForTests();
 		modelDiscoveryTestUtils.registerModelItems([modelItem]);
 	});
@@ -79,20 +77,19 @@ describe("Cursor HTTP/1.1 state", () => {
 	afterEach(() => {
 		if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 		else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
-		delete process.env[CURSOR_HTTP1_ENV];
 		rmSync(agentDir, { recursive: true, force: true });
 		vi.clearAllMocks();
 	});
 
-	it("reports the env source without changing session state", async () => {
-		process.env[CURSOR_HTTP1_ENV] = "1";
+	it("reports the user config source without changing session state", async () => {
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ local: { transport: "http1" } }));
 		const { pi, ctx, commandCtx, commands } = createHarness();
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
 
 		await commands.get("cursor-http")!.handler("", commandCtx);
 
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
-			"Cursor HTTP/1.1/SSE transport is enabled (source: environment). Usage: /cursor-http [on|off|toggle]",
+			"Cursor HTTP/1.1/SSE transport is enabled (source: user). Usage: /cursor-http [on|off|toggle]",
 			"info",
 		);
 		expect(getStoredCursorHttp1Enabled()).toBeUndefined();
@@ -113,7 +110,7 @@ describe("Cursor HTTP/1.1 state", () => {
 		expect(pi.appendEntry).toHaveBeenCalledWith(CURSOR_HTTP1_ENTRY_TYPE, { enabled: true });
 		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toEqual({
 			future: { enabled: true },
-			local: { futureLocal: "keep", useHttp1ForAgent: true },
+			local: { futureLocal: "keep", transport: "http1" },
 		});
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
 
@@ -121,13 +118,13 @@ describe("Cursor HTTP/1.1 state", () => {
 
 		expect(getStoredCursorHttp1Enabled()).toBe(false);
 		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toMatchObject({
-			local: { futureLocal: "keep", useHttp1ForAgent: false },
+			local: { futureLocal: "keep", transport: "default" },
 		});
 		expect(ctx.ui.notify).toHaveBeenCalledWith("Cursor HTTP/1.1/SSE transport disabled", "info");
 	});
 
 	it("retains a completed global save after session append failure", async () => {
-		process.env[CURSOR_HTTP1_ENV] = "1";
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ local: { transport: "http1" } }));
 		const { pi, ctx, commandCtx, commands } = createHarness();
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
 		vi.mocked(pi.appendEntry).mockImplementationOnce(() => {
@@ -137,19 +134,19 @@ describe("Cursor HTTP/1.1 state", () => {
 		await commands.get("cursor-http")!.handler("off", commandCtx);
 
 		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toEqual({
-			local: { useHttp1ForAgent: false },
+			local: { transport: "default" },
 		});
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
 			"Cursor HTTP/1.1 preference was saved globally, but persisting the session entry failed: journal failed",
 			"error",
 		);
-		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off · http1");
+		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off");
 	});
 
 	it("restores the global preference from cursor-sdk.json", async () => {
 		writeFileSync(
 			__testUtils.getConfigPath(),
-			JSON.stringify({ local: { useHttp1ForAgent: true } }),
+			JSON.stringify({ local: { transport: "http1" } }),
 		);
 		const { pi, ctx } = createHarness();
 

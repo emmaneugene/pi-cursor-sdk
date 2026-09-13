@@ -20,6 +20,7 @@ import type { SDKMessage } from "@cursor/sdk";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { installCursorSdkEventDebugUserConfig } from "./helpers/cursor-sdk-event-debug.js";
 
 async function setCursorModeForProviderDebugTest(mode: "agent" | "plan"): Promise<void> {
 	const pi = createPiHarness({ flagValues: { "cursor-mode": mode } });
@@ -32,10 +33,7 @@ describe("streamCursor debug artifacts", () => {
 
 		it("captures provider debug artifacts through streamCursor when enabled", async () => {
 			const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-provider-debug-"));
-			const previousDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-			const previousRunDir = process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = artifactDir;
+			const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: artifactDir });
 
 			try {
 				const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
@@ -73,10 +71,7 @@ describe("streamCursor debug artifacts", () => {
 					waitResultRecorded: true,
 				});
 			} finally {
-				if (previousDebug === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG = previousDebug;
-				if (previousRunDir === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = previousRunDir;
+				restore();
 				rmSync(artifactDir, { recursive: true, force: true });
 			}
 		});
@@ -99,10 +94,7 @@ describe("streamCursor debug artifacts", () => {
 			await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
 
 			const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-provider-mode-debug-"));
-			const previousDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-			const previousRunDir = process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = artifactDir;
+			const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: artifactDir });
 			try {
 				await setCursorModeForProviderDebugTest("plan");
 				await collectEvents(streamCursor(makeModel("gpt-5.5"), makeContext(), { apiKey: "test-key" }));
@@ -111,10 +103,7 @@ describe("streamCursor debug artifacts", () => {
 				expect(metadata.providerMeta).toMatchObject({ agentMode: "plan" });
 				expect(metadata.send).toMatchObject({ agentMode: "plan" });
 			} finally {
-				if (previousDebug === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG = previousDebug;
-				if (previousRunDir === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = previousRunDir;
+				restore();
 				rmSync(artifactDir, { recursive: true, force: true });
 			}
 		});
@@ -128,14 +117,11 @@ describe("streamCursor debug artifacts", () => {
 			const baseDir = mkdtempSync(join(tmpdir(), "pi-cursor-provider-debug-continuation-"));
 			const sessionFile = join(baseDir, "session.jsonl");
 			const eventsDir = join(baseDir, "events");
-			const previousDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-			const previousDebugDir = process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR;
+			const restore = installCursorSdkEventDebugUserConfig({ enabled: true, directory: eventsDir });
 			const { __testUtils: scopeTestUtils } = await import("../src/cursor-session-scope.js");
 
 			sdkEventDebugTestUtils.resetSessionDebugState();
 			scopeTestUtils.set(baseDir, sessionFile);
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR = eventsDir;
 
 			let resolveRun: (result: { id: string; status: "finished"; result: string }) => void = () => {};
 			const runWait = vi.fn(
@@ -204,10 +190,7 @@ describe("streamCursor debug artifacts", () => {
 			} finally {
 				sdkEventDebugTestUtils.resetSessionDebugState();
 				scopeTestUtils.reset();
-				if (previousDebug === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG = previousDebug;
-				if (previousDebugDir === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR = previousDebugDir;
+				restore();
 				if (previousNativeDisplay === undefined) delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
 				else process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = previousNativeDisplay;
 				rmSync(baseDir, { recursive: true, force: true });
@@ -223,14 +206,11 @@ describe("streamCursor debug artifacts", () => {
 			const baseDir = mkdtempSync(join(tmpdir(), "pi-cursor-provider-debug-abort-"));
 			const sessionFile = join(baseDir, "session.jsonl");
 			const eventsDir = join(baseDir, "events");
-			const previousDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-			const previousDebugDir = process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR;
+			const restore = installCursorSdkEventDebugUserConfig({ enabled: true, directory: eventsDir });
 			const { __testUtils: scopeTestUtils } = await import("../src/cursor-session-scope.js");
 
 			sdkEventDebugTestUtils.resetSessionDebugState();
 			scopeTestUtils.set(baseDir, sessionFile);
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR = eventsDir;
 
 			const controller = new AbortController();
 			let firstOnDelta: CursorDeltaHandler | undefined;
@@ -299,10 +279,7 @@ describe("streamCursor debug artifacts", () => {
 			} finally {
 				sdkEventDebugTestUtils.resetSessionDebugState();
 				scopeTestUtils.reset();
-				if (previousDebug === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG = previousDebug;
-				if (previousDebugDir === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG_DIR = previousDebugDir;
+				restore();
 				if (previousNativeDisplay === undefined) delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
 				else process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = previousNativeDisplay;
 				rmSync(baseDir, { recursive: true, force: true });
@@ -311,10 +288,7 @@ describe("streamCursor debug artifacts", () => {
 
 		it("keeps a returned run owned when post-send debug writes throw", async () => {
 			const artifactDir = mkdtempSync(join(tmpdir(), "pi-cursor-provider-debug-throw-"));
-			const previousDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-			const previousRunDir = process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-			process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = artifactDir;
+			const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: artifactDir });
 			const wait = vi.fn().mockResolvedValue({ id: "run-debug", status: "finished", result: "done" });
 			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 404 }));
 			const recordRunMetaSpy = vi.spyOn(CursorSdkEventDebugSink.prototype, "recordRunMeta").mockImplementation(() => {
@@ -338,10 +312,7 @@ describe("streamCursor debug artifacts", () => {
 			} finally {
 				recordRunMetaSpy.mockRestore();
 				fetchSpy.mockRestore();
-				if (previousDebug === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG = previousDebug;
-				if (previousRunDir === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-				else process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = previousRunDir;
+				restore();
 				rmSync(artifactDir, { recursive: true, force: true });
 			}
 		});

@@ -231,7 +231,7 @@ describe("Cursor MCP timeout override", () => {
 				resolvedApiKey: "key",
 				sdkEventDebug: undefined,
 				throwIfAborted: vi.fn(),
-				resolvedConfig: resolveCursorProviderTurnConfig(process.cwd()),
+				resolvedConfig: resolveCursorProviderTurnConfig(),
 			}),
 		).rejects.toThrow("stop before Cursor agent creation");
 
@@ -287,25 +287,19 @@ describe("Cursor MCP timeout override", () => {
 		expect(callback).toHaveBeenCalledTimes(1);
 	});
 
-	it("uses a 10s connect default and supports explicit connect overrides", () => {
+	it("uses a 10s connect default and clamps user config overrides", () => {
 		expect(resolveCursorMcpConnectTimeoutMs({})).toBe(
 			cursorMcpToolTimeoutOverrideDefaults.defaultConnectTimeoutMs,
 		);
-		expect(
-			resolveCursorMcpConnectTimeoutMs({
-				[cursorMcpToolTimeoutOverrideDefaults.connectTimeoutSecondsEnv]: "5",
-			}),
-		).toBe(5_000);
-		expect(
-			resolveCursorMcpConnectTimeoutMs({
-				[cursorMcpToolTimeoutOverrideDefaults.connectTimeoutMsEnv]: "500",
-			}),
-		).toBe(cursorMcpToolTimeoutOverrideDefaults.minConnectTimeoutMs);
-		expect(
-			resolveCursorMcpConnectTimeoutMs({
-				[cursorMcpToolTimeoutOverrideDefaults.connectTimeoutMsEnv]: "120000",
-			}),
-		).toBe(cursorMcpToolTimeoutOverrideDefaults.cursorSdkDefaultTimeoutMs);
+		expect(resolveCursorMcpConnectTimeoutMs({
+			tools: { mcp: { connectTimeoutMs: 5_000 } },
+		})).toBe(5_000);
+		expect(resolveCursorMcpConnectTimeoutMs({
+			tools: { mcp: { connectTimeoutMs: 500 } },
+		})).toBe(cursorMcpToolTimeoutOverrideDefaults.minConnectTimeoutMs);
+		expect(resolveCursorMcpConnectTimeoutMs({
+			tools: { mcp: { connectTimeoutMs: 120_000 } },
+		})).toBe(cursorMcpToolTimeoutOverrideDefaults.cursorSdkDefaultTimeoutMs);
 	});
 
 	it("does not extend unrelated 60s timers", () => {
@@ -342,25 +336,18 @@ describe("Cursor MCP timeout override", () => {
 		}
 	});
 
-	it("uses a 3600s default and supports explicit second or millisecond overrides", () => {
+	it("uses a one-hour default and clamps user config overrides", () => {
 		expect(resolveCursorMcpToolTimeoutMs({})).toBe(
 			cursorMcpToolTimeoutOverrideDefaults.defaultOverrideTimeoutMs,
 		);
-		expect(
-			resolveCursorMcpToolTimeoutMs({
-				[cursorMcpToolTimeoutOverrideDefaults.timeoutSecondsEnv]: "120",
-			}),
-		).toBe(120_000);
-		expect(
-			resolveCursorMcpToolTimeoutMs({
-				[cursorMcpToolTimeoutOverrideDefaults.timeoutMsEnv]: "250000",
-				[cursorMcpToolTimeoutOverrideDefaults.timeoutSecondsEnv]: "120",
-			}),
-		).toBe(250_000);
-		expect(
-			resolveCursorMcpToolTimeoutMs({
-				[cursorMcpToolTimeoutOverrideDefaults.timeoutMsEnv]: "999999999999",
-			}),
-		).toBe(cursorMcpToolTimeoutOverrideDefaults.maxNodeTimerDelayMs);
+		expect(resolveCursorMcpToolTimeoutMs({
+			tools: { mcp: { callTimeoutMs: 120_000 } },
+		})).toBe(120_000);
+		expect(resolveCursorMcpToolTimeoutMs({
+			tools: { mcp: { callTimeoutMs: 250_000 } },
+		})).toBe(250_000);
+		expect(resolveCursorMcpToolTimeoutMs({
+			tools: { mcp: { callTimeoutMs: 999_999_999_999 } },
+		})).toBe(cursorMcpToolTimeoutOverrideDefaults.maxNodeTimerDelayMs);
 	});
 });

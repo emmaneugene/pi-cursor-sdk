@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetCapabilitiesCache, setCapabilities } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
@@ -39,11 +39,30 @@ import {
 } from "../src/cursor-native-tool-display-state.js";
 import { CURSOR_ACTIVATE_SKILL_TOOL_NAME } from "../src/cursor-skill-tool.js";
 
+const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+let agentDir: string;
+
+function setNativeDisplay(native: "auto" | "on" | "off") {
+	writeFileSync(join(agentDir, "cursor-sdk.json"), JSON.stringify({
+		tools: { display: { native } },
+	}));
+}
+
 describe("extension native Cursor tool replay", () => {
-	beforeEach(resetIndexExtensionTestState);
+	beforeEach(async () => {
+		await resetIndexExtensionTestState();
+		agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-native-config-"));
+		process.env.PI_CODING_AGENT_DIR = agentDir;
+	});
+
+	afterEach(() => {
+		if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+		else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+		rmSync(agentDir, { recursive: true, force: true });
+	});
 
 	it("defers native Cursor tool wrapper registration until session_start", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		pi.getAllTools.mockImplementation(() => {
@@ -57,7 +76,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("registers native Cursor tool wrappers with the pi session cwd", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const dir = mkdtempSync(join(tmpdir(), "pi-cursor-native-cwd-"));
 		try {
@@ -83,7 +102,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("updates registered native Cursor tool wrappers to the latest pi session cwd", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const firstDir = mkdtempSync(join(tmpdir(), "pi-cursor-native-cwd-first-"));
 		const secondDir = mkdtempSync(join(tmpdir(), "pi-cursor-native-cwd-second-"));
@@ -114,7 +133,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("registered native Cursor tool wrappers return recorded Cursor results without executing built-ins", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -146,7 +165,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("labels collapsed native read replay cards when only local preview content is available", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const dir = mkdtempSync(join(tmpdir(), "pi-cursor-read-preview-replay-"));
 		try {
@@ -203,7 +222,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("renders Cursor generateImage replay results with a visible path and image fallback", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const dir = mkdtempSync(join(tmpdir(), "pi-cursor-image-replay-"));
 		const imagePath = join(dir, "badge.png");
@@ -242,7 +261,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("renders neutral cursor partial calls from activity metadata", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -266,7 +285,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("renders Cursor web replay cards summary-only until expanded", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -297,7 +316,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("renders canonical neutral Cursor activity labels", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -332,7 +351,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("renders native edit and write replay wrappers without synthetic card names", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -391,7 +410,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("renders Cursor replay-only results with collapsed previews instead of summary-only cards", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -507,7 +526,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("registered native Cursor tool wrappers replay recorded Cursor errors as tool errors", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -530,7 +549,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("does not register native Cursor tool wrappers on non-Cursor models", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -546,7 +565,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("leaves ordinary pi edit rendering untouched on non-Cursor models", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -560,7 +579,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("registers native Cursor tool wrappers on first Cursor model transition", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -581,7 +600,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("core native Cursor wrappers delegate ordinary non-Cursor execution and rendering after model switch", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const dir = mkdtempSync(join(tmpdir(), "pi-cursor-native-cross-model-"));
 		try {
@@ -638,7 +657,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("warns once for conflicting native Cursor tool wrappers across turn lifecycle hooks", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const notify = vi.fn();
 		const ui = { notify, setStatus: vi.fn() };
@@ -673,7 +692,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("does not register native Cursor tool wrappers when native display is disabled", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
+		setNativeDisplay("off");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -683,9 +702,8 @@ describe("extension native Cursor tool replay", () => {
 		expect(canRenderCursorToolNatively("read")).toBe(false);
 	});
 
-	it("does not register native Cursor tool wrappers when native tool registration is disabled", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
-		process.env.PI_CURSOR_REGISTER_NATIVE_TOOLS = "0";
+	it("uses the merged native display setting to disable wrapper registration", async () => {
+		setNativeDisplay("off");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -696,7 +714,7 @@ describe("extension native Cursor tool replay", () => {
 	});
 
 	it("skips only native Cursor tool wrappers owned by another extension", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
+		setNativeDisplay("on");
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi([
 			{

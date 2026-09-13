@@ -22,6 +22,7 @@ import { streamCursor } from "../src/cursor-provider.js";
 import { writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { installCursorSdkEventDebugUserConfig } from "./helpers/cursor-sdk-event-debug.js";
 
 function makeUnauthenticatedConnectError(): Error & { rawMessage: string; code: number } {
 	const error = new Error("[unauthenticated] Error") as Error & { rawMessage: string; code: number };
@@ -408,10 +409,7 @@ describe("streamCursor auth and abort", () => {
 	it("emits start before sanitized error and disposes abort suppression when debug run dir setup fails", async () => {
 		const invalidRunDirFile = join(tmpdir(), `pi-cursor-sdk-debug-run-dir-${process.pid}`);
 		writeFileSync(invalidRunDirFile, "not-a-directory");
-		const previousDebug = process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-		const previousRunDir = process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG = "1";
-		process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = invalidRunDirFile;
+		const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: invalidRunDirFile });
 
 		try {
 			expect(cursorSdkProcessGuardTestUtils.activeProviderTurnCount()).toBe(0);
@@ -428,10 +426,7 @@ describe("streamCursor auth and abort", () => {
 			expect(cursorSdkProcessGuardTestUtils.activeProviderTurnCount()).toBe(0);
 		} finally {
 			rmSync(invalidRunDirFile, { force: true });
-			if (previousDebug === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG;
-			else process.env.PI_CURSOR_SDK_EVENT_DEBUG = previousDebug;
-			if (previousRunDir === undefined) delete process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR;
-			else process.env.PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR = previousRunDir;
+			restore();
 		}
 	});
 });

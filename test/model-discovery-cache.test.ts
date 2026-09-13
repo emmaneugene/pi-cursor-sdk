@@ -115,8 +115,10 @@ describe("discoverModels model-list cache", () => {
 		expect(mockedList).toHaveBeenCalledTimes(2);
 	});
 
-	it("does not read the cache when disabled via env", async () => {
-		process.env.PI_CURSOR_SDK_DISABLE_MODEL_CACHE = "1";
+	it("does not read the cache when disabled in user config", async () => {
+		writeFileSync(join(tmpAgentDir, "cursor-sdk.json"), JSON.stringify({
+			models: { cache: { enabled: false } },
+		}));
 		writeStoredCursorApiKey("cache-key");
 		mockedList.mockResolvedValue([MODEL]);
 

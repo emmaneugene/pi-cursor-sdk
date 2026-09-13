@@ -20,6 +20,8 @@ DEBUG_ENV_UNSETS=()
 BASE_ENV=()
 NONE_ENV=()
 DEFAULT_ENV=()
+NONE_AGENT_DIR=""
+DEFAULT_AGENT_DIR=""
 
 TMUX_SESSIONS=()
 
@@ -47,7 +49,7 @@ Prerequisites:
   pi, node, npm, rg, tmux on PATH
   Resolved pi/node/npm/rg/tmux paths from the parent shell are reused in tmux-launched checks; pi shims run with the resolved node directory first on PATH.
   timeout or gtimeout optional; bash process-group kill fallback is used when absent
-  Child pi runs clear Cursor SDK event-debug env; isolated cases force PI_CURSOR_SETTING_SOURCES=none and default-settings unsets it.
+  Child pi runs clear Cursor SDK event-debug env and ignored PI_CURSOR_* behavior vars. Isolated cases write local.settingSources=[] into an isolated cursor-sdk.json; default-settings omits that override.
 
 Coverage:
   - prereq model listing
@@ -80,11 +82,17 @@ fail() { smoke_fail "$@"; }
 run_with_timeout() { smoke_run_with_timeout "$@"; }
 
 build_smoke_env_arrays() {
-	smoke_build_cursor_sdk_event_debug_unsets
-	DEBUG_ENV_UNSETS=( "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS[@]}" )
+	smoke_build_cursor_sdk_cleared_env_unsets
+	DEBUG_ENV_UNSETS=( "${SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS[@]}" )
 	BASE_ENV=( "$ENV_BIN" "${DEBUG_ENV_UNSETS[@]}" "PATH=$SEALED_PATH" )
-	NONE_ENV=( "$ENV_BIN" "${DEBUG_ENV_UNSETS[@]}" "PATH=$SEALED_PATH" PI_CURSOR_SETTING_SOURCES=none )
-	DEFAULT_ENV=( "$ENV_BIN" "${DEBUG_ENV_UNSETS[@]}" -u PI_CURSOR_SETTING_SOURCES "PATH=$SEALED_PATH" )
+	NONE_ENV=( "$ENV_BIN" "${DEBUG_ENV_UNSETS[@]}" "PATH=$SEALED_PATH" )
+	DEFAULT_ENV=( "$ENV_BIN" "${DEBUG_ENV_UNSETS[@]}" "PATH=$SEALED_PATH" )
+	if [[ -n "$NONE_AGENT_DIR" ]]; then
+		NONE_ENV+=( "PI_CODING_AGENT_DIR=$NONE_AGENT_DIR" )
+	fi
+	if [[ -n "$DEFAULT_AGENT_DIR" ]]; then
+		DEFAULT_ENV+=( "PI_CODING_AGENT_DIR=$DEFAULT_AGENT_DIR" )
+	fi
 }
 
 tail_file() {
@@ -356,6 +364,7 @@ EOF_SELFTEST_NODE
 	ENV_BIN="$(smoke_resolve_cmd env)"
 	NODE_BIN="$(smoke_resolve_node_cmd)"
 	smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/cursor-sdk-event-debug-env.mjs"
+	smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs"
 	hostile_path="$bin_dir:$PATH"
 	[[ "$(smoke_build_sealed_node_path "$NODE_BIN" "")" != *: ]] || fail "self-test failed: empty inherited PATH left a trailing PATH separator"
 	SEALED_PATH="$(smoke_build_sealed_node_path "$NODE_BIN" "$hostile_path")"
@@ -372,16 +381,20 @@ EOF_SELFTEST_NODE
 	[[ ! -e "$fake_node_marker" ]] || fail "self-test failed: sealed PATH still used hostile fake node"
 	captured_path="$(awk -F= '$1 == "PATH" { print substr($0, 6); exit }' "$env_capture")"
 	[[ "${captured_path%%:*}" == "$node_dir" ]] || fail "self-test failed: PATH did not start with resolved node dir"
-	grep -qx 'PI_CURSOR_SETTING_SOURCES=none' "$env_capture" || fail "self-test failed: isolated env did not force PI_CURSOR_SETTING_SOURCES=none"
-	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}"; do
+	if grep -q '^PI_CURSOR_SETTING_SOURCES=' "$env_capture"; then
+		fail "self-test failed: isolated env still set the removed PI_CURSOR_SETTING_SOURCES var"
+	fi
+	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}" "${SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]}"; do
 		if grep -q "^${name}=" "$env_capture"; then
 			fail "self-test failed: $name was not cleared"
 		fi
 	done
+	smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs" "$temp_dir/agent-none" '{"local":{"settingSources":[]}}'
+	grep -q '"settingSources": \[\]' "$temp_dir/agent-none/cursor-sdk.json" || fail "self-test failed: isolated config did not write local.settingSources=[]"
 
 	PI_CURSOR_SETTING_SOURCES=all "${DEFAULT_ENV[@]}" "$fake_pi" --version
 	if grep -q '^PI_CURSOR_SETTING_SOURCES=' "$env_capture"; then
-		fail "self-test failed: default-settings env did not unset PI_CURSOR_SETTING_SOURCES"
+		fail "self-test failed: default-settings env still set the removed PI_CURSOR_SETTING_SOURCES var"
 	fi
 	# Large-catalog prereq: exercise the same capture_and_require_default_model helper.
 	fake_list_pi="$bin_dir/pi-list-models"
@@ -420,8 +433,8 @@ RG_BIN="$(smoke_resolve_cmd rg)"
 TMUX_BIN="$(smoke_resolve_cmd tmux)"
 ENV_BIN="$(smoke_resolve_cmd env)"
 smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/cursor-sdk-event-debug-env.mjs"
+smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs"
 SEALED_PATH="$(smoke_build_sealed_node_path "$NODE_BIN" "$PATH")"
-build_smoke_env_arrays
 if [[ "$SHELL_BIN" != /* ]]; then
 	SHELL_BIN="$(smoke_resolve_cmd "$SHELL_BIN")"
 fi
@@ -436,6 +449,12 @@ if [[ -z "${CURSOR_API_KEY:-}" ]]; then
 fi
 
 mkdir -p "$SMOKE_DIR"
+NONE_AGENT_DIR="$SMOKE_DIR/agent-none"
+DEFAULT_AGENT_DIR="$SMOKE_DIR/agent-default"
+smoke_seed_pi_agent_dir "$NONE_AGENT_DIR"
+smoke_seed_pi_agent_dir "$DEFAULT_AGENT_DIR"
+smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs" "$NONE_AGENT_DIR" '{"local":{"settingSources":[]}}'
+build_smoke_env_arrays
 printf '%s\n' "$SMOKE_DIR" >"$SMOKE_DIR/smoke-dir.txt"
 
 log "SMOKE_DIR=$SMOKE_DIR"

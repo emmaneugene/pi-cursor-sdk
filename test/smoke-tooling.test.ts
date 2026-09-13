@@ -71,17 +71,28 @@ try {
 		try {
 			const { buildLocalResumeSmokeEnv } = await import("../scripts/local-resume-smoke.mjs");
 			const env = buildLocalResumeSmokeEnv(artifactRoot);
+			const configPath = join(artifactRoot, "agent", "cursor-sdk.json");
 
-			expect(env.PI_CURSOR_LOCAL_RESUME).toBe("1");
-			expect(env.PI_CURSOR_PI_TOOL_BRIDGE).toBe("0");
-			expect(env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS).toBe("0");
+			expect(env.PI_CURSOR_LOCAL_RESUME).toBeUndefined();
+			expect(env.PI_CURSOR_PI_TOOL_BRIDGE).toBeUndefined();
+			expect(env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS).toBeUndefined();
+			expect(JSON.parse(readFileSync(configPath, "utf8"))).toMatchObject({
+				local: { resume: true, settingSources: [] },
+				tools: { bridge: { enabled: false, exposeBuiltins: false }, display: { native: "off" } },
+				debug: { sdkEvents: { enabled: true, directory: join(artifactRoot, "debug") } },
+			});
 			const unsetEnv = buildLocalResumeSmokeEnv(artifactRoot, { localResumeEnv: "unset", baseEnv: { ...process.env, PI_CURSOR_LOCAL_RESUME: "1" } });
 			expect(unsetEnv.PI_CURSOR_LOCAL_RESUME).toBeUndefined();
 			const optOutEnv = buildLocalResumeSmokeEnv(artifactRoot, { localResumeEnv: "off", baseEnv: { ...process.env, PI_CURSOR_LOCAL_RESUME: "1" } });
-			expect(optOutEnv.PI_CURSOR_LOCAL_RESUME).toBe("0");
+			expect(optOutEnv.PI_CURSOR_LOCAL_RESUME).toBeUndefined();
+			expect(JSON.parse(readFileSync(configPath, "utf8")).local.resume).toBe(false);
 			const bridgeEnv = buildLocalResumeSmokeEnv(artifactRoot, { bridge: true, exposeBuiltinTools: true });
-			expect(bridgeEnv.PI_CURSOR_PI_TOOL_BRIDGE).toBe("1");
-			expect(bridgeEnv.PI_CURSOR_EXPOSE_BUILTIN_TOOLS).toBe("1");
+			expect(bridgeEnv.PI_CURSOR_PI_TOOL_BRIDGE).toBeUndefined();
+			expect(bridgeEnv.PI_CURSOR_EXPOSE_BUILTIN_TOOLS).toBeUndefined();
+			expect(JSON.parse(readFileSync(configPath, "utf8")).tools.bridge).toEqual({
+				enabled: true,
+				exposeBuiltins: true,
+			});
 			expect(env.PI_CODING_AGENT_DIR).toBe(join(artifactRoot, "agent"));
 			expect(existsSync(env.PI_CODING_AGENT_DIR!)).toBe(true);
 		} finally {
@@ -110,6 +121,9 @@ try {
 		const liveRunner = readFileSync("scripts/platform-smoke/live-suite-runner.mjs", "utf8");
 		expect(liveRunner).toContain("`platform-${args.suite}-${Date.now()}`, prompt]");
 		expect(liveRunner).toContain('PI_OFFLINE: "1"');
+		expect(liveRunner).toContain("if (scenario.userConfig) writeCursorSdkUserConfig(agentDir, scenario.userConfig);");
+		expect(liveRunner).not.toContain("...scenario.env");
+		expect(liveRunner).not.toContain("PI_CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE");
 		expect(liveRunner).toContain("file: process.execPath, args: [cliEntry, ...args]");
 		expect(liveRunner).toContain("const ptyCommand = ptySpawnCommand(piArgs)");
 		expect(liveRunner).toContain("...ptyCommand");
@@ -151,8 +165,15 @@ try {
 			cursorCalls: 1,
 			finalMarker: "HTTP1_LIVE_OK",
 			requiredCards: ["http1-status"],
-			env: { PI_CURSOR_HTTP_1_1: "1", PI_CURSOR_PI_TOOL_BRIDGE: "0", PI_CURSOR_SDK_EVENT_DEBUG: "1" },
+			userConfig: {
+				local: { transport: "http1", settingSources: [] },
+				tools: { bridge: { enabled: false, exposeBuiltins: false }, display: { native: "on" } },
+			},
 		});
+		expect(scenario).not.toHaveProperty("env");
+		for (const liveScenario of Object.values(SCENARIOS)) {
+			expect(liveScenario).not.toHaveProperty("env");
+		}
 	});
 
 	it("rejects invalid platform smoke targets and suites before Crabbox runs", () => {

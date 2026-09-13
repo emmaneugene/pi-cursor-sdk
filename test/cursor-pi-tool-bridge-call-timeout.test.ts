@@ -5,7 +5,8 @@ import { Type } from "typebox";
 import {
 	__testUtils,
 	registerCursorPiToolBridge,
-	resolveCursorPiToolBridgeCallTimeoutMs,
+	resolveCursorPiToolBridgeConfig,
+	type CursorPiToolBridgeExtensionApi,
 	type CursorPiToolBridgeRun,
 } from "../src/cursor-pi-tool-bridge.js";
 import {
@@ -13,6 +14,17 @@ import {
 	createBuiltinToolInfo,
 	getCursorPiBridgeMcpUrl,
 } from "./helpers/pi-harness.js";
+
+function registerTestBridge(pi: CursorPiToolBridgeExtensionApi, callTimeoutMs = 500) {
+	return registerCursorPiToolBridge(pi, resolveCursorPiToolBridgeConfig({
+		tools: {
+			bridge: {
+				exposeBuiltins: true,
+				...(callTimeoutMs === undefined ? {} : { callTimeoutMs }),
+			},
+		},
+	}));
+}
 
 async function waitForQueuedRequest(run: CursorPiToolBridgeRun) {
 	for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -25,30 +37,24 @@ async function waitForQueuedRequest(run: CursorPiToolBridgeRun) {
 
 describe("cursor pi tool bridge CallTool deadline", () => {
 	afterEach(async () => {
-		delete process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS;
-		delete process.env.PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS;
 		await __testUtils.resetRegisteredBridgeForTests();
 	});
 
 	it("defaults to the effective MCP tool timeout and allows only a lower bridge deadline", () => {
-		expect(resolveCursorPiToolBridgeCallTimeoutMs({})).toBe(3_600_000);
-		expect(resolveCursorPiToolBridgeCallTimeoutMs({ PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS: "120000" })).toBe(120_000);
-		expect(resolveCursorPiToolBridgeCallTimeoutMs({ PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS: "7200000" })).toBe(3_600_000);
-		expect(resolveCursorPiToolBridgeCallTimeoutMs({ PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS: "invalid" })).toBe(3_600_000);
-		expect(resolveCursorPiToolBridgeCallTimeoutMs({
-			PI_CURSOR_MCP_TOOL_TIMEOUT_MS: "60000",
-			PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS: "120000",
-		})).toBe(60_000);
+		expect(resolveCursorPiToolBridgeConfig({}).callTimeoutMs).toBe(3_600_000);
+		expect(resolveCursorPiToolBridgeConfig({ tools: { bridge: { callTimeoutMs: 120_000 } } }).callTimeoutMs).toBe(120_000);
+		expect(resolveCursorPiToolBridgeConfig({ tools: { bridge: { callTimeoutMs: 7_200_000 } } }).callTimeoutMs).toBe(3_600_000);
+		expect(resolveCursorPiToolBridgeConfig({
+			tools: { mcp: { callTimeoutMs: 60_000 }, bridge: { callTimeoutMs: 120_000 } },
+		}).callTimeoutMs).toBe(60_000);
 	});
 
 	it("rejects a stranded call, clears pending state, and aborts active pi execution", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		process.env.PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS = "500";
 		const pi = createBridgePiHarness({
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		const run = await registerCursorPiToolBridge(pi).createRun();
+		const run = await registerTestBridge(pi).createRun();
 		const client = new Client({ name: "pi-cursor-sdk-test", version: "1.0.0" });
 		const transport = new StreamableHTTPClientTransport(new URL(getCursorPiBridgeMcpUrl(run)));
 		await client.connect(transport);
@@ -78,12 +84,11 @@ describe("cursor pi tool bridge CallTool deadline", () => {
 	});
 
 	it("aborts active pi execution when the MCP client cancels CallTool", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		const pi = createBridgePiHarness({
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		const run = await registerCursorPiToolBridge(pi).createRun();
+		const run = await registerTestBridge(pi).createRun();
 		const client = new Client({ name: "pi-cursor-sdk-test", version: "1.0.0" });
 		const transport = new StreamableHTTPClientTransport(new URL(getCursorPiBridgeMcpUrl(run)));
 		await client.connect(transport);
@@ -115,13 +120,11 @@ describe("cursor pi tool bridge CallTool deadline", () => {
 	});
 
 	it("blocks a bridge tool event that reaches pi after its call expired", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		process.env.PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS = "500";
 		const pi = createBridgePiHarness({
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		const run = await registerCursorPiToolBridge(pi).createRun();
+		const run = await registerTestBridge(pi).createRun();
 		const client = new Client({ name: "pi-cursor-sdk-test", version: "1.0.0" });
 		const transport = new StreamableHTTPClientTransport(new URL(getCursorPiBridgeMcpUrl(run)));
 		await client.connect(transport);
@@ -146,13 +149,12 @@ describe("cursor pi tool bridge CallTool deadline", () => {
 	});
 
 	it("does not let a superseded tool_call handler block the replacement bridge", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		const pi = createBridgePiHarness({
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		registerCursorPiToolBridge(pi);
-		const run = await registerCursorPiToolBridge(pi).createRun();
+		registerTestBridge(pi);
+		const run = await registerTestBridge(pi).createRun();
 		const client = new Client({ name: "pi-cursor-sdk-test", version: "1.0.0" });
 		const transport = new StreamableHTTPClientTransport(new URL(getCursorPiBridgeMcpUrl(run)));
 		await client.connect(transport);
@@ -200,12 +202,11 @@ describe("cursor pi tool bridge CallTool deadline", () => {
 	});
 
 	it("aborts active pi execution when its bridge run is cancelled", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		const pi = createBridgePiHarness({
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		const run = await registerCursorPiToolBridge(pi).createRun();
+		const run = await registerTestBridge(pi).createRun();
 		const client = new Client({ name: "pi-cursor-sdk-test", version: "1.0.0" });
 		const transport = new StreamableHTTPClientTransport(new URL(getCursorPiBridgeMcpUrl(run)));
 		await client.connect(transport);

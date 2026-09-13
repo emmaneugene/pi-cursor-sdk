@@ -136,10 +136,10 @@ describe("streamCursor bridge MCP", () => {
 	});
 
 	it("rejects late bridge MCP calls after a successful live run is released", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createBuiltinToolInfo("read", Type.Object({ path: Type.String() }), "Read files")],
+			exposeBuiltins: true,
 		});
 
 		const mockSend = vi.fn().mockResolvedValue({
@@ -263,13 +263,13 @@ describe("streamCursor bridge MCP", () => {
 		await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
 		await cursorProviderTestUtils.resetSessionCursorAgents();
 		vi.clearAllMocks();
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		registerBridgeForProviderTest({
 			active: ["read", "bash"],
 			tools: [
 				createBuiltinToolInfo("read", Type.Object({ path: Type.String() }), "Read files"),
 				createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run commands"),
 			],
+			exposeBuiltins: true,
 		});
 		mockCreatedAgent({
 			agentId: "agent-2",
@@ -282,10 +282,10 @@ describe("streamCursor bridge MCP", () => {
 	});
 
 	it("omits bridge MCP servers from Agent.create when disabled or when the active snapshot is empty", async () => {
-		process.env.PI_CURSOR_PI_TOOL_BRIDGE = "0";
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createTestToolInfo("read")],
+			enabled: false,
 		});
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
@@ -307,8 +307,6 @@ describe("streamCursor bridge MCP", () => {
 
 		await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
 		await cursorProviderTestUtils.resetSessionCursorAgents();
-		delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
-		delete process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS;
 		nativeToolDisplayTestUtils.registerNativeToolNameForTests("cursor");
 		vi.clearAllMocks();
 		registerBridgeForProviderTest({
@@ -328,8 +326,6 @@ describe("streamCursor bridge MCP", () => {
 	it("keeps bridge MCP requests alive past idle disposal and resumes the same Cursor run in plan mode", async () => {
 		await setCursorModeForBridgeTest("plan");
 		cursorProviderTestUtils.setCursorNativeReplayIdleDisposeMs(100);
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 		registerBridgeForProviderTest({
@@ -338,6 +334,7 @@ describe("streamCursor bridge MCP", () => {
 				createBuiltinToolInfo("read", Type.Object({ path: Type.String() }), "Read files"),
 				createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run commands"),
 			],
+			exposeBuiltins: true,
 		});
 
 		let onDelta: CursorDeltaHandler | undefined;
@@ -480,6 +477,7 @@ describe("streamCursor bridge MCP", () => {
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createTestToolInfo("read", Type.Object({ path: Type.String() }), "Read files")],
+			exposeBuiltins: true,
 		});
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({
@@ -518,12 +516,12 @@ describe("streamCursor bridge MCP", () => {
 	});
 
 	it("releases an abandoned live run after its pending bridge call reaches the bridge deadline", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		process.env.PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS = "300";
 		cursorProviderTestUtils.setCursorNativeReplayIdleDisposeMs(20);
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createTestToolInfo("read", Type.Object({ path: Type.String() }), "Read files")],
+			exposeBuiltins: true,
+			callTimeoutMs: 300,
 		});
 		const mockDispose = vi.fn().mockResolvedValue(undefined);
 		const sdkCancel = vi.fn().mockResolvedValue(undefined);
@@ -564,10 +562,10 @@ describe("streamCursor bridge MCP", () => {
 	});
 
 	it("surfaces incomplete external Cursor tools as transcript traces in bridge-only live runs", async () => {
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createBuiltinToolInfo("read", Type.Object({ path: Type.String() }), "Read files")],
+			exposeBuiltins: true,
 		});
 
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {

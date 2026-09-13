@@ -1,4 +1,29 @@
+import { buildCursorSmokeUserConfig } from "../lib/cursor-smoke-env.mjs";
 import { LOCAL_RESUME_SUITES } from "./local-resume-suites.mjs";
+
+const QUIET_NATIVE_USER_CONFIG = buildCursorSmokeUserConfig({
+	settingSources: "none",
+	nativeToolDisplay: true,
+	registerNativeTools: true,
+	bridge: false,
+	exposeBuiltinTools: false,
+});
+const HTTP1_NATIVE_USER_CONFIG = buildCursorSmokeUserConfig({
+	settingSources: "none",
+	transport: "http1",
+	nativeToolDisplay: true,
+	registerNativeTools: true,
+	bridge: false,
+	exposeBuiltinTools: false,
+});
+const BRIDGE_MATRIX_USER_CONFIG = buildCursorSmokeUserConfig({
+	settingSources: "none",
+	nativeToolDisplay: true,
+	registerNativeTools: true,
+	bridge: true,
+	exposeBuiltinTools: true,
+	bridgeDebug: true,
+});
 
 /**
  * Scenario definitions for all required platform smoke suites.
@@ -26,14 +51,7 @@ export const SCENARIOS = {
 	"cursor-native-visual-matrix": {
 		description: "Prove provider reality, native tool replay, card rendering, JSONL correctness.",
 		cursorCalls: 1,
-		env: {
-			PI_CURSOR_SETTING_SOURCES: "none",
-			PI_CURSOR_NATIVE_TOOL_DISPLAY: "1",
-			PI_CURSOR_REGISTER_NATIVE_TOOLS: "1",
-			PI_CURSOR_PI_TOOL_BRIDGE: "0",
-			PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "0",
-			PI_CURSOR_SDK_EVENT_DEBUG: "1",
-		},
+		userConfig: QUIET_NATIVE_USER_CONFIG,
 		commands: {
 			shellSmoke: {
 				posix: "printf 'cursor visual smoke\\n'",
@@ -99,15 +117,7 @@ NATIVE_MATRIX_OK package=<name> grep=<yes/no> find=<yes/no> list=<yes/no> shell=
 	"cursor-http1-live": {
 		description: "Prove an opt-in HTTP/1.1/SSE local provider turn and visible transport status.",
 		cursorCalls: 1,
-		env: {
-			PI_CURSOR_SETTING_SOURCES: "none",
-			PI_CURSOR_HTTP_1_1: "1",
-			PI_CURSOR_NATIVE_TOOL_DISPLAY: "1",
-			PI_CURSOR_REGISTER_NATIVE_TOOLS: "1",
-			PI_CURSOR_PI_TOOL_BRIDGE: "0",
-			PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "0",
-			PI_CURSOR_SDK_EVENT_DEBUG: "1",
-		},
+		userConfig: HTTP1_NATIVE_USER_CONFIG,
 		promptTemplate: "Join HTTP1, LIVE, and OK with underscores and reply with only the result.",
 		finalMarker: "HTTP1_LIVE_OK",
 		requiredCards: ["http1-status"],
@@ -116,15 +126,7 @@ NATIVE_MATRIX_OK package=<name> grep=<yes/no> find=<yes/no> list=<yes/no> shell=
 	"cursor-bridge-visual-matrix": {
 		description: "Prove pi bridge routing, bridge tool cards, diagnostics, real pi tool names.",
 		cursorCalls: 1,
-		env: {
-			PI_CURSOR_SETTING_SOURCES: "none",
-			PI_CURSOR_NATIVE_TOOL_DISPLAY: "1",
-			PI_CURSOR_REGISTER_NATIVE_TOOLS: "1",
-			PI_CURSOR_PI_TOOL_BRIDGE: "1",
-			PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1",
-			PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1",
-			PI_CURSOR_SDK_EVENT_DEBUG: "1",
-		},
+		userConfig: BRIDGE_MATRIX_USER_CONFIG,
 		commands: {
 			shellSmoke: {
 				posix: "node -e \"console.log('bridge visual smoke')\"",
@@ -174,15 +176,7 @@ BRIDGE_MATRIX_OK bash_ok=<yes/no> read_ok=<yes/no> read_missing_error=<yes/no>`,
 	"cursor-abort-cleanup": {
 		description: "Prove long-running bridge cancellation with no orphan processes.",
 		cursorCalls: 1,
-		env: {
-			PI_CURSOR_SETTING_SOURCES: "none",
-			PI_CURSOR_NATIVE_TOOL_DISPLAY: "1",
-			PI_CURSOR_REGISTER_NATIVE_TOOLS: "1",
-			PI_CURSOR_PI_TOOL_BRIDGE: "1",
-			PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1",
-			PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1",
-			PI_CURSOR_SDK_EVENT_DEBUG: "1",
-		},
+		userConfig: BRIDGE_MATRIX_USER_CONFIG,
 		commands: {
 			longRunning: {
 				posix: "node -e \"const fs=require('fs');fs.mkdirSync('.debug/platform-smoke',{recursive:true});fs.writeFileSync('.debug/platform-smoke/abort-started.txt',String(process.pid));setTimeout(() => console.log(process.env.PLATFORM_ABORT_MARKER), 30000)\"",

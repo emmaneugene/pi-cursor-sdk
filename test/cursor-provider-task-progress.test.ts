@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
 	resetCursorProviderTestState,
@@ -114,9 +117,13 @@ describe("streamCursor Cursor task progress", () => {
 		})).toBe("LIVE TEST PASS final report");
 	});
 
-	it("can preserve SDK task wording through the experiment opt-out", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
-		process.env.PI_CURSOR_TASK_PRESENTATION = "task";
+	it("can preserve SDK task wording through user config", async () => {
+		const agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-task-presentation-"));
+		const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = agentDir;
+		writeFileSync(join(agentDir, "cursor-sdk.json"), JSON.stringify({
+			tools: { display: { native: "off", taskPresentation: "task" } },
+		}));
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({
 				update: {
@@ -150,11 +157,16 @@ describe("streamCursor Cursor task progress", () => {
 		});
 		mockCreatedAgent({ send: mockSend });
 
-		const events = await collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
-		const trace = collectThinkingDeltas(events);
-
-		expect(trace).toContain("Cursor task: Review API auth flow");
-		expect(trace).not.toContain("Cursor subagent: Review API auth flow");
+		try {
+			const events = await collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
+			const trace = collectThinkingDeltas(events);
+			expect(trace).toContain("Cursor task: Review API auth flow");
+			expect(trace).not.toContain("Cursor subagent: Review API auth flow");
+		} finally {
+			if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+			else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+			rmSync(agentDir, { recursive: true, force: true });
+		}
 	});
 
 	it("does not emit task progress for normal read or bash starts", async () => {

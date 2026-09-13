@@ -6,13 +6,12 @@ export function resolveCursorSettingSources(raw) {
 	const trimmed = raw?.trim();
 	if (!trimmed) return [...DEFAULT_CURSOR_SETTING_SOURCES];
 	const normalized = trimmed.toLowerCase();
-	if (["0", "false", "off", "none", "omit", "disabled"].includes(normalized)) return undefined;
+	if (["0", "false", "off", "none", "omit", "disabled"].includes(normalized)) return [];
 	if (["1", "true", "on", "all"].includes(normalized)) return ["all"];
 	const sources = trimmed
 		.split(",")
 		.map((entry) => entry.trim())
 		.filter(Boolean);
-	if (sources.length === 0) return undefined;
 	return sources;
 }
 

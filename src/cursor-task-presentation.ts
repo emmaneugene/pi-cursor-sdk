@@ -1,6 +1,5 @@
 import { asRecord, getBoolean, getRecord, getString } from "./cursor-record-utils.js";
-
-export const CURSOR_TASK_PRESENTATION_ENV = "PI_CURSOR_TASK_PRESENTATION";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 
 export type CursorTaskPresentationMode = "task" | "subagent" | "subagent-meta";
 
@@ -10,11 +9,9 @@ const VALID_CURSOR_TASK_PRESENTATION_MODES = new Set<CursorTaskPresentationMode>
 	"subagent-meta",
 ]);
 
-export function getCursorTaskPresentationMode(env: NodeJS.ProcessEnv = process.env): CursorTaskPresentationMode {
-	const raw = env[CURSOR_TASK_PRESENTATION_ENV]?.trim();
-	return raw && VALID_CURSOR_TASK_PRESENTATION_MODES.has(raw as CursorTaskPresentationMode)
-		? (raw as CursorTaskPresentationMode)
-		: "subagent-meta";
+export function getCursorTaskPresentationMode(config: CursorSdkConfig = loadCursorSdkUserConfig()): CursorTaskPresentationMode {
+	const mode = config.tools?.display?.taskPresentation;
+	return mode && VALID_CURSOR_TASK_PRESENTATION_MODES.has(mode) ? mode : "subagent-meta";
 }
 
 export interface CursorTaskMetadata {
@@ -48,14 +45,14 @@ function cleanMetadataValue(value: string | undefined): string | undefined {
 	return trimmed || undefined;
 }
 
-export function getCursorTaskActivityTitle(): string {
-	return getCursorTaskPresentationMode() === "task" ? "Cursor task" : "Cursor subagent";
+export function getCursorTaskActivityTitle(config?: CursorSdkConfig): string {
+	return getCursorTaskPresentationMode(config) === "task" ? "Cursor task" : "Cursor subagent";
 }
 
-export function getCursorTaskTranscriptHeader(args: Record<string, unknown>, resultValue?: unknown): string {
+export function getCursorTaskTranscriptHeader(args: Record<string, unknown>, resultValue?: unknown, config?: CursorSdkConfig): string {
 	const metadata = readCursorTaskMetadata(args, resultValue);
 	const description = cleanMetadataValue(metadata.description) ?? "task";
-	const mode = getCursorTaskPresentationMode();
+	const mode = getCursorTaskPresentationMode(config);
 	if (mode === "task") return `task ${description}`;
 	if (mode === "subagent-meta") {
 		const subagentName = cleanMetadataValue(metadata.subagentName);

@@ -35,7 +35,7 @@ The repo also ships partial automation for the prerequisite/basic/default-settin
 npm run smoke:live
 ```
 
-`npm run smoke:live` resolves `pi`, `node`, `npm`, `rg`, and `tmux` once in the parent shell, then runs all `pi` shims with the resolved Node directory first on `PATH`. It clears inherited Cursor SDK event-debug env for every child pi run. Isolated helper cases force `PI_CURSOR_SETTING_SOURCES=none`; the `default-settings` helper case explicitly unsets `PI_CURSOR_SETTING_SOURCES` so it exercises the default ambient setting-source path.
+`npm run smoke:live` resolves `pi`, `node`, `npm`, `rg`, and `tmux` once in the parent shell, then runs all `pi` shims with the resolved Node directory first on `PATH`. It clears inherited Cursor SDK event-debug env for every child pi run. Isolated helper cases write `local.settingSources: []` into the isolated `cursor-sdk.json`; the `default-settings` helper case omits that override so it exercises the default ambient setting-source path.
 
 The canonical visual runner for section 4 is checked in separately:
 
@@ -53,7 +53,7 @@ SKIP_LIVE=1 npm run smoke:isolated
 npm run smoke:isolated -- --self-test
 ```
 
-`npm run smoke:isolated` follows the same smoke-runner env contract as live/visual/steering helpers: pack-only work resolves only `node`, `npm`, and `env` from the parent shell and does not require `pi`; live checks then resolve `pi` and `rg`. It runs pi/npm shims with the resolved Node directory first on `PATH`, clears Cursor SDK event-debug env, forces `PI_CURSOR_SETTING_SOURCES=none` for provider checks, and explicitly unsets `PI_CURSOR_SETTING_SOURCES` for install/list checks.
+`npm run smoke:isolated` follows the same smoke-runner env contract as live/visual/steering helpers: pack-only work resolves only `node`, `npm`, and `env` from the parent shell and does not require `pi`; live checks then resolve `pi` and `rg`. It runs pi/npm shims with the resolved Node directory first on `PATH`, clears Cursor SDK event-debug env, writes `local.settingSources: []` for provider checks, and leaves setting sources at the default for install/list checks.
 
 Scan persisted sessions for native replay tool failures:
 
@@ -74,10 +74,14 @@ Pass criteria:
 - No Cursor key or auth token is printed.
 - If neither `~/.pi/agent/auth.json` cursor auth nor `CURSOR_API_KEY` is available, stop and report the live smoke as blocked.
 
+Manual live checks isolate `PI_CODING_AGENT_DIR` and write `cursor-sdk.json` there. `PI_CURSOR_*` behavior variables are ignored.
+
 ## 1. Basic provider reality check
 
 ```bash
-PI_CURSOR_SETTING_SOURCES=none \
+export PI_CODING_AGENT_DIR="$SMOKE_DIR/basic-agent"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '%s\n' '{"local":{"settingSources":[]}}' > "$PI_CODING_AGENT_DIR/cursor-sdk.json"
 pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/basic" \
   --no-tools \
@@ -117,8 +121,11 @@ Run a real interactive session under tmux:
 
 ```bash
 SESSION="pi-cursor-sdk-smoke-$(date +%s)"
+export PI_CODING_AGENT_DIR="$SMOKE_DIR/tui-agent"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '%s\n' '{"local":{"settingSources":[]}}' > "$PI_CODING_AGENT_DIR/cursor-sdk.json"
 tmux new-session -d -s "$SESSION" -x 120 -y 40 -- zsh -lc \
-  "cd '$PWD' && PI_CURSOR_SETTING_SOURCES=none pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 --session-dir '$SMOKE_DIR/tui' --session-id cursor-sdk-1016-tui --no-tools 'TUI smoke. Compute 19 + 23. Reply only with SUM=<number>.'"
+  "cd '$PWD' && PI_CODING_AGENT_DIR='$SMOKE_DIR/tui-agent' pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 --session-dir '$SMOKE_DIR/tui' --session-id cursor-sdk-1016-tui --no-tools 'TUI smoke. Compute 19 + 23. Reply only with SUM=<number>.'"
 ```
 
 Observe with `tmux capture-pane -pt "$SESSION"` or attach manually.
@@ -204,7 +211,9 @@ Pass criteria:
 ## 5. Cursor SDK plan-mode provider check
 
 ```bash
-PI_CURSOR_SETTING_SOURCES=none \
+export PI_CODING_AGENT_DIR="$SMOKE_DIR/plan-agent"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '%s\n' '{"local":{"settingSources":[]}}' > "$PI_CODING_AGENT_DIR/cursor-sdk.json"
 pi -ne --approve -e . --cursor-no-fast --cursor-mode plan --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/cursor-mode-plan" \
   --session-id cursor-sdk-1016-plan \
@@ -224,9 +233,9 @@ Pass criteria:
 ## 6. Bridge multi-tool success and failure
 
 ```bash
-PI_CURSOR_SETTING_SOURCES=none \
-PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1 \
-PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1 \
+export PI_CODING_AGENT_DIR="$SMOKE_DIR/bridge-agent"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '%s\n' '{"local":{"settingSources":[]},"tools":{"bridge":{"exposeBuiltins":true,"debug":{"stderr":true}}}}' > "$PI_CODING_AGENT_DIR/cursor-sdk.json"
 pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/bridge" \
   -p 'Bridge smoke. Do exactly two tool calls before answering: first call pi__read on ./package.json; second call pi__read on ./definitely-missing-pi-cursor-sdk-smoke-file.txt. Then answer: OK_NAME=<package name>; MISSING_RESULT=<error or success>. Do not use shell.' \
@@ -245,9 +254,9 @@ Pass criteria:
 ## 7. Native replay cards without the pi bridge
 
 ```bash
-PI_CURSOR_SETTING_SOURCES=none \
-PI_CURSOR_PI_TOOL_BRIDGE=0 \
-PI_CURSOR_NATIVE_TOOL_DISPLAY=1 \
+export PI_CODING_AGENT_DIR="$SMOKE_DIR/native-replay-agent"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '%s\n' '{"local":{"settingSources":[]},"tools":{"bridge":{"enabled":false},"display":{"native":"on"}}}' > "$PI_CODING_AGENT_DIR/cursor-sdk.json"
 pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/native-replay" \
   -p 'Native replay smoke. Use your Cursor file-reading capability to read ./README.md, then answer README_SEEN=yes if it contains pi-cursor-sdk.' \
@@ -310,7 +319,7 @@ fi
 Pass criteria:
 
 - The scan returns no matching files except deliberately planted test strings that are asserted not to appear in serialized diagnostics, and it does not print matched secret-bearing lines.
-- If tool names themselves are considered sensitive for a release target, do not enable `PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1` for shared logs. The diagnostics contract intentionally allows tool names.
+- If tool names themselves are considered sensitive for a release target, do not enable `tools.bridge.debug.stderr` for shared logs. The diagnostics contract intentionally allows tool names.
 
 ## 9. Long-running bridge and abort/cancel
 
@@ -319,9 +328,9 @@ Use this focused check when debugging abort cleanup. The current fork release ev
 Use a harmless long-running command and interrupt it after the bridge request is queued:
 
 ```bash
-PI_CURSOR_SETTING_SOURCES=none \
-PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1 \
-PI_CURSOR_PI_TOOL_BRIDGE_DEBUG=1 \
+export PI_CODING_AGENT_DIR="$SMOKE_DIR/abort-agent"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '%s\n' '{"local":{"settingSources":[]},"tools":{"bridge":{"exposeBuiltins":true,"debug":{"stderr":true}}}}' > "$PI_CODING_AGENT_DIR/cursor-sdk.json"
 pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/abort" \
   -p 'Abort smoke. Call pi__bash with command: sleep 30 && echo SHOULD_NOT_PRINT. Do not answer until the tool completes.'

@@ -18,9 +18,7 @@ import {
 	buildCursorPiToolBridgeSurfaceSignature,
 	registerCursorPiToolBridge,
 	registerNestedCursorPiToolBridge,
-	resolveCursorPiToolBridgeBuiltinsEnabled,
-	resolveCursorPiToolBridgeDebugEnabled,
-	resolveCursorPiToolBridgeEnabled,
+	resolveCursorPiToolBridgeConfig,
 	type CursorPiToolBridgeRun,
 } from "../src/cursor-pi-tool-bridge.js";
 
@@ -30,6 +28,10 @@ function createToolInfo(name: string, description = `${name} description`, param
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function bridgeConfigWithBuiltins() {
+	return resolveCursorPiToolBridgeConfig({ tools: { bridge: { exposeBuiltins: true } } });
 }
 
 async function waitForQueuedRequests(run: CursorPiToolBridgeRun) {
@@ -100,28 +102,19 @@ describe("cursor pi tool bridge flags and snapshots", () => {
 		await __testUtils.resetRegisteredBridgeForTests();
 	});
 
-	it("defaults the bridge on and built-in overlap exposure off with explicit env controls", () => {
-		expect(resolveCursorPiToolBridgeEnabled({})).toBe(true);
-		expect(resolveCursorPiToolBridgeEnabled({ PI_CURSOR_PI_TOOL_BRIDGE: "0" })).toBe(false);
-		expect(resolveCursorPiToolBridgeEnabled({ PI_CURSOR_PI_TOOL_BRIDGE: "false" })).toBe(false);
-		expect(resolveCursorPiToolBridgeEnabled({ PI_CURSOR_PI_TOOL_BRIDGE: "off" })).toBe(false);
-		expect(resolveCursorPiToolBridgeEnabled({ PI_CURSOR_PI_TOOL_BRIDGE: "none" })).toBe(false);
-		expect(resolveCursorPiToolBridgeEnabled({ PI_CURSOR_PI_TOOL_BRIDGE: "1" })).toBe(true);
-		expect(resolveCursorPiToolBridgeEnabled({ PI_CURSOR_PI_TOOL_BRIDGE: "true" })).toBe(true);
-
-		expect(resolveCursorPiToolBridgeBuiltinsEnabled({})).toBe(false);
-		expect(resolveCursorPiToolBridgeBuiltinsEnabled({ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "0" })).toBe(false);
-		expect(resolveCursorPiToolBridgeBuiltinsEnabled({ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "off" })).toBe(false);
-		expect(resolveCursorPiToolBridgeBuiltinsEnabled({ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "unexpected" })).toBe(false);
-		expect(resolveCursorPiToolBridgeBuiltinsEnabled({ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" })).toBe(true);
-		expect(resolveCursorPiToolBridgeBuiltinsEnabled({ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "true" })).toBe(true);
-
-		expect(resolveCursorPiToolBridgeDebugEnabled({})).toBe(false);
-		expect(resolveCursorPiToolBridgeDebugEnabled({ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "false" })).toBe(false);
-		expect(resolveCursorPiToolBridgeDebugEnabled({ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "0" })).toBe(false);
-		expect(resolveCursorPiToolBridgeDebugEnabled({ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "unexpected" })).toBe(false);
-		expect(resolveCursorPiToolBridgeDebugEnabled({ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1" })).toBe(true);
-		expect(resolveCursorPiToolBridgeDebugEnabled({ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "true" })).toBe(true);
+	it("defaults bridge behavior and reads explicit user config", () => {
+		expect(resolveCursorPiToolBridgeConfig({})).toMatchObject({
+			enabled: true,
+			exposeBuiltins: false,
+			debug: { stderr: false },
+		});
+		expect(resolveCursorPiToolBridgeConfig({
+			tools: { bridge: { enabled: false, exposeBuiltins: true, debug: { stderr: true } } },
+		})).toMatchObject({
+			enabled: false,
+			exposeBuiltins: true,
+			debug: { stderr: true },
+		});
 	});
 
 	it("maps only active pi tools, includes dynamic tools, and excludes only registered internal Cursor replay names", () => {
@@ -314,7 +307,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	it("uses endpoint-independent request IDs so historical tool results cannot resolve a new run", async () => {
 		const registry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read", "Read files", Type.Object({ path: Type.String() }))] }),
-			{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+			{ exposeBuiltins: true },
 		);
 		const run = await registry.createRun();
 		const { endpointToken } = getBridgeEndpointMaterial(run);
@@ -371,7 +364,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		const tools = [createToolInfo("cursor")];
 		const disabledRegistry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
-			{ PI_CURSOR_PI_TOOL_BRIDGE: "0" },
+			{ enabled: false },
 		);
 		const disabledRun = await disabledRegistry.createRun();
 		expect(disabledRun.enabled).toBe(false);
@@ -395,7 +388,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		try {
 			const registry = __testUtils.createRegistry(
 				createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
-				{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+				{ exposeBuiltins: true },
 			);
 			const run = await registry.createRun();
 			await run.dispose();
@@ -457,14 +450,14 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		try {
 			const disabledRegistry = __testUtils.createRegistry(
 				createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
-				{ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1", PI_CURSOR_PI_TOOL_BRIDGE: "0" },
+				{ debug: { stderr: true }, enabled: false },
 			);
 			const disabledRun = await disabledRegistry.createRun();
 			await disabledRun.dispose();
 
 			const registry = __testUtils.createRegistry(
 				createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read", "Read files")] }),
-				{ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1", PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+				{ debug: { stderr: true }, exposeBuiltins: true },
 			);
 			const run = await registry.createRun();
 			const { endpointPath, endpointToken } = getBridgeEndpointMaterial(run);
@@ -502,7 +495,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		const diagnostics = collectBridgeDiagnosticOutput();
 		const registry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read", "Read files", Type.Object({ path: Type.String() }))] }),
-			{ PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1", PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+			{ debug: { stderr: true }, exposeBuiltins: true },
 		);
 		const run = await registry.createRun();
 		const { endpointPath, endpointToken } = getBridgeEndpointMaterial(run);
@@ -613,7 +606,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 					]),
 				],
 			}),
-			{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+			{ exposeBuiltins: true },
 		);
 		const run = await registry.createRun();
 
@@ -653,7 +646,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	it("queues MCP calls, maps them back to real pi tool names, and resolves from pi tool results", async () => {
 		const registry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read", "Read files", Type.Object({ path: Type.String() }))] }),
-			{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+			{ exposeBuiltins: true },
 		);
 		const run = await registry.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
@@ -709,8 +702,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		});
 		const sigintListenerCount = process.listenerCount("SIGINT");
 		const sigtermListenerCount = process.listenerCount("SIGTERM");
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		const bridge = registerCursorPiToolBridge(pi);
+		const bridge = registerCursorPiToolBridge(pi, bridgeConfigWithBuiltins());
 		const run = await bridge.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
 		try {
@@ -770,8 +762,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		const bridge = registerCursorPiToolBridge(pi);
+		const bridge = registerCursorPiToolBridge(pi, bridgeConfigWithBuiltins());
 		const run = await bridge.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
 		try {
@@ -815,8 +806,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		const bridge = registerCursorPiToolBridge(pi);
+		const bridge = registerCursorPiToolBridge(pi, bridgeConfigWithBuiltins());
 		const run = await bridge.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
 		try {
@@ -859,8 +849,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 			active: ["bash"],
 			tools: [createBuiltinToolInfo("bash", Type.Object({ command: Type.String() }), "Run shell commands")],
 		});
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		const bridge = registerCursorPiToolBridge(pi);
+		const bridge = registerCursorPiToolBridge(pi, bridgeConfigWithBuiltins());
 		const run = await bridge.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
 		try {
@@ -900,8 +889,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	it("keeps a live bridge when registerCursorPiToolBridge is called again during a run", async () => {
 		const pi = createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] });
 		const nestedPi = createBridgePiHarness({ active: [], tools: [] });
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		const first = registerCursorPiToolBridge(pi);
+		const first = registerCursorPiToolBridge(pi, bridgeConfigWithBuiltins());
 		const run = await first.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
 		try {
@@ -909,7 +897,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 			const observedCallError = callPromise.catch((error: unknown) => error);
 			await waitForQueuedRequests(run);
 
-			const second = registerCursorPiToolBridge(nestedPi);
+			const second = registerCursorPiToolBridge(nestedPi, bridgeConfigWithBuiltins());
 			await sleep(50);
 
 			expect(second).toBe(first);
@@ -929,8 +917,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	it("keeps a parent bridge run alive when a nested bridge shuts down", async () => {
 		const parentPi = createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] });
 		const nestedPi = createBridgePiHarness({ active: [], tools: [] });
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		const parentBridge = registerCursorPiToolBridge(parentPi);
+		const parentBridge = registerCursorPiToolBridge(parentPi, bridgeConfigWithBuiltins());
 		const parentRun = await parentBridge.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(parentRun));
 		try {
@@ -957,8 +944,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 
 	it("rejects pending MCP waits on registered session shutdown cleanup", async () => {
 		const pi = createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] });
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
-		const bridge = registerCursorPiToolBridge(pi);
+		const bridge = registerCursorPiToolBridge(pi, bridgeConfigWithBuiltins());
 		const run = await bridge.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
 		try {
@@ -981,7 +967,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		const diagnostics = collectBridgeDiagnosticOutput();
 		const registry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
-			{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1", PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1" },
+			{ exposeBuiltins: true, debug: { stderr: true } },
 		);
 		const run = await registry.createRun({
 			onToolRequest: () => {
@@ -1010,7 +996,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		const diagnostics = collectBridgeDiagnosticOutput();
 		const registry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
-			{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1", PI_CURSOR_PI_TOOL_BRIDGE_DEBUG: "1" },
+			{ exposeBuiltins: true, debug: { stderr: true } },
 		);
 		const run = await registry.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
@@ -1040,7 +1026,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	it("rejects MCP calls when no live run handler is bound", async () => {
 		const registry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
-			{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+			{ exposeBuiltins: true },
 		);
 		const run = await registry.createRun({ onToolRequest: () => {} });
 		run.setOnToolRequest(undefined);
@@ -1060,7 +1046,7 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	it("rejects pending MCP waits on abort/dispose", async () => {
 		const registry = __testUtils.createRegistry(
 			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
-			{ PI_CURSOR_EXPOSE_BUILTIN_TOOLS: "1" },
+			{ exposeBuiltins: true },
 		);
 		const run = await registry.createRun();
 		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));

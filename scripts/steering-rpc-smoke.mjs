@@ -4,7 +4,7 @@
  */
 import { spawn, spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { accessSync, chmodSync, constants, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, constants, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -159,7 +159,7 @@ function waitFor(getStdout, predicate, timeoutMs = 300_000) {
 	});
 }
 
-function buildPiRpcEnv(baseEnv = process.env, nodePath = process.execPath) {
+function buildPiRpcEnv(baseEnv = process.env, nodePath = process.execPath, agentDir) {
 	return buildCursorSmokeEnv({
 		baseEnv,
 		nodePath,
@@ -167,12 +167,13 @@ function buildPiRpcEnv(baseEnv = process.env, nodePath = process.execPath) {
 		nativeToolDisplay: true,
 		registerNativeTools: true,
 		bridge: false,
+		agentDir,
 	});
 }
 
 async function runPiRpcSmoke(sessionDir, piBin) {
 	const args = ["--approve", "-e", root, "--cursor-no-fast", "--model", "cursor/grok-4.6", "--mode", "rpc", "--session-dir", sessionDir];
-	const env = buildPiRpcEnv();
+	const env = buildPiRpcEnv(process.env, process.execPath, join(sessionDir, "pi-agent"));
 
 	const child = spawn(piBin, args, {
 		cwd: root,
@@ -281,17 +282,22 @@ async function runSelfTest() {
 			if (resolvePiBin() !== fakePi) fail("self-test failed: resolvePiBin should use PATH when PI_BIN is absent");
 			process.env.PI_BIN = fakePi;
 			if (resolvePiBin() !== fakePi) fail("self-test failed: resolvePiBin should honor absolute PI_BIN");
+			const agentDir = join(tempDir, "pi-agent");
 			const hostileEnv = buildPiRpcEnv({
 				...Object.fromEntries(DEBUG_ENV_NAMES.map((name) => [name, join(tempDir, name)])),
 				PATH: hostilePath,
 				PI_CURSOR_REGISTER_NATIVE_TOOLS: "0",
 				PI_CURSOR_SETTING_SOURCES: "all",
 				PI_CURSOR_PI_TOOL_BRIDGE: "1",
-			});
+			}, process.execPath, agentDir);
 			if ((hostileEnv.PATH ?? "").split(delimiter)[0] !== dirname(process.execPath)) fail("self-test failed: sealed PATH should start with resolved node directory");
-			if (hostileEnv.PI_CURSOR_REGISTER_NATIVE_TOOLS !== "1") fail("self-test failed: native registration should be forced on");
-			if (hostileEnv.PI_CURSOR_SETTING_SOURCES !== "none") fail("self-test failed: setting sources should be forced off");
-			if (hostileEnv.PI_CURSOR_PI_TOOL_BRIDGE !== "0") fail("self-test failed: bridge should be forced off");
+			if (hostileEnv.PI_CURSOR_REGISTER_NATIVE_TOOLS !== undefined) fail("self-test failed: native registration should not use the removed public env var");
+			if (hostileEnv.PI_CURSOR_SETTING_SOURCES !== undefined) fail("self-test failed: setting sources should not use the removed public env var");
+			if (hostileEnv.PI_CURSOR_PI_TOOL_BRIDGE !== undefined) fail("self-test failed: bridge should not use the removed public env var");
+			const isolatedConfig = JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8"));
+			if (isolatedConfig.tools?.display?.native !== "on") fail("self-test failed: native display should be forced on in isolated user config");
+			if (!Array.isArray(isolatedConfig.local?.settingSources) || isolatedConfig.local.settingSources.length !== 0) fail("self-test failed: setting sources should be none in isolated user config");
+			if (isolatedConfig.tools?.bridge?.enabled !== false) fail("self-test failed: bridge should be forced off in isolated user config");
 			for (const name of DEBUG_ENV_NAMES) {
 				if (name in hostileEnv) fail(`self-test failed: ${name} should be cleared`);
 			}

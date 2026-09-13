@@ -17,9 +17,9 @@ Pi CLI tool toggles apply at the pi tool-registry boundary. `--no-tools`, `--too
 ## Discoverability
 
 - **MCP `listTools`** (and pi's MCP catalog when present) lists **MCP servers only** — for example `pi_tools` with `pi__cursor_activate_skill`. It does **not** enumerate Cursor SDK host tools such as `Read` or `Shell`.
-- **Bootstrap prompts** include a short **Cursor SDK tool boundary** block plus a compact **callable tool surfaces** manifest by default (disable manifest with `PI_CURSOR_TOOL_MANIFEST=0`). The manifest reminds the model that Cursor host/configured MCP tools are controlled by Cursor, while pi tool toggles only affect pi tools/bridge exposure; when bridge tools are exposed, it lists the current `pi__*` names. MCP `listTools` entries for bridged pi tools point back to the bootstrap prompt instead of repeating the full contract.
+- **Bootstrap prompts** include a short **Cursor SDK tool boundary** block plus a compact **callable tool surfaces** manifest by default (disable with `tools.manifest: false`). The manifest reminds the model that Cursor host/configured MCP tools are controlled by Cursor, while pi tool toggles only affect pi tools/bridge exposure; when bridge tools are exposed, it lists the current `pi__*` names. MCP `listTools` entries for bridged pi tools point back to the bootstrap prompt instead of repeating the full contract.
 - **Incremental prompts** omit the full boundary block but keep a short tail guard (including an explicit shell `cd` hint); the session agent retains prior bootstrap context. They also omit invariant Pi system instructions; a changed system prompt forces bootstrap with the new section.
-- **In-session debug:** `/cursor-tools` prints bridge enablement, manifest enablement, effective `PI_CURSOR_SETTING_SOURCES`, and the current callable-surface snapshot.
+- **In-session debug:** `/cursor-tools` prints `tools.bridge.enabled`, `tools.manifest`, `local.settingSources`, and the current callable-surface snapshot.
 
 ## Pi bridge vs Cursor native
 
@@ -27,24 +27,23 @@ Default behavior:
 
 - Cursor host tools handle files, shell, grep, and edits.
 - When exposed, `pi__mcp` is preferred for MCP work and `pi__subagent` is preferred for delegation. Cursor-configured MCP and Cursor-native subagents are fallbacks when the matching pi tool is not exposed or is unavailable.
-- The pi bridge exposes **active pi tools** as `pi__*` MCP names when `PI_CURSOR_PI_TOOL_BRIDGE` is enabled (default on).
-- Hide individual pi tools from the bridge with `bridge.excludeTools` in `~/.pi/agent/cursor-sdk.json` or trusted `.pi/cursor-sdk.json`. Denylisted active pi tools are hidden from Cursor; unset means no restriction, and an explicitly empty list parses to unset so it falls through to lower-precedence config. Trusted project config wins over user config.
-- Overlapping pi builtins (`read`, `bash`, `write`, `edit`, `grep`, `find`, `ls`) are **hidden** from the bridge unless `PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1`; a `bridge.excludeTools` entry keeps a tool hidden even with that opt-in.
+- The pi bridge exposes **active pi tools** as `pi__*` MCP names when `tools.bridge.enabled` is true (default).
+- Hide individual pi tools from the bridge with `tools.bridge.exclude` in `~/.pi/agent/cursor-sdk.json`. Denylisted active pi tools are hidden from Cursor; unset or empty means no restriction.
+- Overlapping pi builtins (`read`, `bash`, `write`, `edit`, `grep`, `find`, `ls`) are **hidden** from the bridge unless `tools.bridge.exposeBuiltins` is true; a `tools.bridge.exclude` entry keeps a tool hidden even with that opt-in.
 
-Pending bridged calls use a local deadline capped by the effective MCP tool timeout; `PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS` can lower it. When pi has visible Agent Skills loaded, the extension also rewrites pi's skill catalog for Cursor and activates `cursor_activate_skill`; Cursor sees `pi__cursor_activate_skill` and should call it with a listed skill name before applying that skill. The activation result returns the full `SKILL.md`, the skill directory for relative paths, and a bounded list of bundled `scripts/`, `references/`, and `assets/` files without eagerly reading those resources.
+Pending bridged calls use a local deadline capped by the effective MCP tool timeout; `tools.bridge.callTimeoutMs` can lower it. When pi has visible Agent Skills loaded, the extension also rewrites pi's skill catalog for Cursor and activates `cursor_activate_skill`; Cursor sees `pi__cursor_activate_skill` and should call it with a listed skill name before applying that skill. The activation result returns the full `SKILL.md`, the skill directory for relative paths, and a bounded list of bundled `scripts/`, `references/`, and `assets/` files without eagerly reading those resources.
 
-```bash
-# Disable pi bridge entirely
-PI_CURSOR_PI_TOOL_BRIDGE=0 pi --model cursor/grok-4.6
-
-# Expose overlapping pi builtins through the bridge
-PI_CURSOR_EXPOSE_BUILTIN_TOOLS=1 pi --model cursor/grok-4.6
-
-# Fail a stranded bridge call sooner than the effective MCP tool timeout
-PI_CURSOR_PI_BRIDGE_CALL_TIMEOUT_MS=120000 pi --model cursor/grok-4.6
-
-# Disable bootstrap tool manifest
-PI_CURSOR_TOOL_MANIFEST=0 pi --model cursor/grok-4.6
+```json
+{
+  "tools": {
+    "manifest": false,
+    "bridge": {
+      "enabled": false,
+      "exposeBuiltins": true,
+      "callTimeoutMs": 120000
+    }
+  }
+}
 ```
 
 ## Runtime and transport policy
@@ -63,12 +62,12 @@ Disabling or removing an MCP server **only in pi** does not remove Cursor ambien
 | --- | --- |
 | `pi --no-tools` | Disables pi built-in/extension/custom tools and therefore removes pi bridge exposure; Cursor SDK host tools still remain callable. |
 | `pi --tools ...` / `pi --exclude-tools ...` | Narrows pi's active tool registry and therefore the pi bridge snapshot; Cursor SDK host tools and configured Cursor MCP are unchanged. |
-| `PI_CURSOR_SETTING_SOURCES=all` (default) | Loads user/project Cursor MCP, plugins, rules (`~/.cursor/mcp.json`, etc.) |
-| `PI_CURSOR_SETTING_SOURCES=none` | Disables ambient Cursor setting sources for local agents |
-| `PI_CURSOR_SETTING_SOURCES=project,plugins` | Narrows which layers load |
+| `local.settingSources: ["all"]` (default) | Loads user/project Cursor MCP, plugins, rules (`~/.cursor/mcp.json`, etc.) |
+| `local.settingSources: []` | Disables ambient Cursor setting sources for local agents |
+| `local.settingSources: ["project", "plugins"]` | Narrows which layers load |
 | Empty or edited `~/.cursor/mcp.json` | Changes which user MCP servers Cursor connects to |
 
-To reproduce a **minimal** surface (pi-cursor-sdk + Cursor host only), use extension-only install, empty user MCP config, and `PI_CURSOR_SETTING_SOURCES=none` when you do not need Cursor rules/MCP from disk.
+To reproduce a **minimal** surface (pi-cursor-sdk + Cursor host only), use extension-only install, empty user MCP config, and `local.settingSources: []` when you do not need Cursor rules/MCP from disk.
 
 ## JSONL ID patterns (debugging)
 

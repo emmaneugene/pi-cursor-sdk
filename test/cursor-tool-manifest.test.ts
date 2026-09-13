@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { buildCursorPrompt } from "../src/context.js";
 import {
 	buildCursorToolManifestText,
-	CURSOR_TOOL_MANIFEST_ENV,
 	resolveCursorToolManifestEnabled,
 } from "../src/cursor-tool-manifest.js";
 
@@ -71,9 +70,9 @@ describe("cursor-tool-manifest", () => {
 		expect(empty).toContain("no pi__* tools exposed");
 	});
 
-	it("defaults manifest env to enabled", () => {
+	it("defaults the manifest to enabled and reads user config", () => {
 		expect(resolveCursorToolManifestEnabled({})).toBe(true);
-		expect(resolveCursorToolManifestEnabled({ [CURSOR_TOOL_MANIFEST_ENV]: "0" })).toBe(false);
+		expect(resolveCursorToolManifestEnabled({ tools: { manifest: false } })).toBe(false);
 	});
 
 	it("includes manifest in bootstrap prompts when provided", () => {

@@ -11,13 +11,12 @@ import { registerCursorModelLifecycle, type CursorModelLifecycleExtensionApi } f
 import {
 	isCursorNativeToolDisplayRequested,
 	isCursorNativeToolRegistrationRequested,
-	NATIVE_CURSOR_TOOL_DISPLAY_ENV,
-	readBooleanEnv,
 	registeredNativeToolNames,
 	setCursorNativeToolDisplayRuntimeRequested,
 	skippedNativeToolNames,
 } from "./cursor-native-tool-display-state.js";
 import { isCursorReplayToolName } from "./cursor-tool-presentation-registry.js";
+import { loadCursorSdkUserConfig } from "./cursor-config.js";
 import { registerNativeCursorTool } from "./cursor-native-tool-display-tools.js";
 
 export const CURSOR_CORE_PI_REPLAY_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
@@ -60,7 +59,7 @@ function registerNativeCursorToolsFromSet(
 }
 
 function notifySkippedNativeCursorToolsIfNeeded(ctx: NativeRegistrationContext, skippedToolNames: readonly NativeCursorToolName[]): void {
-	if (skippedToolNames.length === 0 || readBooleanEnv(NATIVE_CURSOR_TOOL_DISPLAY_ENV) !== true || ctx.mode !== "tui") return;
+	if (skippedToolNames.length === 0 || loadCursorSdkUserConfig().tools?.display?.native !== "on" || ctx.mode !== "tui") return;
 	ctx.ui.notify(
 		`Cursor native tool replay skipped for ${skippedToolNames.join(", ")} because another extension already provides ${skippedToolNames.length === 1 ? "that tool" : "those tools"}. Cursor will use scrubbed activity transcripts for skipped tools.`,
 		"warning",

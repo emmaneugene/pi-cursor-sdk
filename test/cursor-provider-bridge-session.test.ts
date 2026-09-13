@@ -324,11 +324,10 @@ describe("streamCursor session agent", () => {
 	});
 
 	it("rebinds bridge onToolRequest when reusing the session agent on a follow-up turn", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
-		process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS = "1";
 		registerBridgeForProviderTest({
 			active: ["read"],
 			tools: [createBuiltinToolInfo("read", Type.Object({ path: Type.String() }), "Read files")],
+			exposeBuiltins: true,
 		});
 
 		let turn2OnDelta: CursorDeltaHandler | undefined;
@@ -473,7 +472,7 @@ describe("streamCursor session agent", () => {
 		try {
 			// Denylisting every bridgeable tool skips bridge MCP injection entirely.
 			writeFileSync(join(tmpAgentDir, "cursor-sdk.json"), JSON.stringify({
-				bridge: { excludeTools: ["tool_alpha", "tool_beta"] },
+				tools: { bridge: { exclude: ["tool_alpha", "tool_beta"] } },
 			}));
 			await collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
 			expect(getCreatedAgentOptions(0).mcpServers).toBeUndefined();

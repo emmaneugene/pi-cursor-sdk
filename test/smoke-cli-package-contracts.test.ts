@@ -54,7 +54,7 @@ describe("smoke CLI and package contracts", () => {
 		expect(steeringHelp.stdout).toContain("RPC steering smoke");
 		expect(visualHelp.status).toBe(0);
 		expect(visualHelp.stdout).toContain("Canonical offscreen TUI visual smoke runner");
-		expect(visualHelp.stdout).toContain("PI_CURSOR_REGISTER_NATIVE_TOOLS=1");
+		expect(visualHelp.stdout).toContain("tools.display.native=on");
 		expect(visualHelp.stdout).toContain("--expose-builtin-tools");
 		expect(jsonlHelp.status).toBe(0);
 		expect(jsonlHelp.stdout).toContain("Validate assistant presence");

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelListItem } from "@cursor/sdk";
 import { SessionManager, type ExtensionContext, type SessionEntry } from "@earendil-works/pi-coding-agent";
-import { CURSOR_HTTP1_ENV } from "../src/cursor-config.js";
 import {
 	__testUtils,
 	getEffectiveFastForModelId,
@@ -66,12 +65,10 @@ function createFastHarness(options: { modelId?: string; branch?: SessionEntry[] 
 describe("Cursor fast preference persistence", () => {
 	let tmpAgentDir: string;
 	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-	const originalHttp1Env = process.env[CURSOR_HTTP1_ENV];
 
 	beforeEach(() => {
 		tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-fast-persistence-"));
 		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
-		delete process.env[CURSOR_HTTP1_ENV];
 		__testUtils.sessionFastPreferences.clear();
 		__testUtils.resetCursorModeStateForTests();
 		modelDiscoveryTestUtils.registerModelItems(modelItems);
@@ -83,8 +80,6 @@ describe("Cursor fast preference persistence", () => {
 		} else {
 			process.env.PI_CODING_AGENT_DIR = originalAgentDir;
 		}
-		if (originalHttp1Env === undefined) delete process.env[CURSOR_HTTP1_ENV];
-		else process.env[CURSOR_HTTP1_ENV] = originalHttp1Env;
 		rmSync(tmpAgentDir, { recursive: true, force: true });
 		vi.clearAllMocks();
 	});
@@ -104,7 +99,7 @@ describe("Cursor fast preference persistence", () => {
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off");
 		expect(getEffectiveFastForModelId("composer-2")).toBe(false);
 		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toEqual({
-			fastDefaults: { "composer-2": false },
+			models: { fastDefaults: { "composer-2": false } },
 		});
 	});
 
@@ -112,7 +107,7 @@ describe("Cursor fast preference persistence", () => {
 		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({
 			future: { enabled: true },
 			cloud: { futureCloud: "kept" },
-			fastDefaults: { "composer-2": true },
+			models: { fastDefaults: { "composer-2": true } },
 		}));
 		const { pi, ctx, commandCtx, commands } = createFastHarness({ modelId: "composer-2" });
 		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
@@ -122,7 +117,7 @@ describe("Cursor fast preference persistence", () => {
 		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toEqual({
 			future: { enabled: true },
 			cloud: { futureCloud: "kept" },
-			fastDefaults: { "composer-2": false },
+			models: { fastDefaults: { "composer-2": false } },
 		});
 	});
 
@@ -160,7 +155,7 @@ describe("Cursor fast preference persistence", () => {
 		expect(getEffectiveFastForModelId("composer-2.5")).toBe(false);
 	});
 	it("keeps legacy session fast preferences above global canonical defaults", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2.5": true } }));
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "composer-2.5": true } } }));
 		const { pi, ctx } = createFastHarness({
 			modelId: "composer-2.5",
 			branch: [{
@@ -194,7 +189,7 @@ describe("Cursor fast preference persistence", () => {
 	});
 
 	it("keeps the global fast save authoritative when session append fails", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2": true } }));
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "composer-2": true } } }));
 		const { pi, ctx, commandCtx, commands } = createFastHarness({ modelId: "composer-2" });
 		pi.appendEntry.mockImplementationOnce(() => {
 			throw new Error("journal unavailable");
@@ -210,7 +205,7 @@ describe("Cursor fast preference persistence", () => {
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off");
 		expect(getEffectiveFastForModelId("composer-2")).toBe(false);
 		expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf-8"))).toEqual({
-			fastDefaults: { "composer-2": false },
+			models: { fastDefaults: { "composer-2": false } },
 		});
 	});
 
@@ -218,7 +213,7 @@ describe("Cursor fast preference persistence", () => {
 		const path = __testUtils.getConfigPath();
 		const original = {
 			future: { enabled: true },
-			fastDefaults: { "composer-2": "future-value", other: true },
+			models: { fastDefaults: { "composer-2": "future-value", other: true } },
 		};
 		writeFileSync(path, JSON.stringify(original));
 		const { pi, ctx, commandCtx, commands } = createFastHarness({ modelId: "composer-2" });
@@ -231,7 +226,7 @@ describe("Cursor fast preference persistence", () => {
 
 		expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
 			future: { enabled: true },
-			fastDefaults: { "composer-2": false, other: true },
+			models: { fastDefaults: { "composer-2": false, other: true } },
 		});
 		expect(existsSync(`${path}.lock`)).toBe(false);
 	});
@@ -239,7 +234,7 @@ describe("Cursor fast preference persistence", () => {
 	it.each([false, true])(
 		"keeps failed append globally authoritative across tree restore (side effect: %s)",
 		async (sideEffect) => {
-			writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2": true } }));
+			writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "composer-2": true } } }));
 			const branch: SessionEntry[] = [{
 				type: "custom",
 				id: "existing-fast",
@@ -269,13 +264,13 @@ describe("Cursor fast preference persistence", () => {
 
 			expect(getEffectiveFastForModelId("composer-2")).toBe(false);
 			expect(JSON.parse(readFileSync(__testUtils.getConfigPath(), "utf8"))).toEqual({
-				fastDefaults: { "composer-2": false },
+				models: { fastDefaults: { "composer-2": false } },
 			});
 		},
 	);
 
 	it("clears failed-append authority after a later successful append", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2": true } }));
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "composer-2": true } } }));
 		const branch: SessionEntry[] = [{
 			type: "custom",
 			id: "initial-fast",
@@ -304,7 +299,7 @@ describe("Cursor fast preference persistence", () => {
 	});
 
 	it("clears failed-append authority on session start", async () => {
-		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ fastDefaults: { "composer-2": true } }));
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "composer-2": true } } }));
 		const branch: SessionEntry[] = [{
 			type: "custom",
 			id: "contrary-fast",

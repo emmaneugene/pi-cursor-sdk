@@ -62,7 +62,7 @@ Prerequisites:
   Live checks: pi, rg, python3, and ~/.pi/agent/auth.json with cursor provider OR CURSOR_API_KEY.
   Resolved node/npm/env paths from the parent shell are reused for pack-only work; live checks then resolve pi/rg.
   Pi and npm shims run with the resolved node directory first on PATH.
-  Child pi runs clear Cursor SDK event-debug env. Live provider checks force PI_CURSOR_SETTING_SOURCES=none; install/list checks explicitly unset it.
+  Child pi runs clear Cursor SDK event-debug env and ignored PI_CURSOR_* behavior vars. Live provider checks write local.settingSources=[] into the isolated cursor-sdk.json; install/list checks leave setting sources at the default.
 
 Options:
   -h, --help                    Show this help.
@@ -80,8 +80,8 @@ has_auth_provider() { smoke_has_auth_provider "$1" "$HOME_DIR/.pi/agent/auth.jso
 run_with_timeout() { smoke_run_with_timeout_or_fail "$@"; }
 
 build_smoke_env_arrays() {
-	smoke_build_cursor_sdk_event_debug_unsets
-	DEBUG_ENV_UNSETS=( "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS[@]}" )
+	smoke_build_cursor_sdk_cleared_env_unsets
+	DEBUG_ENV_UNSETS=( "${SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS[@]}" )
 	# Sealed pi runs use env -i, which drops the parent's TLS trust config. On
 	# hosts behind a TLS-intercepting proxy (corporate MITM CA), Node then
 	# rejects every Cursor connection as "Network request failed". Pass the
@@ -92,8 +92,8 @@ build_smoke_env_arrays() {
 	fi
 	TOOL_ENV=( "$ENV_BIN" "${DEBUG_ENV_UNSETS[@]}" "PATH=$SEALED_PATH" )
 	# ${arr[@]+...} keeps macOS /bin/bash 3.2 from treating the empty array as unbound under set -u.
-	PI_DEFAULT_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" -u PI_CURSOR_SETTING_SOURCES HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 ${CA_PASSTHROUGH_ENV[@]+"${CA_PASSTHROUGH_ENV[@]}"} )
-	PI_NONE_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 PI_CURSOR_SETTING_SOURCES=none ${CA_PASSTHROUGH_ENV[@]+"${CA_PASSTHROUGH_ENV[@]}"} )
+	PI_DEFAULT_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 ${CA_PASSTHROUGH_ENV[@]+"${CA_PASSTHROUGH_ENV[@]}"} )
+	PI_NONE_ENV=( "$ENV_BIN" -i "${DEBUG_ENV_UNSETS[@]}" HOME="$HOME_DIR" PATH="$SEALED_PATH" MISE_DISABLE=1 ${CA_PASSTHROUGH_ENV[@]+"${CA_PASSTHROUGH_ENV[@]}"} )
 }
 
 run_in_dir() {
@@ -159,6 +159,7 @@ EOF_SELFTEST_NODE
 		SHELL_BIN="$(smoke_resolve_cmd "$SHELL_BIN")"
 	fi
 	smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/cursor-sdk-event-debug-env.mjs"
+	smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs"
 	hostile_path="$bin_dir:$PATH"
 	old_path="$PATH"
 	old_pi_bin="${PI_BIN-}"
@@ -195,12 +196,16 @@ EOF_SELFTEST_NODE
 	[[ "${captured_path%%:*}" == "$node_dir" ]] || fail "self-test failed: PATH did not start with resolved node dir"
 	grep -qx "HOME=$HOME_DIR" "$env_capture" || fail "self-test failed: isolated HOME was not set"
 	grep -qx 'MISE_DISABLE=1' "$env_capture" || fail "self-test failed: MISE_DISABLE was not set"
-	grep -qx 'PI_CURSOR_SETTING_SOURCES=none' "$env_capture" || fail "self-test failed: live pi env did not force PI_CURSOR_SETTING_SOURCES=none"
-	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}"; do
+	if grep -q '^PI_CURSOR_SETTING_SOURCES=' "$env_capture"; then
+		fail "self-test failed: live pi env still set the removed PI_CURSOR_SETTING_SOURCES var"
+	fi
+	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}" "${SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]}"; do
 		if grep -q "^${name}=" "$env_capture"; then
 			fail "self-test failed: $name was not cleared"
 		fi
 	done
+	smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs" "$HOME_DIR/.pi/agent" '{"local":{"settingSources":[]}}'
+	grep -q '"settingSources": \[\]' "$HOME_DIR/.pi/agent/cursor-sdk.json" || fail "self-test failed: live pi config did not write local.settingSources=[]"
 
 	PI_CURSOR_SETTING_SOURCES=all \
 	PI_CURSOR_SDK_EVENT_DEBUG=1 \
@@ -210,9 +215,9 @@ EOF_SELFTEST_NODE
 	PI_CURSOR_SDK_EVENT_DEBUG_STDERR=1 \
 		"${PI_DEFAULT_ENV[@]}" "$fake_pi" --version
 	if grep -q '^PI_CURSOR_SETTING_SOURCES=' "$env_capture"; then
-		fail "self-test failed: default pi env did not unset PI_CURSOR_SETTING_SOURCES"
+		fail "self-test failed: default pi env still set the removed PI_CURSOR_SETTING_SOURCES var"
 	fi
-	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}"; do
+	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}" "${SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]}"; do
 		if grep -q "^${name}=" "$env_capture"; then
 			fail "self-test failed: default pi env leaked $name"
 		fi
@@ -304,6 +309,7 @@ if [[ "$SHELL_BIN" != /* ]]; then
 	SHELL_BIN="$(smoke_resolve_cmd "$SHELL_BIN")"
 fi
 smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/cursor-sdk-event-debug-env.mjs"
+smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs"
 SEALED_PATH="$(smoke_build_sealed_node_path "$NODE_BIN" "$PATH")"
 build_smoke_env_arrays
 
@@ -364,6 +370,8 @@ if [[ -n "${CURSOR_API_KEY:-}" ]]; then
 	PI_CURSOR_ENV+=( CURSOR_API_KEY="$CURSOR_API_KEY" )
 fi
 
+smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs" "$HOME_DIR/.pi/agent" '{"local":{"settingSources":[]}}'
+
 log "check: list-models"
 LIST_OUT="$ISOLATED/list-models.txt"
 run_in_dir_capture_combined "list-models" 30 "$PROJECT_DIR" "$LIST_OUT" "${PI_CURSOR_ENV[@]}" \
@@ -379,17 +387,19 @@ run_in_dir_capture_split "basic prompt" "$PI_LIVE_TIMEOUT" "$PROJECT_DIR" "$ISOL
 "$RG_BIN" -q "PI_CURSOR_ISOLATED_OK" "$ISOLATED/basic.stdout.txt" || fail "basic prompt missing PI_CURSOR_ISOLATED_OK"
 validate_replay_jsonl "$BASIC_DIR"
 
+smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs" "$HOME_DIR/.pi/agent" '{"local":{"settingSources":[]},"tools":{"display":{"native":"on"}}}'
+
 log "check: native replay"
 REPLAY_DIR="$SESSION_ROOT/native-replay"
 mkdir -p "$REPLAY_DIR"
-run_in_dir_capture_split "native replay" "$PI_LIVE_TIMEOUT" "$PROJECT_DIR" "$ISOLATED/replay.stdout.txt" "$ISOLATED/replay.stderr.txt" "${PI_CURSOR_ENV[@]}" PI_CURSOR_NATIVE_TOOL_DISPLAY=1 \
+run_in_dir_capture_split "native replay" "$PI_LIVE_TIMEOUT" "$PROJECT_DIR" "$ISOLATED/replay.stdout.txt" "$ISOLATED/replay.stderr.txt" "${PI_CURSOR_ENV[@]}" \
 	"$PI_BIN" --approve --cursor-no-fast --model cursor/grok-4.6 --session-dir "$REPLAY_DIR" -p 'Read ./README.md briefly, then answer README_SEEN=yes if it mentions pi-cursor-sdk.'
 validate_replay_jsonl "$REPLAY_DIR"
 
 log "check: plan-strip shim (plan-mode execute reset)"
 PLAN_DIR="$SESSION_ROOT/plan-strip"
 mkdir -p "$PLAN_DIR"
-run_in_dir_capture_split "plan-strip replay" "$PI_LIVE_TIMEOUT" "$PROJECT_DIR" "$ISOLATED/plan.stdout.txt" "$ISOLATED/plan.stderr.txt" "${PI_CURSOR_ENV[@]}" PI_CURSOR_NATIVE_TOOL_DISPLAY=1 \
+run_in_dir_capture_split "plan-strip replay" "$PI_LIVE_TIMEOUT" "$PROJECT_DIR" "$ISOLATED/plan.stdout.txt" "$ISOLATED/plan.stderr.txt" "${PI_CURSOR_ENV[@]}" \
 	"$PI_BIN" --approve -e "$SHIM_DIR" --cursor-no-fast --model cursor/grok-4.6 --session-dir "$PLAN_DIR" -p 'After reset, read README.md and answer PLAN_STRIP_OK=yes.'
 validate_replay_jsonl "$PLAN_DIR"
 

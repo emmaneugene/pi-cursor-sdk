@@ -1,10 +1,14 @@
 import { isCursorModel } from "./cursor-model.js";
 import { registerCursorModelLifecycle, type CursorModelLifecycleExtensionApi } from "./cursor-model-lifecycle.js";
 import { resolveCursorFacingSystemPrompt } from "./cursor-agents-context.js";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 
 export type CursorAgentsContextExtensionApi = CursorModelLifecycleExtensionApi;
 
-export function registerCursorAgentsContextDedup(pi: CursorAgentsContextExtensionApi): void {
+export function registerCursorAgentsContextDedup(
+	pi: CursorAgentsContextExtensionApi,
+	config: CursorSdkConfig = loadCursorSdkUserConfig(),
+): void {
 	registerCursorModelLifecycle(pi, {
 		beforeAgentStart: (event, ctx) => {
 			if (!isCursorModel(ctx.model)) return undefined;
@@ -12,6 +16,9 @@ export function registerCursorAgentsContextDedup(pi: CursorAgentsContextExtensio
 				event.systemPrompt,
 				ctx.model,
 				event.systemPromptOptions,
+				undefined,
+				undefined,
+				config,
 			);
 			if (resolved === event.systemPrompt) return undefined;
 			return { systemPrompt: resolved };

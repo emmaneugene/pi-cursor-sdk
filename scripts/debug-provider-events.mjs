@@ -24,7 +24,8 @@ import {
 import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
 import { createScriptFail } from "./lib/cursor-script-fail.mjs";
 import { ensureBuilt } from "./lib/ensure-built.mjs";
-import { serializeCursorSettingSources } from "../shared/cursor-setting-sources.mjs";
+import { clearCursorSdkEventDebugEnv, writeCursorSdkUserConfig } from "./lib/cursor-smoke-env.mjs";
+import { CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV } from "../shared/cursor-sdk-event-debug-env.mjs";
 
 function isMainModule() {
 	if (!process.argv[1]) return false;
@@ -196,8 +197,13 @@ export async function runDebugProviderEvents(args, envInput = process.env) {
 
 	const artifactDir = args.out ?? defaultOutDir(args.cwd);
 	const sessionDir = args.sessionDir ?? join(artifactDir, "session");
+	const agentDir = join(artifactDir, "pi-agent");
 	mkdirSync(artifactDir, { recursive: true });
 	mkdirSync(sessionDir, { recursive: true });
+	writeCursorSdkUserConfig(agentDir, {
+		local: { settingSources: args.settingSources ?? ["all"] },
+		debug: { sdkEvents: { enabled: true } },
+	});
 
 	const piArgs = [
 		"--approve",
@@ -211,15 +217,12 @@ export async function runDebugProviderEvents(args, envInput = process.env) {
 		"--session-dir",
 		sessionDir,
 	];
-	const env = {
+	const env = clearCursorSdkEventDebugEnv({
 		...envInput,
 		CURSOR_API_KEY: args.apiKey,
-		PI_CURSOR_SDK_EVENT_DEBUG: "1",
-		PI_CURSOR_SDK_EVENT_DEBUG_RUN_DIR: artifactDir,
-		PI_CURSOR_SETTING_SOURCES: serializeCursorSettingSources(args.settingSources),
-		PI_CURSOR_NATIVE_TOOL_DISPLAY: envFlag(envInput.PI_CURSOR_NATIVE_TOOL_DISPLAY, "1"),
-		PI_CURSOR_PI_TOOL_BRIDGE: envFlag(envInput.PI_CURSOR_PI_TOOL_BRIDGE, "1"),
-	};
+		PI_CODING_AGENT_DIR: agentDir,
+		[CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV]: artifactDir,
+	});
 
 	const child = spawn("pi", piArgs, {
 		cwd: args.cwd,
@@ -289,11 +292,6 @@ export async function runDebugProviderEvents(args, envInput = process.env) {
 	} finally {
 		if (!closed) await terminateChild(child);
 	}
-}
-
-function envFlag(raw, defaultValue) {
-	if (raw === undefined || raw === "") return defaultValue;
-	return raw;
 }
 
 async function main(argv = process.argv.slice(2), env = process.env) {

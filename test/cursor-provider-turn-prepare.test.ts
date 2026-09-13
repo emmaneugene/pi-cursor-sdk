@@ -5,7 +5,7 @@ import { installCursorSdkProcessErrorGuard } from "../src/cursor-sdk-process-err
 import { makeAssistantMessage, makeContext, makeModel } from "./helpers/pi-harness.js";
 
 function makeResolvedConfig(): CursorResolvedSdkConfig {
-	return resolveCursorSdkConfig({ env: {} });
+	return resolveCursorSdkConfig();
 }
 
 const { mockResolveCursorProviderTurnConfig, mockPrepareCursorProviderTurn } = vi.hoisted(() => ({

@@ -9,14 +9,10 @@ import {
 } from "../src/cursor-http1.js";
 
 function setting(
-	value: boolean,
-	source: "environment" | "user" | "session" | "builtin",
-): CursorResolvedSetting<boolean> {
-	return {
-		value,
-		source,
-		trustLevel: source === "environment" ? "environment" : source,
-	};
+	value: "default" | "http1",
+	source: "user" | "session" | "builtin",
+): CursorResolvedSetting<"default" | "http1"> {
+	return { value, source };
 }
 
 function sdkWithConfigure(configure: (options: CursorConfigureOptions) => void) {
@@ -58,21 +54,21 @@ describe("Cursor SDK HTTP/1.1 configuration", () => {
 	});
 
 	it.each([
-		[true, "environment"],
-		[false, "user"],
-	] as const)("configures an explicit %s value from %s", (value, source) => {
+		["http1", "user", true],
+		["default", "session", false],
+	] as const)("configures explicit %s transport from %s", (value, source, enabled) => {
 		const configure = vi.fn<(options: CursorConfigureOptions) => void>();
 
-		expect(configureCursorSdkHttp1(sdkWithConfigure(configure), setting(value, source))).toBe(value);
+		expect(configureCursorSdkHttp1(sdkWithConfigure(configure), setting(value, source))).toBe(enabled);
 		expect(configure).toHaveBeenCalledWith({
-			local: { useHttp1ForAgent: value },
+			local: { useHttp1ForAgent: enabled },
 		});
 	});
 
 	it("does not configure the SDK when the setting is unset", () => {
 		const configure = vi.fn<(options: CursorConfigureOptions) => void>();
 
-		expect(configureCursorSdkHttp1(sdkWithConfigure(configure), setting(false, "builtin"))).toBeUndefined();
+		expect(configureCursorSdkHttp1(sdkWithConfigure(configure), setting("default", "builtin"))).toBeUndefined();
 		expect(configure).not.toHaveBeenCalled();
 	});
 
@@ -80,8 +76,8 @@ describe("Cursor SDK HTTP/1.1 configuration", () => {
 		const configure = vi.fn<(options: CursorConfigureOptions) => void>();
 		const sdk = sdkWithConfigure(configure);
 
-		configureCursorSdkHttp1(sdk, setting(true, "session"));
-		expect(configureCursorSdkHttp1(sdk, setting(false, "builtin"))).toBeUndefined();
+		configureCursorSdkHttp1(sdk, setting("http1", "session"));
+		expect(configureCursorSdkHttp1(sdk, setting("default", "builtin"))).toBeUndefined();
 		expect(configure).toHaveBeenLastCalledWith({
 			local: { useHttp1ForAgent: null },
 		});

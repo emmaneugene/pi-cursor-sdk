@@ -46,9 +46,8 @@ import { __testUtils as cursorSessionResumeTestUtils } from "../../src/cursor-se
 import { __testUtils as cursorSessionLineageTestUtils } from "../../src/cursor-session-agent-lineage.js";
 import { __testUtils as cursorStateTestUtils } from "../../src/cursor-state.js";
 import { __testUtils as cursorHttp1TestUtils } from "../../src/cursor-http1.js";
-import { CURSOR_HTTP1_ENV } from "../../src/cursor-config.js";
 import { streamCursor, __testUtils as cursorProviderTestUtils } from "../../src/cursor-provider.js";
-import { registerCursorPiToolBridge, __testUtils as cursorPiToolBridgeTestUtils } from "../../src/cursor-pi-tool-bridge.js";
+import { registerCursorPiToolBridge, resolveCursorPiToolBridgeConfig, __testUtils as cursorPiToolBridgeTestUtils } from "../../src/cursor-pi-tool-bridge.js";
 import { __testUtils as modelDiscoveryTestUtils } from "../../src/model-discovery.js";
 import { __testUtils as nativeToolDisplayTestUtils } from "../../src/cursor-native-tool-display-state.js";
 import { registerCursorNativeToolDisplay } from "../../src/cursor-native-tool-display-registration.js";
@@ -139,9 +138,23 @@ export function textFromToolResultBlock(block: TextContent | ImageContent | unde
 	return block?.type === "text" ? block.text : "";
 }
 
-export function registerBridgeForProviderTest(options: { active: string[]; tools: ToolInfo[] }) {
+export function registerBridgeForProviderTest(options: {
+	active: string[];
+	tools: ToolInfo[];
+	enabled?: boolean;
+	exposeBuiltins?: boolean;
+	callTimeoutMs?: number;
+}) {
 	const pi = createBridgePiHarness(options);
-	registerCursorPiToolBridge(pi);
+	registerCursorPiToolBridge(pi, resolveCursorPiToolBridgeConfig({
+		tools: {
+			bridge: {
+				enabled: options.enabled,
+				exposeBuiltins: options.exposeBuiltins,
+				callTimeoutMs: options.callTimeoutMs,
+			},
+		},
+	}));
 	return { pi, runSessionShutdown: pi.runSessionShutdown.bind(pi) };
 }
 
@@ -371,7 +384,6 @@ export async function resetCursorProviderTestState(): Promise<void> {
 	delete process.env.PI_CURSOR_SANDBOX;
 	delete process.env.PI_CURSOR_LOCAL_FORCE;
 	delete process.env.PI_CURSOR_LOCAL_RESUME;
-	delete process.env[CURSOR_HTTP1_ENV];
 	process.env.PI_CURSOR_TOOL_MANIFEST = "0";
 	expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0);
 	cursorProviderTestUtils.resetCursorNativeReplayIdleDisposeMs();
