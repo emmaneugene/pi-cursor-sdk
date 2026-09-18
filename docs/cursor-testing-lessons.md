@@ -1,6 +1,6 @@
 # Cursor Testing Lessons
 
-> **Release evidence:** The current fork release evidence bar includes unit tests, typechecks, package dry run, a live print-mode Cursor run, and visual smoke. The Crabbox-backed cross-platform matrix is deferred under [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2). See [the deferred platform smoke runbook](./platform-smoke.md) for the retained implementation.
+> **Release evidence:** The current fork release evidence bar includes unit tests, typechecks, package dry run, a live print-mode Cursor run, and visual smoke.
 
 ## Purpose
 
@@ -262,10 +262,9 @@ Then use the [Cursor live smoke checklist](./cursor-live-smoke-checklist.md) for
 
 - **CI / default `npm test`:** mocked provider tests, extension lifecycle tests, JSONL validator tests, script syntax/help checks. No live Cursor calls.
 - **Current fork release evidence:** full unit tests, typechecks, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'`.
-- **Deferred platform matrix:** `npm run smoke:platform:all`, tracked in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2).
 - **Focused manual smoke:** `npm run smoke:isolated`, `npm run smoke:live`, and selected live-checklist sections for behavior mocks cannot reproduce.
 
-If Cursor auth is unavailable, report the release as **blocked**, not skipped-ready. Missing deferred platform infrastructure does not block the current fork evidence bar.
+If Cursor auth is unavailable, report the release as **blocked**, not skipped-ready.
 
 ## Cursor SDK event capture probe
 

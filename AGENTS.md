@@ -55,7 +55,6 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-usage-accounting.ts` owns pi usage mapping from local turn-ended and billed `Agent.getUsage()` spend, plus post-compaction occupancy floors.
 - `src/cursor-sdk-billed-usage.ts` owns `Agent.getUsage()` fetch, local usage-UUID watermarks, and billed turn selection.
 - `scripts/lib/cursor-smoke-env.mjs`, `scripts/lib/cursor-smoke-shell.sh`, and `scripts/lib/cursor-visual-render.mjs` own maintainer smoke PATH/env isolation and browser-rendered visual artifacts; smoke runners should consume these helpers instead of duplicating debug env names, sealed Node PATH logic, or xterm/Playwright rendering.
-- `scripts/platform-smoke/artifact-bundle-contract.mjs` owns the canonical platform artifact bundle path/size/shape contract; `scripts/platform-smoke/artifact-fs-safety.mjs` owns no-follow traversal, bounded reads, extraction preflight, and spill writes; `scripts/platform-smoke/artifact-anchored-extract.mjs` plus `artifact-openat-extract.c` own descriptor-relative POSIX extraction/rollback and fail-closed Windows-controller handling; `scripts/platform-smoke/artifact-secrets.mjs` owns bundle secret-scan/redaction; `scripts/platform-smoke/wrapped-line-match.mjs` owns terminal-wrap-aware line matching. Platform smoke scripts should consume these instead of duplicating fs-safety or redaction logic.
 - `src/cursor-tool-presentation-registry.ts` is the canonical typed registry for Cursor tool names, labels, visibility, lifecycle, replay metadata (legacy wrapper names, wrapper labels, side-effect policy, call-summary policy), web remapping, alias normalization, and bridge exclusions for internal replay wrappers only (`cursor`, `cursor_*`); sibling modules derive from it.
 - `src/cursor-transcript-tool-specs.ts` owns per-tool transcript formatters and pi display builders keyed by normalized tool name; its display implementation keys must match registry entries exactly (`CURSOR_TOOL_DISPLAY_SPEC_KEYS`).
 - `src/cursor-pi-tool-bridge-types.ts` owns shared bridge/MCP type contracts.
@@ -112,7 +111,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 ## Setup and commands
 
 - Install dependencies: `npm install` (runs `prepare`, which compiles `src/` into `dist/` — the manifest entry pi loads)
-- Build after editing `src/`: `npm run build` — required before any direct `pi -e .` run, or pi loads the previous build. The steering/local-resume/provider-debug launchers rebuild automatically (even when run directly with `node scripts/...`), `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts, and `smoke:platform*` builds inside its packed installs; only direct `pi -e .` runs need a manual build.
+- Build after editing `src/`: `npm run build` — required before any direct `pi -e .` run, or pi loads the previous build. The steering/local-resume/provider-debug launchers rebuild automatically (even when run directly with `node scripts/...`), `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; only direct `pi -e .` runs need a manual build.
 - Run tests: `npm test`
 - Typecheck (src + tests): `npm run typecheck`
 - Typecheck src only: `npm run typecheck:src`
@@ -156,7 +155,7 @@ If validation fails:
 
 Use a short written plan before multi-file behavior changes, SDK integration changes, or public UX changes. Use `PLANS.md` only if a task needs durable multi-session tracking; do not create one for routine edits.
 
-When plans, reviews, investigations, or generated smoke/debug artifacts are no longer the active source of truth, delete them or fold the durable facts into the current docs. Do not leave stale files under `docs/plans/`, `docs/reviews/`, `docs/investigations/`, `.artifacts/`, `.debug/`, `.crabbox/`, or similar local artifact directories once they are superseded.
+When plans, reviews, investigations, or generated smoke/debug artifacts are no longer the active source of truth, delete them or fold the durable facts into the current docs. Do not leave stale files under `docs/plans/`, `docs/reviews/`, `docs/investigations/`, `.artifacts/`, `.debug/`, or similar local artifact directories once they are superseded.
 
 ## Security and side effects
 
@@ -166,7 +165,7 @@ When plans, reviews, investigations, or generated smoke/debug artifacts are no l
 - Ambient Cursor settings/rules loading is enabled by default through `local.settingSources: ["all"]` in `~/.pi/agent/cursor-sdk.json`; keep SDK startup log filtering intact so settings/skills output does not corrupt pi's TUI. Users can narrow or disable Cursor setting sources in that file.
 - Live `pi`/Cursor smoke tests may call external services and require Cursor auth in `~/.pi/agent/auth.json` and/or `CURSOR_API_KEY`; run them for Cursor provider/runtime changes. If auth is unavailable, report live smoke as release-blocked instead of skipped-ready. See `docs/cursor-testing-lessons.md` for isolated harness auth seeding.
 - For live runtime evidence, use `cursor/grok-4.6` as much as needed.
-- For Cursor provider/runtime changes, the current fork release evidence bar is `npm test`, `npm run typecheck`, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'`; see `docs/cursor-live-smoke-checklist.md`. The three-OS Crabbox platform matrix is deferred in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) until the required macOS, Ubuntu, and Windows infrastructure exists. Do not treat `npm run smoke:platform:all` as a release blocker while that issue remains open.
+- For Cursor provider/runtime changes, the current fork release evidence bar is `npm test`, `npm run typecheck`, `npm pack --dry-run`, a live print-mode Cursor run, and `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'`; see `docs/cursor-live-smoke-checklist.md`.
 
 ## PR review workflow (maintainer)
 
@@ -189,9 +188,9 @@ Before publishing any npm/GitHub release or tagging release-ready status:
 
 Before **every commit** that touches Cursor provider/runtime, prompt/session send policy, agents-context dedup, bridge, replay, or related extension wiring:
 
-- Run the current fork release evidence checks: `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'` plus a live print-mode Cursor run. The deferred three-OS platform matrix is tracked in [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2).
+- Run the current fork release evidence checks: `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'` plus a live print-mode Cursor run.
 - Use `npm run smoke:live` (`scripts/tmux-live-smoke.sh`), `npm run smoke:isolated`, or direct `pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6` as optional focused helpers when narrowing a specific failure. For card/color claims, use the required `smoke:visual` command above, capture ANSI from the offscreen TUI, render it through the canonical browser/xterm path, save PNG evidence, and inspect JSONL.
-- If Cursor auth (`~/.pi/agent/auth.json` or `CURSOR_API_KEY`) is unavailable, **do not commit**—report live smoke as blocked, not skipped-ready. Missing deferred Crabbox/platform resources is tracked in issue #2 and does not block the current fork gate.
+- If Cursor auth (`~/.pi/agent/auth.json` or `CURSOR_API_KEY`) is unavailable, **do not commit**—report live smoke as blocked, not skipped-ready.
 - Unit tests (`npm test`, `npm run typecheck`) are necessary but not sufficient for these commits.
 
 ## Progress updates and handoff

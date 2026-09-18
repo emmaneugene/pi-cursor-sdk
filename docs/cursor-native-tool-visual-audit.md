@@ -1,6 +1,6 @@
 # Cursor Native Tool Visual Audit Workflow
 
-> **Release visual evidence:** `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'` is the current fork visual check. The deterministic cross-platform card matrix remains deferred under [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2); see [docs/platform-smoke.md](./platform-smoke.md) for the retained future contract.
+> **Release visual evidence:** `npm run smoke:visual -- --label release-check --prompt 'Read ./package.json and reply with its package name.'` is the current fork visual check.
 
 This workflow is the canonical repo path for verifying Cursor SDK tool replay the way a human sees it in pi's interactive TUI, without stealing macOS focus.
 
@@ -63,7 +63,7 @@ The canonical workflow is now offscreen and browser-rendered:
 5. Save PNG screenshots with `agent_browser` when the harness is available, or Playwright directly when running outside that harness.
 6. Inspect the session JSONL for exact persisted `toolCall` / `toolResult` data.
 
-This is the best default focused visual-debug path because it exercises the real pi TUI, captures card class/color/label/order/truncation issues before users see them, avoids desktop focus stealing, and leaves reviewable artifacts. Use visible Terminal/Ghostty screenshots only for terminal-specific or pixel-level bugs that cannot be judged through browser-rendered ANSI. The cross-platform matrix is retained as a future gate under [Platform Smoke](./platform-smoke.md) and issue #2.
+This is the best default focused visual-debug path because it exercises the real pi TUI, captures card class/color/label/order/truncation issues before users see them, avoids desktop focus stealing, and leaves reviewable artifacts. Use visible Terminal/Ghostty screenshots only for terminal-specific or pixel-level bugs that cannot be judged through browser-rendered ANSI.
 
 ## Tool stack
 

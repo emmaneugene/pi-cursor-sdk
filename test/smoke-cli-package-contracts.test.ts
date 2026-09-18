@@ -1,11 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
-import { LOCAL_RESUME_SUITES } from "../scripts/platform-smoke/local-resume-suites.mjs";
+import { LOCAL_RESUME_SUITES } from "../scripts/lib/local-resume-suites.mjs";
 
 function run(command: string, args: string[], env = process.env, cwd = process.cwd()) {
 	return spawnSync(command, args, { cwd, encoding: "utf8", env, shell: process.platform === "win32" && command === "npm" });
@@ -24,13 +21,9 @@ describe("smoke CLI and package contracts", () => {
 		expect(run(process.execPath, ["--check", "scripts/debug-sdk-events.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/debug-provider-events.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/local-resume-smoke.mjs"]).status).toBe(0);
+		expect(run(process.execPath, ["--check", "scripts/local-resume-cleanup-smoke.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/lib/local-resume-smoke-harness.mjs"]).status).toBe(0);
-		expect(run(process.execPath, ["--check", "scripts/platform-smoke.mjs"]).status).toBe(0);
-		expect(run(process.execPath, ["--check", "scripts/platform-smoke/doctor.mjs"]).status).toBe(0);
-		expect(run(process.execPath, ["--check", "scripts/platform-smoke/live-suite-runner.mjs"]).status).toBe(0);
-		expect(run(process.execPath, ["--check", "scripts/platform-smoke/local-resume-runner.mjs"]).status).toBe(0);
-		expect(run(process.execPath, ["--check", "scripts/platform-smoke/target-runtime.mjs"]).status).toBe(0);
-		expect(run(process.execPath, ["--check", "scripts/platform-smoke/targets.mjs"]).status).toBe(0);
+		expect(run(process.execPath, ["--check", "scripts/lib/local-resume-suites.mjs"]).status).toBe(0);
 
 		const liveHelp = process.platform === "win32" ? undefined : run("scripts/tmux-live-smoke.sh", ["--help"]);
 		const isolatedHelp = process.platform === "win32" ? undefined : run("scripts/isolated-cursor-smoke.sh", ["--help"]);
@@ -39,7 +32,6 @@ describe("smoke CLI and package contracts", () => {
 		const jsonlHelp = run(process.execPath, ["scripts/validate-smoke-jsonl.mjs", "--help"]);
 		const sdkEventsHelp = run(process.execPath, ["scripts/debug-sdk-events.mjs", "--help"]);
 		const providerEventsHelp = run(process.execPath, ["scripts/debug-provider-events.mjs", "--help"]);
-		const platformLiveHelp = run(process.execPath, ["scripts/platform-smoke/live-suite-runner.mjs", "--help"]);
 		const localResumeHelp = run(process.execPath, ["scripts/local-resume-smoke.mjs", "--help"]);
 
 		if (process.platform !== "win32") {
@@ -63,8 +55,6 @@ describe("smoke CLI and package contracts", () => {
 		expect(sdkEventsHelp.stdout).toContain("Capture timestamped Cursor SDK event timelines");
 		expect(providerEventsHelp.status).toBe(0);
 		expect(providerEventsHelp.stdout).toContain("Capture raw Cursor SDK onDelta/onStep payloads through pi's provider path");
-		expect(platformLiveHelp.status).toBe(0);
-		expect(platformLiveHelp.stdout).toContain("--prep-dir");
 		expect(localResumeHelp.status).toBe(0);
 		expect(localResumeHelp.stdout).toContain("smoke:local-resume");
 		expect(localResumeHelp.stdout).toContain("--safety");
@@ -163,50 +153,7 @@ describe("smoke CLI and package contracts", () => {
 		}
 	});
 
-	it("rejects invalid platform paid-run arguments before artifacts or target runners", () => {
-		const cwd = mkdtempSync(join(tmpdir(), "platform-smoke-cli-test-"));
-		const staleRun = join(cwd, ".artifacts", "platform-smoke", "run-1-stale");
-		const sentinel = join(staleRun, "sentinel.txt");
-		const loadedMarker = join(cwd, "targets-loaded.txt");
-		const loader = join(cwd, "load-observer.mjs");
-		mkdirSync(staleRun, { recursive: true });
-		writeFileSync(sentinel, "keep");
-		writeFileSync(loader, `import { appendFileSync } from "node:fs";\nexport async function load(url, context, nextLoad) {\n  if (url.endsWith("/scripts/platform-smoke/targets.mjs")) appendFileSync(${JSON.stringify(loadedMarker)}, url + "\\n");\n  return nextLoad(url, context);\n}\n`);
-		const script = join(process.cwd(), "scripts", "platform-smoke.mjs");
-		const cases = [
-			["run", "extra"],
-			["run", "--targt", "macos"],
-			["run", "--target"],
-			["run", "--suite"],
-			["run", "run"],
-			["run", "doctor"],
-			["run", "--target", "macos", "--target", "ubuntu"],
-			["run", "--target", "macos,macos"],
-			["run", "--target", "macos,"],
-			["run", "--suite", "platform-build", "--suite", "platform-build"],
-			["run", "--target", "plan9"],
-			["run", "--suite", "stdout-only"],
-			["doctor", "--target", "macos"],
-			["doctor", "--suite", "platform-build"],
-			["--target", "macos"],
-		];
-		try {
-			for (const args of cases) {
-				const result = run(process.execPath, ["--experimental-loader", pathToFileURL(loader).href, script, ...args], {
-					...process.env,
-					PLATFORM_SMOKE_CRABBOX: process.execPath,
-				}, cwd);
-				expect(result.status, args.join(" ")).toBe(2);
-				expect(result.stderr).toContain("usage error:");
-				expect(existsSync(sentinel), args.join(" ")).toBe(true);
-				expect(existsSync(loadedMarker), args.join(" ")).toBe(false);
-			}
-		} finally {
-			rmSync(cwd, { recursive: true, force: true });
-		}
-	}, 20_000);
-
-	it("uses the platform local-resume suite manifest for CLI lane metadata", () => {
+	it("uses one local-resume suite manifest for CLI lane metadata", () => {
 		expect(LOCAL_RESUME_SUITES.map(({ key, flag, script }) => ({ key, flag, script }))).toEqual([
 			{ key: "restart", flag: undefined, script: "smoke:local-resume" },
 			{ key: "safety", flag: "--safety", script: "smoke:local-resume:safety" },
@@ -219,35 +166,9 @@ describe("smoke CLI and package contracts", () => {
 			{ key: "defaultDryRun", flag: "--default-dry-run", script: "smoke:local-resume:default-dry-run" },
 			{ key: "cleanup", flag: "--cleanup", script: "smoke:local-resume:cleanup" },
 		]);
-		const runbook = readFileSync("docs/platform-smoke.md", "utf8");
-		for (const { suite } of LOCAL_RESUME_SUITES) expect(runbook).toContain(`run ${suite}`);
 	});
 
-	it("preserves local-resume target command construction in its focused runner", () => {
-		const code = String.raw`
-import { buildLocalResumeSuiteCommand } from "./scripts/platform-smoke/local-resume-runner.mjs";
-const prepDir = ".platform-smoke-runs/local-resume-prep-1783794405965-windows-native";
-const posix = buildLocalResumeSuiteCommand("ubuntu", "smoke:local-resume:safety", prepDir, "pi-cursor-sdk", "cursor-local-resume-safety");
-const windowsCommand = buildLocalResumeSuiteCommand("windows-native", "smoke:local-resume:cleanup", prepDir, "pi-cursor-sdk", "cursor-local-resume-cleanup");
-const encoded = windowsCommand.split(" -EncodedCommand ")[1];
-const windows = encoded ? Buffer.from(encoded, "base64").toString("utf16le") : "";
-const result = { posix, windowsCommand, windows };
-console.log(JSON.stringify(result));
-for (const command of [posix, windows]) {
-  if (!command.includes("--prepare-only") || !command.includes("packed-workspace") || !command.includes("CURSOR_LOCAL_RESUME_SMOKE_EXTENSION_PATH") || !command.includes("CURSOR_LOCAL_RESUME_SMOKE_EMIT_BUNDLE")) process.exit(1);
-  if (command.includes(" -e .") || command.includes("npm ci && npm run smoke:local-resume")) process.exit(1);
-}
-if (!posix.includes("npm run smoke:local-resume:safety")) process.exit(1);
-if (!windowsCommand.startsWith("powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand ") || windowsCommand.includes("$") || windowsCommand.length >= 2400) process.exit(1);
-if (!windows.includes("npm run smoke:local-resume:cleanup") || !windows.includes("/lr") || windows.includes("local-resume-cursor-local-resume-cleanup")) process.exit(1);
-if (!windows.includes("for($i=0;$i -lt 10") || !windows.includes("$w=$e.Replace('/','\\')") || !windows.includes("cmd.exe /d /c rd /s /q $w") || !windows.includes("Start-Sleep -Milliseconds 200") || !windows.includes("local-resume evidence cleanup failed") || windows.includes("SilentlyContinue")) process.exit(1);
-`;
-		const result = run(process.execPath, ["--input-type=module", "-e", code]);
-		expect(result.status).toBe(0);
-		expect(result.stdout).toContain('"posix":"node scripts/platform-smoke/live-suite-runner.mjs --prepare-only');
-	});
-
-	it("packages smoke scripts and platform smoke docs", () => {
+	it("packages maintainer smoke scripts", () => {
 		const result = run("npm", ["pack", "--dry-run", "--json"]);
 		expect(result.status).toBe(0);
 		const [pack] = JSON.parse(result.stdout) as Array<{ name: string; version: string; files: Array<{ path: string }> }>;
@@ -262,12 +183,6 @@ if (!windows.includes("for($i=0;$i -lt 10") || !windows.includes("$w=$e.Replace(
 		expect(paths.has("scripts/validate-smoke-jsonl.mjs")).toBe(true);
 		expect(paths.has("scripts/debug-sdk-events.mjs")).toBe(true);
 		expect(paths.has("scripts/debug-provider-events.mjs")).toBe(true);
-		expect(paths.has("platform-smoke.config.mjs")).toBe(true);
-		expect(paths.has("scripts/platform-smoke/artifact-bundle-chunk.mjs")).toBe(true);
-		expect(paths.has("scripts/platform-smoke/live-suite-runner.mjs")).toBe(true);
-		expect(paths.has("scripts/platform-smoke/local-resume-runner.mjs")).toBe(true);
-		expect(paths.has("scripts/platform-smoke/target-runtime.mjs")).toBe(true);
-		expect(paths.has("scripts/platform-smoke/visual-evidence.mjs")).toBe(true);
 		for (const path of paths) {
 			if (!path.endsWith(".mjs")) continue;
 			const declarationPath = path.replace(/\.mjs$/, ".d.mts");
@@ -278,6 +193,8 @@ if (!windows.includes("for($i=0;$i -lt 10") || !windows.includes("$w=$e.Replace(
 		expect(paths.has("shared/cursor-sensitive-text.mjs")).toBe(true);
 		expect(paths.has("shared/cursor-sensitive-text.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/local-resume-smoke-harness.mjs")).toBe(true);
+		expect(paths.has("scripts/lib/local-resume-suites.mjs")).toBe(true);
+		expect(paths.has("scripts/lib/local-resume-suites.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/cursor-smoke-env.mjs")).toBe(true);
 		expect(paths.has("scripts/lib/cursor-smoke-env.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/cursor-smoke-shell.sh")).toBe(true);
@@ -290,7 +207,6 @@ if (!windows.includes("for($i=0;$i -lt 10") || !windows.includes("$w=$e.Replace(
 		expect(paths.has("scripts/lib/cursor-cli-args.mjs")).toBe(true);
 		expect(paths.has("CHANGELOG.md")).toBe(true);
 		expect(paths.has("README.md")).toBe(true);
-		expect(paths.has("docs/platform-smoke.md")).toBe(true);
 		expect(paths.has("dist/index.js")).toBe(true);
 		// pi silently drops manifest entries whose file is missing; assert the
 		// manifest target exists on disk after the pack-triggered build.

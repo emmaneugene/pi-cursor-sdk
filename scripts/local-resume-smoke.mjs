@@ -28,8 +28,7 @@ import {
 } from "./lib/local-resume-smoke-harness.mjs";
 import { ensureBuilt } from "./lib/ensure-built.mjs";
 import { runCleanupSmoke } from "./local-resume-cleanup-smoke.mjs";
-import { writePlatformArtifactBundle } from "./platform-smoke/artifacts.mjs";
-import { LOCAL_RESUME_SUITES } from "./platform-smoke/local-resume-suites.mjs";
+import { LOCAL_RESUME_SUITES } from "./lib/local-resume-suites.mjs";
 
 export { buildLocalResumeSmokeEnv };
 
@@ -49,8 +48,8 @@ Environment:
   CURSOR_LOCAL_RESUME_SMOKE_MODEL          Canonical Cursor model id (default: cursor/grok-4.6; smoke forces fast off).
   CURSOR_LOCAL_RESUME_SMOKE_TIMEOUT_MS     Timeout in ms per model turn (default: 300000).
   CURSOR_LOCAL_RESUME_SMOKE_KEEP_ARTIFACTS Keep temp artifacts when set to 1.
-  CURSOR_LOCAL_RESUME_SMOKE_EXTENSION_PATH Packed extension path override (platform runner only).
-  CURSOR_LOCAL_RESUME_SMOKE_ARTIFACT_DIR   Fixed artifact root (platform runner only).
+  CURSOR_LOCAL_RESUME_SMOKE_EXTENSION_PATH Extension package path override.
+  CURSOR_LOCAL_RESUME_SMOKE_ARTIFACT_DIR   Fixed artifact root override.
 
 Exit codes:
   0  local resume proof passed
@@ -630,15 +629,8 @@ function selectedRun() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
 	ensureBuilt();
 	const run = selectedRun();
-	run()
-		.catch((error) => {
-			reportFailure(error);
-			process.exitCode = 1;
-		})
-		.finally(() => {
-			const artifactRoot = process.env.CURSOR_LOCAL_RESUME_SMOKE_ARTIFACT_DIR;
-			if (artifactRoot && process.env.CURSOR_LOCAL_RESUME_SMOKE_EMIT_BUNDLE === "1") {
-				writePlatformArtifactBundle(artifactRoot, "local-resume-evidence");
-			}
-		});
+	run().catch((error) => {
+		reportFailure(error);
+		process.exitCode = 1;
+	});
 }

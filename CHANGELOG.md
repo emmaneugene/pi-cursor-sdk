@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Remove the deferred Crabbox platform-smoke matrix and retain the host-local live, visual, and local-resume smoke checks.
+
 ## 0.5.1 - 2026-09-13
 
 ### Breaking changes

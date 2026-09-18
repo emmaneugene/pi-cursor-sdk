@@ -422,8 +422,6 @@ For Cursor provider/runtime changes, the current fork release evidence bar is:
 
 The visual smoke captures an offscreen PTY, renders it through browser/xterm, and saves PNG screenshots with Playwright or `agent_browser`. Its default matrix is native replay only: native replay registration is forced on, Cursor setting sources are disabled, the pi bridge is off, overlapping built-in pi tools are not exposed, and inherited Cursor SDK event-debug artifact env is cleared. The visible TUI/output, rendered screenshots, scrubbed diagnostics, and persisted JSONL must agree. See [Cursor live smoke checklist](docs/cursor-live-smoke-checklist.md) and [Cursor testing lessons](docs/cursor-testing-lessons.md).
 
-The Crabbox-backed macOS, Ubuntu, and Windows native platform matrix is deferred. Issue [#2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2) tracks the infrastructure and evidence needed to reintroduce it as a release gate.
-
 ### Maintainer Cursor SDK event capture
 
 Use `npm run debug:sdk-events` to capture timestamped `run.stream()`, `onDelta`, and `onStep` timelines for one direct `@cursor/sdk` run.

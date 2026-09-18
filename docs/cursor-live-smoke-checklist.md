@@ -1,6 +1,6 @@
 # Cursor Live Smoke Checklist
 
-> **Release evidence:** This checklist is part of the current fork release evidence bar. The Crabbox-backed cross-platform matrix is deferred under [issue #2](https://github.com/emmaneugene/pi-cursor-sdk/issues/2). See [docs/platform-smoke.md](./platform-smoke.md) for the retained future matrix.
+> **Release evidence:** This checklist is part of the current fork release evidence bar. The project uses host-local live and visual smoke tests.
 
 ## Purpose
 
@@ -13,7 +13,7 @@ Use this checklist for live provider/runtime evidence. Unit tests and mocks are 
 - Use the local extension under test: `pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6`. `-ne` keeps a host `pi install` of this package from colliding with `-e .`.
 - Use a temporary `--session-dir` for every run.
 - Do not paste or commit Cursor API keys, raw session contents with secrets, endpoint URLs, or local private paths.
-- If a live check fails, stop and fix it. Do not treat the deferred platform matrix as a current release blocker.
+- If a live check fails, stop and fix it.
 - Match focused live checks to the changed surface. Provider reality, TUI behavior, bridge behavior, replay behavior, diagnostics safety, abort/cancel cleanup, usage accounting, packaging, and cleanup each need targeted evidence when the change touches them.
 - A check is passed only when the visible TUI/output, stderr diagnostics, and persisted JSONL agree with the expected behavior.
 
@@ -323,7 +323,7 @@ Pass criteria:
 
 ## 9. Long-running bridge and abort/cancel
 
-Use this focused check when debugging abort cleanup. The current fork release evidence bar is documented at the top of this checklist; the platform matrix is deferred under issue #2.
+Use this focused check when debugging abort cleanup. The current fork release evidence bar is documented at the top of this checklist.
 
 Use a harmless long-running command and interrupt it after the bridge request is queued:
 
