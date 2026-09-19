@@ -61,7 +61,7 @@ import {
 	getGrepBody,
 	getLsBody,
 	getShellOutput,
-	usesLocalReadPreview,
+	resolveReadContent,
 } from "./cursor-transcript-tool-formatters.js";
 export interface ToolDisplayContext {
 	rawName: string;
@@ -304,16 +304,24 @@ const TOOL_DISPLAY_IMPLEMENTATIONS: Record<CursorNormalizedToolName, ToolDisplay
 	read: {
 		formatTranscript: ({ args, result, options }) => formatRead(args, result, options),
 		buildPiToolDisplay: ({ args, result, options }) => {
-			const isError = result.status === "error";
-			const usesLocalPreview = !isError && usesLocalReadPreview(args, result, options);
+			if (result.status === "error") {
+				return {
+					toolName: "read",
+					args: buildReadDisplayArgs(args, options),
+					result: textToolResult(formatError(result.error)),
+					isError: true,
+				};
+			}
+			const resolved = resolveReadContent(args, result, options);
+			const isLocalPreview = resolved.source === "local-preview";
 			return {
 				toolName: "read",
-				args: buildReadDisplayArgs(args, options, result),
+				args: buildReadDisplayArgs(args, options, isLocalPreview),
 				result: textToolResult(
-					isError ? formatError(result.error) : formatNativeReadDisplayContent(args, result, options),
-					usesLocalPreview ? { localReadPreview: true } : undefined,
+					formatNativeReadDisplayContent(resolved, options),
+					isLocalPreview ? { localReadPreview: true } : undefined,
 				),
-				isError,
+				isError: false,
 			};
 		},
 	},

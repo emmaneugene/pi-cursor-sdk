@@ -38,34 +38,53 @@ import {
 	type TranscriptOptions,
 } from "./cursor-transcript-utils.js";
 
-export function usesLocalReadPreview(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): boolean {
-	if (result.status === "error") return false;
-	const value = asRecord(result.value);
-	const resultContent = getString(value, "content");
-	if (resultContent && resultContent.length > 0) return false;
-	const rawPath = typeof args.path === "string" ? args.path : undefined;
-	if (!rawPath) return false;
-	const readOptions = {
-		...options,
-		maxChars: options.maxChars ?? DEFAULT_READ_TRANSCRIPT_CHARS,
-		maxLines: options.maxLines ?? DEFAULT_READ_TRANSCRIPT_LINES,
-	};
-	return readFilePreview(rawPath, readOptions) !== undefined;
+export type ResolvedReadContent = {
+	source: "result" | "local-preview";
+	text: string;
+	totalLines?: number;
+};
+
+function readMaxChars(options: TranscriptOptions): number {
+	return options.maxChars ?? DEFAULT_READ_TRANSCRIPT_CHARS;
 }
 
-function getReadContent(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {
-	const rawPath = typeof args.path === "string" ? args.path : undefined;
-	const readOptions = {
+function readLimitOptions(
+	options: TranscriptOptions,
+	defaultMaxLines: number,
+): TranscriptOptions & Required<Pick<TranscriptOptions, "maxChars" | "maxLines">> {
+	return {
 		...options,
-		maxChars: options.maxChars ?? DEFAULT_READ_TRANSCRIPT_CHARS,
-		maxLines: options.maxLines ?? DEFAULT_READ_TRANSCRIPT_LINES,
+		maxChars: readMaxChars(options),
+		maxLines: options.maxLines ?? defaultMaxLines,
 	};
+}
+
+export function resolveReadContent(
+	args: Record<string, unknown>,
+	result: NormalizedResult,
+	options: TranscriptOptions,
+): ResolvedReadContent {
 	const value = asRecord(result.value);
+	const totalLines = getNumber(value, "totalLines");
 	const resultContent = getString(value, "content");
-	if (resultContent && resultContent.length > 0) return resultContent;
-	if (!rawPath) return stringifyUnknown(result.value);
-	const localPreview = readFilePreview(rawPath, readOptions);
-	return localPreview ? `${LOCAL_READ_PREVIEW_NOTICE}\n${localPreview}` : stringifyUnknown(result.value);
+	if (resultContent && resultContent.length > 0) return { source: "result", text: resultContent, totalLines };
+
+	const rawPath = typeof args.path === "string" ? args.path : undefined;
+	if (rawPath) {
+		const localPreview = readFilePreview(rawPath, {
+			...options,
+			maxChars: readMaxChars(options),
+		});
+		if (localPreview !== undefined) {
+			const previewText = localPreview.trimEnd();
+			return {
+				source: "local-preview",
+				text: previewText ? `${LOCAL_READ_PREVIEW_NOTICE}\n${previewText}` : LOCAL_READ_PREVIEW_NOTICE,
+				totalLines: totalLines === undefined ? undefined : totalLines + 1,
+			};
+		}
+	}
+	return { source: "result", text: stringifyUnknown(result.value), totalLines };
 }
 
 export function formatRead(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {
@@ -73,27 +92,19 @@ export function formatRead(args: Record<string, unknown>, result: NormalizedResu
 	const path = rawPath ? formatDisplayPath(rawPath, options.cwd) : "unknown";
 	if (result.status === "error") return joinSections(`read ${path}`, formatError(result.error));
 
-	const value = asRecord(result.value);
-	const totalLines = getNumber(value, "totalLines");
-	const readOptions = {
-		...options,
-		maxChars: options.maxChars ?? DEFAULT_READ_TRANSCRIPT_CHARS,
-		maxLines: options.maxLines ?? DEFAULT_READ_TRANSCRIPT_LINES,
-	};
-	return joinSections(`read ${path}`, limitText(getReadContent(args, result, options), readOptions, totalLines));
+	const resolved = resolveReadContent(args, result, options);
+	const readOptions = readLimitOptions(options, DEFAULT_READ_TRANSCRIPT_LINES);
+	return joinSections(`read ${path}`, limitText(resolved.text, readOptions, resolved.totalLines));
 }
 
 export function buildReadDisplayArgs(
 	args: Record<string, unknown>,
 	options: TranscriptOptions,
-	result?: NormalizedResult,
+	localReadPreview = false,
 ): Record<string, unknown> {
 	const rawPath = typeof args.path === "string" ? args.path : undefined;
 	const displayArgs = rawPath ? { ...args, path: formatDisplayPath(rawPath, options.cwd) } : args;
-	if (result && usesLocalReadPreview(args, result, options)) {
-		return { ...displayArgs, localReadPreview: true };
-	}
-	return displayArgs;
+	return localReadPreview ? { ...displayArgs, localReadPreview: true } : displayArgs;
 }
 
 function buildPathDisplayArgs(args: Record<string, unknown>, options: TranscriptOptions): Record<string, unknown> {
@@ -173,23 +184,22 @@ export function buildCursorEditActivityDisplayArgs(args: Record<string, unknown>
 	return rawPath ? { ...args, path: formatDisplayPath(rawPath, options.cwd) } : args;
 }
 
-export function formatNativeReadDisplayContent(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {
-	const value = asRecord(result.value);
-	const totalLines = getNumber(value, "totalLines");
-	const readOptions = {
-		...options,
-		maxChars: options.maxChars ?? DEFAULT_READ_TRANSCRIPT_CHARS,
-		maxLines: options.maxLines ?? DEFAULT_NATIVE_READ_DISPLAY_LINES,
-	};
-	const content = getReadContent(args, result, readOptions);
-	if (totalLines === undefined) return limitText(content, readOptions);
+export function formatNativeReadDisplayContent(resolved: ResolvedReadContent, options: TranscriptOptions): string {
+	const readOptions = readLimitOptions(options, DEFAULT_NATIVE_READ_DISPLAY_LINES);
+	if (resolved.totalLines === undefined) return limitText(resolved.text, readOptions);
 
-	const maxLines = readOptions.maxLines ?? DEFAULT_NATIVE_READ_DISPLAY_LINES;
-	const lines = content.split("\n");
-	const visible = lines.slice(0, maxLines).join("\n");
-	if (totalLines <= maxLines && lines.length <= maxLines) return visible;
-	if (visible.length > (readOptions.maxChars ?? DEFAULT_READ_TRANSCRIPT_CHARS)) return limitText(content, readOptions, totalLines);
-	return `${visible}\n\n[${Math.max(totalLines - maxLines, 0)} more lines in file. Use offset=${maxLines + 1} to continue.]`;
+	const maxLines = readOptions.maxLines;
+	const lines = resolved.text.split("\n");
+	const visibleLines = lines.slice(0, maxLines);
+	const visible = visibleLines.join("\n");
+	if (resolved.totalLines <= maxLines && lines.length <= maxLines) return visible;
+	if (visible.length > readOptions.maxChars) {
+		return limitText(resolved.text, readOptions, resolved.totalLines);
+	}
+	const previewNoticeLines = resolved.source === "local-preview" ? 1 : 0;
+	const visibleFileLines = Math.max(visibleLines.length - previewNoticeLines, 0);
+	const totalFileLines = Math.max(resolved.totalLines - previewNoticeLines, 0);
+	return `${visible}\n\n[${Math.max(totalFileLines - visibleFileLines, 0)} more lines in file. Use offset=${visibleFileLines + 1} to continue.]`;
 }
 
 export function getShellOutput(result: NormalizedResult, args: Record<string, unknown> = {}): { text: string; exitCode: number | undefined; timedOut: boolean } {

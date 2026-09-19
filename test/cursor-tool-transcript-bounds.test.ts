@@ -145,6 +145,28 @@ describe("formatCursorToolTranscript bounds and aliases", () => {
 		);
 	});
 
+	it("counts the local-preview notice separately from file continuation lines", () => {
+		const dir = mkdtempSync(join(tmpdir(), "cursor-tool-transcript-"));
+		try {
+			const content = Array.from({ length: 25 }, (_, index) => `line ${index + 1}`).join("\n");
+			writeFileSync(join(dir, "README.md"), content);
+			const display = buildCursorPiToolDisplay(
+				{
+					name: "read",
+					args: { path: join(dir, "README.md") },
+					result: { status: "success", value: { content: "", totalLines: 25, fileSize: content.length } },
+				},
+				{ cwd: dir },
+			);
+
+			expect(display.result.content[0].text).toBe(
+				`[local file preview at transcript time; Cursor read result content was unavailable]\n${Array.from({ length: 19 }, (_, index) => `line ${index + 1}`).join("\n")}\n\n[6 more lines in file. Use offset=20 to continue.]`,
+			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it("builds native pi grep display data for Cursor grep calls and find display data for Cursor glob calls", () => {
 		const grepDisplay = buildCursorPiToolDisplay({
 			type: "grep",

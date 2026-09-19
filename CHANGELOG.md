@@ -6,6 +6,7 @@
 
 - Remove the deferred Crabbox platform-smoke matrix and retain the host-local live, visual, and local-resume smoke checks.
 - Remove unused internal exports, bridge indexes, native-replay state, and test-only compatibility surfaces.
+- Resolve read fallback content once per transcript or display build, including consistent empty-file previews.
 
 ## 0.5.1 - 2026-09-13
 

@@ -8,17 +8,6 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Ranked recommendations
 
-### 3. Compute the read preview once (S09)
-
-- **Verdict:** recommend
-- **Evidence:** `src/cursor-transcript-tool-formatters.ts:53` tests `readFilePreview(...) !== undefined`; `:67` tests truthiness; `:93` calls `usesLocalReadPreview` again; `src/cursor-transcript-tool-specs.ts:308` calls `usesLocalReadPreview` then `buildReadDisplayArgs`.
-- **Current complexity:** up to three synchronous file reads per card. An empty local file sets preview metadata (`"" !== undefined`) but renders the SDK result (`""` is falsy).
-- **Proposed representation:** resolve once into `{ source: "sdk" | "local-preview" | "fallback"; text; totalLines? }` and derive transcript text, native content, args, and `localReadPreview` details from it. Remove `usesLocalReadPreview`. ≈ −10 to −20 lines.
-- **Scope:** `src/cursor-transcript-tool-formatters.ts`, `src/cursor-transcript-tool-specs.ts`. No public change.
-- **Risks:** preserve read limits, continuation text, sensitive-path rejection, symlink containment. Decide the empty-file behavior explicitly.
-- **Validation:** `test/cursor-tool-transcript-read.test.ts`, `test/cursor-tool-transcript-bounds.test.ts`; add an empty-file case.
-- **Confidence:** high
-
 ### 4. Smoke env: one native-display option, string-only resume mode (S14 + S15 scenarios)
 
 - **Verdict:** recommend
@@ -119,8 +108,7 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Best next slices (one small PR each)
 
-1. #3 read preview computed once (two files).
-2. #4 smoke env option collapse (scripts + two tests).
+1. #4 smoke env option collapse (scripts + two tests).
 
 ## Cross-cutting patterns
 
@@ -141,7 +129,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S06 | Turn coordinator, normalization | `cursor-provider-turn-{coordinator,shell-output,tool-ledger,sdk-normalizer,display-router,lifecycle-emitter}.ts`, `cursor-tool-lifecycle.ts`, `cursor-partial-content-emitter.ts`, `cursor-incomplete-tool-visibility.ts`, `cursor-display-only-trace.ts` | recommend (#9) |
 | S07 | Session agents, resume, store, scope | `cursor-session-agent*.ts`, `cursor-session-store.ts`, `cursor-session-scope.ts`, `cursor-session-compaction-prep.ts`, `cursor-session-send-policy.ts`, `cursor-session-turn-queue.ts`, `cursor-durable-fs.ts`, `cursor-sdk-platform-package.ts` | recommend (#6); pool slot-map demoted |
 | S08 | Live run coordinator, drain, routing | `cursor-live-run-coordinator.ts`, `cursor-provider-live-run-drain.ts`, `cursor-live-run-accounting.ts`, `cursor-native-replay-routing.ts` | **skip** — a `running/finished/cancelled/error` union would add 40–80 lines and touch out-of-boundary mutators |
-| S09 | Tool registry, transcript formatting | `cursor-tool-presentation-registry.ts`, `cursor-transcript-*.ts`, `cursor-tool-transcript.ts`, `cursor-tool-result-display-readers.ts`, `cursor-tool-visibility.ts`, `cursor-native-tool-names.ts`, `cursor-display-text.ts`, `cursor-record-utils.ts`, `cursor-edit-diff.ts`, `cursor-compact-tool-summary.ts`, `cursor-web-tool-*.ts`, `cursor-agent-message-web-tools.ts`, `cursor-replay-source-names.ts` | recommend (#3) |
+| S09 | Tool registry, transcript formatting | `cursor-tool-presentation-registry.ts`, `cursor-transcript-*.ts`, `cursor-tool-transcript.ts`, `cursor-tool-result-display-readers.ts`, `cursor-tool-visibility.ts`, `cursor-native-tool-names.ts`, `cursor-display-text.ts`, `cursor-record-utils.ts`, `cursor-edit-diff.ts`, `cursor-compact-tool-summary.ts`, `cursor-web-tool-*.ts`, `cursor-agent-message-web-tools.ts`, `cursor-replay-source-names.ts` | read preview consolidated |
 | S10 | Native replay cards | `cursor-native-tool-display-*.ts`, `cursor-native-replay-trace.ts`, `cursor-replay-{activity-builders,summary-args,tool-details}.ts` | recommend (#11) |
 | S11 | Pi tool bridge | `cursor-pi-tool-bridge*.ts` | dead surface removed |
 | S12 | Usage accounting | `cursor-usage-accounting.ts`, `cursor-sdk-billed-usage.ts` | guard merge demoted |

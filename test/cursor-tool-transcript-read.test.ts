@@ -78,6 +78,28 @@ describe("formatCursorToolTranscript read and shell", () => {
 		}
 	});
 
+	it("uses one local preview decision for an empty file", () => {
+		const dir = mkdtempSync(join(tmpdir(), "cursor-tool-transcript-"));
+		try {
+			writeFileSync(join(dir, "empty.txt"), "");
+			const toolCall = {
+				name: "read",
+				args: { path: join(dir, "empty.txt") },
+				result: { status: "success" as const, value: { content: "", totalLines: 0, fileSize: 0 } },
+			};
+
+			const transcript = formatCursorToolTranscript(toolCall, { cwd: dir });
+			const display = buildCursorPiToolDisplay(toolCall, { cwd: dir });
+
+			expect(transcript).toContain("[local file preview at transcript time; Cursor read result content was unavailable]");
+			expect(display.args).toEqual({ path: "empty.txt", localReadPreview: true });
+			expect(display.result.details).toEqual({ localReadPreview: true });
+			expect(display.result.content[0].text).toBe("[local file preview at transcript time; Cursor read result content was unavailable]");
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it("does not fill empty Cursor read results from sensitive or out-of-workspace files", () => {
 		const dir = mkdtempSync(join(tmpdir(), "cursor-tool-transcript-"));
 		const outsideDir = mkdtempSync(join(tmpdir(), "cursor-tool-transcript-outside-"));
@@ -101,9 +123,19 @@ describe("formatCursorToolTranscript read and shell", () => {
 				},
 				{ cwd: dir },
 			);
+			const sensitiveDisplay = buildCursorPiToolDisplay(
+				{
+					name: "read",
+					args: { path: join(dir, ".env") },
+					result: { status: "success", value: { content: "", totalLines: 1, fileSize: 20 } },
+				},
+				{ cwd: dir },
+			);
 
 			expect(sensitiveTranscript).not.toContain("do-not-show");
 			expect(outsideTranscript).not.toContain("outside content");
+			expect(sensitiveDisplay.args).not.toHaveProperty("localReadPreview");
+			expect(sensitiveDisplay.result.details).toBeUndefined();
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 			rmSync(outsideDir, { recursive: true, force: true });
