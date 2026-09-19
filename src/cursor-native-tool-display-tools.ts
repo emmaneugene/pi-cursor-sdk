@@ -11,14 +11,9 @@ import {
 import { Text } from "@earendil-works/pi-tui";
 import type { TSchema } from "typebox";
 import { getCursorSessionCwd } from "./cursor-session-scope.js";
-import {
-	BUILTIN_NATIVE_CURSOR_TOOL_NAMES,
-	CURSOR_MODEL_ACTIVE_REPLAY_TOOL_NAMES,
-	CURSOR_REPLAY_TOOL_NAMES,
-	isNativeCursorToolName,
-	NATIVE_CURSOR_TOOL_NAMES,
-	type BuiltinNativeCursorToolName,
-	type NativeCursorToolName,
+import type {
+	BuiltinNativeCursorToolName,
+	NativeCursorToolName,
 } from "./cursor-native-tool-names.js";
 import { isCursorReplayToolName } from "./cursor-tool-presentation-registry.js";
 import {
@@ -218,5 +213,3 @@ export function registerNativeCursorTool(
 	const definition = createNativeCursorToolDefinition(toolName, getCursorSessionCwd());
 	pi.registerTool(wrapNativeCursorTool(definition, () => createNativeCursorToolDefinition(toolName, getCursorSessionCwd())));
 }
-
-export { CURSOR_MODEL_ACTIVE_REPLAY_TOOL_NAMES, CURSOR_REPLAY_TOOL_NAMES };

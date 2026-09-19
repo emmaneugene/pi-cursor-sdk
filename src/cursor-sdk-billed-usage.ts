@@ -20,11 +20,11 @@ export function sumCursorSdkTurnUsage(usages: readonly CursorSdkTurnUsage[]): Cu
 	);
 }
 
-export function peekCursorBilledUsageRunIds(agentId: string): ReadonlySet<string> {
+function peekCursorBilledUsageRunIds(agentId: string): ReadonlySet<string> {
 	return seenBilledRunIdsByAgent.get(agentId) ?? new Set();
 }
 
-export function rememberCursorBilledUsageRunIds(agentId: string, runIds: readonly string[]): void {
+function rememberCursorBilledUsageRunIds(agentId: string, runIds: readonly string[]): void {
 	if (runIds.length === 0) return;
 	let seen = seenBilledRunIdsByAgent.get(agentId);
 	if (!seen) {

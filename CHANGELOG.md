@@ -5,6 +5,7 @@
 ### Changed
 
 - Remove the deferred Crabbox platform-smoke matrix and retain the host-local live, visual, and local-resume smoke checks.
+- Remove unused internal exports, bridge indexes, native-replay state, and test-only compatibility surfaces.
 
 ## 0.5.1 - 2026-09-13
 

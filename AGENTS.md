@@ -58,7 +58,6 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-tool-presentation-registry.ts` is the canonical typed registry for Cursor tool names, labels, visibility, lifecycle, replay metadata (legacy wrapper names, wrapper labels, side-effect policy, call-summary policy), web remapping, alias normalization, and bridge exclusions for internal replay wrappers only (`cursor`, `cursor_*`); sibling modules derive from it.
 - `src/cursor-transcript-tool-specs.ts` owns per-tool transcript formatters and pi display builders keyed by normalized tool name; its display implementation keys must match registry entries exactly (`CURSOR_TOOL_DISPLAY_SPEC_KEYS`).
 - `src/cursor-pi-tool-bridge-types.ts` owns shared bridge/MCP type contracts.
-- `src/cursor-env-boolean.ts` owns canonical env boolean parsing (default and tri-state optional) for leftover CLI/internal flags.
 - `src/cursor-live-run-coordinator.ts` owns live Cursor run registry/scope matching, queued events, drain leases, idle disposal timers, and release cleanup.
 - `src/cursor-pi-tool-bridge.ts` re-exports bridge registration and snapshot helpers; exposes active pi tools through owner and nested-child loopback MCP bridge registries without cross-session shutdown.
 - `src/cursor-pi-tool-bridge-snapshot.ts` owns bridge snapshot building and surface signatures.
@@ -86,7 +85,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-state.ts` owns Cursor fast/mode controls, `/cursor-http` session/user persistence, `/cursor-tools`, local config refresh/cleanup wiring, and stable state re-exports.
 - `src/cursor-runtime-state.ts` owns effective Cursor runtime status helpers.
 - `src/context.ts`, `src/context-window-cache.ts`, and `src/bundled-context-windows.ts` handle prompt conversion and context-window caches.
-- `src/cursor-bridge-contract.ts` owns pi bridge MCP description helpers and the exported full bridge contract text (bootstrap/manifest carry the user-facing contract; MCP descriptions use a one-line pointer).
+- `src/cursor-bridge-contract.ts` owns pi bridge naming, preference text, and MCP description helpers.
 - `src/cursor-tool-manifest.ts` owns bootstrap callable-surface manifest text (`tools.manifest`, default on).
 - `test/**/*.test.ts` contains Vitest coverage for provider registration, discovery, state, context, bridge, replay, and streaming behavior.
 - `test/helpers/pi-harness.ts` is the canonical fake pi/extension harness (`createPiHarness`, shared model/context/event runners, tool factories).

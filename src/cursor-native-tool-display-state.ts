@@ -12,7 +12,7 @@ export const nativeToolResults = new Map<string, CursorNativeToolDisplayItem>();
 
 let nativeToolDisplayRuntimeRequested = false;
 
-export function isCursorNativeToolDisplayRequested(mode?: string, config: CursorSdkConfig = loadCursorSdkUserConfig()): boolean {
+function isCursorNativeToolDisplayRequested(mode?: string, config: CursorSdkConfig = loadCursorSdkUserConfig()): boolean {
 	const setting = config.tools?.display?.native ?? "auto";
 	if (setting === "on") return true;
 	if (setting === "off") return false;
@@ -28,19 +28,11 @@ export function setCursorNativeToolDisplayRuntimeRequested(requested: boolean): 
 	nativeToolDisplayRuntimeRequested = requested;
 }
 
-export function isCursorNativeToolDisplayEnabled(): boolean {
-	return registeredNativeToolNames.size > 0;
-}
-
 export function isCursorNativeToolDisplayRuntimeEnabled(): boolean {
 	return nativeToolDisplayRuntimeRequested && registeredNativeToolNames.size > 0;
 }
 
 export function canRenderCursorToolNatively(toolName: string): boolean {
-	return registeredNativeToolNames.has(toolName);
-}
-
-export function isRegisteredCursorNativeToolName(toolName: string): boolean {
 	return registeredNativeToolNames.has(toolName);
 }
 
@@ -62,10 +54,6 @@ export function consumeCursorNativeToolDisplay(id: string): CursorNativeToolDisp
 
 export function isCursorReplayToolCallId(toolCallId: string): boolean {
 	return toolCallId.startsWith("cursor-replay-");
-}
-
-export function isCursorFileMutationToolName(toolName: string): toolName is "edit" | "write" {
-	return toolName === "edit" || toolName === "write";
 }
 
 export const __testUtils = {

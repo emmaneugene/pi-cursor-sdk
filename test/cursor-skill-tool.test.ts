@@ -124,7 +124,12 @@ describe("registerCursorSkillTool", () => {
 
 		expect(result?.systemPrompt).toContain(CURSOR_ACTIVATE_SKILL_MCP_NAME);
 		expect(pi._activeToolNames()).toContain(CURSOR_ACTIVATE_SKILL_TOOL_NAME);
-		expect(buildCursorPiToolBridgeSnapshot(pi).piToolNameToMcpToolName.get(CURSOR_ACTIVATE_SKILL_TOOL_NAME)).toBe(CURSOR_ACTIVATE_SKILL_MCP_NAME);
+		expect(buildCursorPiToolBridgeSnapshot(pi).tools).toContainEqual(
+			expect.objectContaining({
+				piToolName: CURSOR_ACTIVATE_SKILL_TOOL_NAME,
+				mcpToolName: CURSOR_ACTIVATE_SKILL_MCP_NAME,
+			}),
+		);
 
 		const tool = getHarnessRegisteredTool(pi._tools, CURSOR_ACTIVATE_SKILL_TOOL_NAME);
 		const toolResult = await tool.execute("call-1", { name: "global-skill" }, undefined, undefined, createExtensionTestContext({ model: makeModel("composer-2.5"), cwd: dir }));
@@ -157,7 +162,12 @@ describe("registerCursorSkillTool", () => {
 		await pi.runTurnStart({ model, cwd: "/repo" });
 
 		expect(pi._activeToolNames()).toContain(CURSOR_ACTIVATE_SKILL_TOOL_NAME);
-		expect(buildCursorPiToolBridgeSnapshot(pi).piToolNameToMcpToolName.get(CURSOR_ACTIVATE_SKILL_TOOL_NAME)).toBe(CURSOR_ACTIVATE_SKILL_MCP_NAME);
+		expect(buildCursorPiToolBridgeSnapshot(pi).tools).toContainEqual(
+			expect.objectContaining({
+				piToolName: CURSOR_ACTIVATE_SKILL_TOOL_NAME,
+				mcpToolName: CURSOR_ACTIVATE_SKILL_MCP_NAME,
+			}),
+		);
 	});
 
 	it("does not expose the activation tool when no visible skills are available", async () => {

@@ -2,14 +2,12 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { arePiToolsDisabled } from "./cursor-active-tools.js";
 import {
 	CURSOR_MODEL_ACTIVE_REPLAY_TOOL_NAMES,
-	isNativeCursorToolName,
 	NATIVE_CURSOR_TOOL_NAMES,
 	type NativeCursorToolName,
 } from "./cursor-native-tool-names.js";
 import { isCursorModel } from "./cursor-model.js";
 import { registerCursorModelLifecycle, type CursorModelLifecycleExtensionApi } from "./cursor-model-lifecycle.js";
 import {
-	isCursorNativeToolDisplayRequested,
 	isCursorNativeToolRegistrationRequested,
 	registeredNativeToolNames,
 	setCursorNativeToolDisplayRuntimeRequested,
@@ -19,7 +17,7 @@ import { isCursorReplayToolName } from "./cursor-tool-presentation-registry.js";
 import { loadCursorSdkUserConfig } from "./cursor-config.js";
 import { registerNativeCursorTool } from "./cursor-native-tool-display-tools.js";
 
-export const CURSOR_CORE_PI_REPLAY_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
+const CURSOR_CORE_PI_REPLAY_TOOL_NAMES = ["read", "bash", "edit", "write"] as const;
 const CORE_PI_TOOL_NAMES = new Set<string>(CURSOR_CORE_PI_REPLAY_TOOL_NAMES);
 
 function isCursorCorePiReplayToolName(toolName: string): toolName is (typeof CURSOR_CORE_PI_REPLAY_TOOL_NAMES)[number] {
@@ -130,5 +128,3 @@ export function registerCursorNativeToolDisplay(pi: CursorNativeToolDisplayExten
 		ensureThenSyncNativeCursorToolsForModel(pi, ctx);
 	});
 }
-
-export { isNativeCursorToolName, isCursorNativeToolDisplayRequested };

@@ -48,7 +48,6 @@ export class CursorTurnDisplayRouter {
 	private readonly contentEmitter: CursorPartialContentEmitter;
 	private readonly debugRecorder?: CursorSdkEventDebugRecorder;
 	private nativeToolDisplayCounter = 0;
-	nativeToolReplayStarted = false;
 	planTextCandidate: string | undefined;
 
 	constructor(options: CursorTurnDisplayRouterOptions) {
@@ -79,7 +78,6 @@ export class CursorTurnDisplayRouter {
 		});
 
 		if (disposition === "queue_replay" && this.liveRun) {
-			this.nativeToolReplayStarted = true;
 			const id = `${this.nativeReplayId}-tool-${++this.nativeToolDisplayCounter}`;
 			const scrubbedDisplay = scrubPiToolDisplay(display, this.resolvedApiKey);
 			this.recordDisplayDecision({
@@ -126,7 +124,6 @@ export class CursorTurnDisplayRouter {
 		});
 
 		if (disposition === "queue_replay" && this.liveRun && reason !== "abort") {
-			this.nativeToolReplayStarted = true;
 			const id = `${this.nativeReplayId}-tool-${++this.nativeToolDisplayCounter}`;
 			this.recordDisplayDecision({
 				action: "queue_replay",

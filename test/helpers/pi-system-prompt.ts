@@ -1,12 +1,8 @@
 import type { BuildSystemPromptOptions } from "@earendil-works/pi-coding-agent";
 import {
-	PI_PROJECT_INSTRUCTIONS_OPEN_PREFIX,
 	serializePiProjectContextSection,
-	serializePiProjectInstructionsBlock,
 	type PiAgentsContextFile,
 } from "../../src/cursor-agents-context.js";
-
-export { PI_PROJECT_INSTRUCTIONS_OPEN_PREFIX, serializePiProjectContextSection, serializePiProjectInstructionsBlock };
 
 export function makeSystemPromptOptions(
 	contextFiles: PiAgentsContextFile[],

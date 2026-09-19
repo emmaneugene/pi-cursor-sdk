@@ -90,7 +90,7 @@ function getCursorSdkUncachedInputTokens(turnUsage: CursorSdkTurnUsage): number 
 	return turnUsage.inputTokens - turnUsage.cacheReadTokens - turnUsage.cacheWriteTokens;
 }
 
-export function isCursorSdkUsagePartitionSafe(turnUsage: CursorSdkTurnUsage, model: Model<Api>): boolean {
+function isCursorSdkUsagePartitionSafe(turnUsage: CursorSdkTurnUsage, model: Model<Api>): boolean {
 	const counts = [turnUsage.inputTokens, turnUsage.outputTokens, turnUsage.cacheReadTokens, turnUsage.cacheWriteTokens];
 	const uncachedInput = getCursorSdkUncachedInputTokens(turnUsage);
 	return (
@@ -113,7 +113,7 @@ export interface CursorSdkUsageApplyOptions {
 	billed?: CursorSdkTurnUsage;
 }
 
-export function applyCursorSdkUsage(partial: AssistantMessage, turnUsage: CursorSdkTurnUsage): void {
+function applyCursorSdkUsage(partial: AssistantMessage, turnUsage: CursorSdkTurnUsage): void {
 	// Pi treats input/cacheRead/cacheWrite as disjoint additive prompt components.
 	partial.usage.input = getCursorSdkUncachedInputTokens(turnUsage);
 	partial.usage.output = turnUsage.outputTokens;

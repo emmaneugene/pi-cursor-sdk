@@ -248,11 +248,3 @@ export function registerCursorSkillTool(pi: CursorSkillToolExtensionApi): void {
 		},
 	});
 }
-
-export const __testUtils = {
-	AVAILABLE_SKILLS_SECTION_PATTERN,
-	buildActivationDetails,
-	setCurrentSkills,
-	listSkillResourcePaths,
-	wrapSkillContent,
-};

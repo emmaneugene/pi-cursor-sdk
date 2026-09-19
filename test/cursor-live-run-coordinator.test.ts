@@ -7,7 +7,6 @@ import {
 	hasTrailingUserMessagesAfterToolResults,
 	type CursorLiveRun,
 } from "../src/cursor-live-run-coordinator.js";
-import type { CursorNativeToolDisplayItem } from "../src/cursor-native-tool-display-state.js";
 import type { CursorPiToolBridgeRun } from "../src/cursor-pi-tool-bridge.js";
 import {
 	cursorLiveRuns,
@@ -17,16 +16,6 @@ import { __testUtils as cursorSdkProcessGuardTestUtils } from "../src/cursor-sdk
 
 function makeAgent(agentId = "agent-1"): SDKAgent {
 	return { agentId } as SDKAgent;
-}
-
-function makeToolDisplay(id: string): CursorNativeToolDisplayItem {
-	return {
-		id,
-		toolName: "read",
-		args: { path: "README.md" },
-		result: { content: [{ type: "text", text: "ok" }] },
-		isError: false,
-	};
 }
 
 function makeCursorSdkAbortConnectError(): Error & { rawMessage: string; code: number; cause: DOMException } {
@@ -52,7 +41,7 @@ function makeBridgeRun(id: string, pendingPiToolCallIds: string[] = []): CursorP
 	return {
 		id,
 		enabled: true,
-		snapshot: { tools: [], mcpToolNameToPiToolName: new Map(), piToolNameToMcpToolName: new Map() },
+		snapshot: { tools: [], mcpToolNameToPiToolName: new Map() },
 		takeQueuedToolRequests: vi.fn(() => []),
 		resolveToolResults: vi.fn().mockResolvedValue(undefined),
 		resolveToolResultsFromContext: vi.fn().mockResolvedValue(undefined),

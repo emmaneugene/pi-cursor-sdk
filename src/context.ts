@@ -363,14 +363,6 @@ export function shouldBootstrapCursorContext(
 	return false;
 }
 
-/** @deprecated Use planCursorSessionSend() for send mode and shouldBootstrapCursorContext() for context-only checks. */
-export function shouldBootstrapCursorSend(
-	sendState: { bootstrapped: boolean; contextFingerprint: string },
-	context: Context,
-): boolean {
-	return shouldBootstrapCursorContext(sendState, context);
-}
-
 export function buildCursorIncrementalPrompt(context: Context, options: CursorPromptOptions = {}): CursorPrompt {
 	// Incremental sends omit Pi system instructions and the full tool boundary; the session agent retains both from bootstrap.
 	const messages = normalizePiContextMessages(context.messages);

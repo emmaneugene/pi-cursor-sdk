@@ -66,8 +66,6 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 	private readonly knownCursorMcpCallIds = new Set<string>();
 	private readonly queuedRequests: CursorPiBridgeToolRequest[] = [];
 	private readonly pendingByPiToolCallId = new Map<string, PendingBridgeCall>();
-	private readonly pendingByBridgeCallId = new Map<string, PendingBridgeCall>();
-	private readonly pendingByCursorMcpCallId = new Map<string, PendingBridgeCall>();
 	private onToolRequest?: (request: CursorPiBridgeToolRequest) => void;
 	private debugRecorder: CursorPiToolBridgeRunOptions["debugRecorder"];
 	private liveRunHandlerDetached = false;
@@ -226,7 +224,7 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 			});
 		}
 		this.queuedRequests.splice(0);
-		for (const pending of [...this.pendingByBridgeCallId.values()]) {
+		for (const pending of [...this.pendingByPiToolCallId.values()]) {
 			this.rejectAndAbortPending(pending, error, "cancelled");
 		}
 	}
@@ -307,8 +305,6 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 			}
 			signal?.addEventListener("abort", pending.onAbort, { once: true });
 			this.pendingByPiToolCallId.set(request.piToolCallId, pending);
-			this.pendingByBridgeCallId.set(request.bridgeCallId, pending);
-			this.pendingByCursorMcpCallId.set(cursorMcpCallId, pending);
 			this.knownCursorMcpCallIds.add(cursorMcpCallId);
 			pending.timeout = setTimeout(() => {
 				const reason = `Cursor pi bridge CallTool timed out after ${this.callTimeoutMs} ms`;
@@ -422,15 +418,13 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 	}
 
 	private pendingCount(): number {
-		return this.pendingByBridgeCallId.size;
+		return this.pendingByPiToolCallId.size;
 	}
 
 	private removePending(pending: PendingBridgeCall): void {
 		if (pending.onAbort) pending.signal?.removeEventListener("abort", pending.onAbort);
 		if (pending.timeout) clearTimeout(pending.timeout);
 		this.pendingByPiToolCallId.delete(pending.request.piToolCallId);
-		this.pendingByBridgeCallId.delete(pending.request.bridgeCallId);
-		if (pending.request.cursorMcpCallId) this.pendingByCursorMcpCallId.delete(pending.request.cursorMcpCallId);
 		const queuedIndex = this.queuedRequests.findIndex((request) => request.bridgeCallId === pending.request.bridgeCallId);
 		if (queuedIndex >= 0) this.queuedRequests.splice(queuedIndex, 1);
 	}

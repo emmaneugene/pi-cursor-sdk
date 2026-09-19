@@ -5,7 +5,7 @@ import type {
 	CursorPiToolBridgeSnapshotOptions,
 } from "./cursor-pi-tool-bridge-types.js";
 import { createMcpToolName, normalizeMcpInputSchema, stableNameHash } from "./cursor-pi-tool-bridge-mcp.js";
-import { isRegisteredCursorNativeToolName } from "./cursor-native-tool-display-state.js";
+import { canRenderCursorToolNatively } from "./cursor-native-tool-display-state.js";
 import { isExcludedFromCursorBridgeExposure } from "./cursor-tool-presentation-registry.js";
 
 const OVERLAPPING_CURSOR_NATIVE_PI_BUILTIN_TOOL_NAMES = new Set(["read", "bash", "write", "edit", "grep", "find", "ls"]);
@@ -14,7 +14,6 @@ export function createEmptySnapshot(): CursorPiToolBridgeSnapshot {
 	return {
 		tools: [],
 		mcpToolNameToPiToolName: new Map(),
-		piToolNameToMcpToolName: new Map(),
 	};
 }
 
@@ -50,7 +49,6 @@ export function buildCursorPiToolBridgeSnapshot(
 	const allTools = pi.getAllTools();
 	const usedMcpToolNames = new Set<string>();
 	const mcpToolNameToPiToolName = new Map<string, string>();
-	const piToolNameToMcpToolName = new Map<string, string>();
 	const tools: CursorPiBridgeToolDefinition[] = [];
 
 	const exposeOverlappingBuiltins = options.exposeOverlappingBuiltins === true;
@@ -58,13 +56,12 @@ export function buildCursorPiToolBridgeSnapshot(
 	for (const tool of allTools) {
 		if (!activeToolNames.has(tool.name)) continue;
 		if (options.excludedToolNames?.has(tool.name)) continue;
-		if (isExcludedFromCursorBridgeExposure(tool.name) && isRegisteredCursorNativeToolName(tool.name)) continue;
+		if (isExcludedFromCursorBridgeExposure(tool.name) && canRenderCursorToolNatively(tool.name)) continue;
 		if (!exposeOverlappingBuiltins && isOverlappingCursorNativePiToolName(tool.name)) continue;
 
 		const mcpToolName = createMcpToolName(tool.name, usedMcpToolNames);
 		const description = tool.description || `Run pi tool ${tool.name}`;
 		mcpToolNameToPiToolName.set(mcpToolName, tool.name);
-		piToolNameToMcpToolName.set(tool.name, mcpToolName);
 		tools.push({
 			piToolName: tool.name,
 			mcpToolName,
@@ -75,5 +72,5 @@ export function buildCursorPiToolBridgeSnapshot(
 		});
 	}
 
-	return { tools, mcpToolNameToPiToolName, piToolNameToMcpToolName };
+	return { tools, mcpToolNameToPiToolName };
 }

@@ -18,10 +18,8 @@ import { getNormalizedCursorToolName } from "./cursor-tool-visibility.js";
 import { buildCursorPiToolDisplay } from "./cursor-tool-transcript.js";
 import { getField } from "./cursor-record-utils.js";
 import { CursorTurnDisplayRouter } from "./cursor-provider-turn-display-router.js";
-import {
-	createTurnCoordinatorContentEmitter,
-	CursorToolLifecycleEmitter,
-} from "./cursor-provider-turn-lifecycle-emitter.js";
+import { CursorPartialContentEmitter } from "./cursor-partial-content-emitter.js";
+import { CursorToolLifecycleEmitter } from "./cursor-provider-turn-lifecycle-emitter.js";
 import { resolveCursorToolCompletion } from "./cursor-provider-turn-sdk-normalizer.js";
 import {
 	CursorShellOutputTracker,
@@ -49,15 +47,10 @@ export interface CursorSdkTurnCoordinatorOptions {
 }
 
 export class CursorSdkTurnCoordinator {
-	readonly stream: AssistantMessageEventStream;
-	readonly partial: AssistantMessage;
-	readonly cwd: string;
-	readonly resolvedApiKey?: string;
-	readonly liveRun?: CursorLiveRun;
-	readonly useNativeToolReplay: boolean;
-	readonly activeToolNames?: ReadonlySet<string>;
-	readonly nativeReplayId: string;
-	readonly textDeltas: string[];
+	private readonly cwd: string;
+	private readonly resolvedApiKey?: string;
+	private readonly liveRun?: CursorLiveRun;
+	private readonly textDeltas: string[];
 
 	private readonly debugRecorder?: CursorSdkEventDebugRecorder;
 	private readonly ledger = new CursorToolCompletionLedger();
@@ -68,17 +61,13 @@ export class CursorSdkTurnCoordinator {
 	private sdkTurnUsage?: CursorSdkTurnUsage;
 
 	constructor(options: CursorSdkTurnCoordinatorOptions) {
-		this.stream = options.stream;
-		this.partial = options.partial;
 		this.cwd = options.cwd;
 		this.resolvedApiKey = options.resolvedApiKey;
 		this.liveRun = options.liveRun;
-		this.useNativeToolReplay = options.useNativeToolReplay;
-		this.activeToolNames = options.activeToolNames;
-		this.nativeReplayId = options.nativeReplayId;
 		this.textDeltas = options.textDeltas;
 		this.debugRecorder = options.debugRecorder;
-		this.contentEmitter = createTurnCoordinatorContentEmitter(options.stream, options.partial);
+		const mutuallyExclusiveContent = false;
+		this.contentEmitter = new CursorPartialContentEmitter(options.stream, options.partial, undefined, mutuallyExclusiveContent);
 		this.displayRouter = new CursorTurnDisplayRouter({
 			cwd: options.cwd,
 			resolvedApiKey: options.resolvedApiKey,
@@ -101,10 +90,6 @@ export class CursorSdkTurnCoordinator {
 
 	get planTextCandidate(): string | undefined {
 		return this.displayRouter.planTextCandidate;
-	}
-
-	get replayStarted(): boolean {
-		return this.displayRouter.nativeToolReplayStarted;
 	}
 
 	get lastSdkTurnUsage(): CursorSdkTurnUsage | undefined {

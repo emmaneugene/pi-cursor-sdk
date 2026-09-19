@@ -2,13 +2,6 @@ import type { AssistantMessage, AssistantMessageEventStream } from "@earendil-wo
 
 const DEFAULT_THINKING_TRACE_MAX_CHARS = 50000;
 
-export interface CursorPartialContentEmitterOptions {
-	stream: AssistantMessageEventStream;
-	partial: AssistantMessage;
-	thinkingMaxChars?: number;
-	mutuallyExclusive?: boolean;
-}
-
 export class CursorPartialContentEmitter {
 	private thinkingContentIndex = -1;
 	private textContentIndex = -1;

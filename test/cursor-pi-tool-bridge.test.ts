@@ -140,7 +140,6 @@ describe("cursor pi tool bridge flags and snapshots", () => {
 		expect(snapshot.tools.map((tool) => tool.piToolName)).toEqual(["custom_read", "sem_reindex"]);
 		expect(snapshot.tools.map((tool) => tool.mcpToolName)).toEqual(["pi__custom_read", "pi__sem_reindex"]);
 		expect(snapshot.mcpToolNameToPiToolName.get("pi__custom_read")).toBe("custom_read");
-		expect(snapshot.piToolNameToMcpToolName.get("sem_reindex")).toBe("pi__sem_reindex");
 		expect(snapshot.tools[0].description).toBe("Custom read files");
 		expect(snapshot.tools[0].inputSchema).toBe(readParameters);
 		expect(snapshot.tools[1].inputSchema).toBe(dynamicParameters);

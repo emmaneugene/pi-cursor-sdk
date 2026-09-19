@@ -1,7 +1,6 @@
-import type { AssistantMessage, AssistantMessageEventStream } from "@earendil-works/pi-ai";
 import type { CursorLiveRun } from "./cursor-live-run-coordinator.js";
 import { cursorLiveRuns } from "./cursor-provider-live-run-drain.js";
-import { CursorPartialContentEmitter } from "./cursor-partial-content-emitter.js";
+import type { CursorPartialContentEmitter } from "./cursor-partial-content-emitter.js";
 import type { CursorSdkEventDebugRecorder } from "./cursor-sdk-event-debug.js";
 import {
 	CURSOR_TOOL_LIFECYCLE_DEFER_MS,
@@ -140,11 +139,4 @@ export class CursorToolLifecycleEmitter {
 		}
 		this.contentEmitter.appendThinkingDelta(progressText);
 	}
-}
-
-export function createTurnCoordinatorContentEmitter(
-	stream: AssistantMessageEventStream,
-	partial: AssistantMessage,
-): CursorPartialContentEmitter {
-	return new CursorPartialContentEmitter(stream, partial, undefined, false);
 }

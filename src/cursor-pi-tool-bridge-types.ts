@@ -38,7 +38,6 @@ export interface CursorPiBridgeToolDefinition {
 export interface CursorPiToolBridgeSnapshot {
 	tools: CursorPiBridgeToolDefinition[];
 	mcpToolNameToPiToolName: ReadonlyMap<string, string>;
-	piToolNameToMcpToolName: ReadonlyMap<string, string>;
 }
 
 export interface CursorPiToolBridgeSnapshotOptions {

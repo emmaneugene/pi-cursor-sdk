@@ -20,7 +20,6 @@ describe("cursor-tool-manifest", () => {
 					},
 				],
 				mcpToolNameToPiToolName: new Map([["pi__sem_reindex", "sem_reindex"]]),
-				piToolNameToMcpToolName: new Map([["sem_reindex", "pi__sem_reindex"]]),
 			},
 		});
 
@@ -46,7 +45,6 @@ describe("cursor-tool-manifest", () => {
 					},
 				],
 				mcpToolNameToPiToolName: new Map(),
-				piToolNameToMcpToolName: new Map(),
 			},
 		});
 
@@ -65,7 +63,7 @@ describe("cursor-tool-manifest", () => {
 
 	it("distinguishes disabled bridge from empty exposure", () => {
 		const disabled = buildCursorToolManifestText({ piBridgeEnabled: false });
-		const empty = buildCursorToolManifestText({ piBridgeEnabled: true, bridgeSnapshot: { tools: [], mcpToolNameToPiToolName: new Map(), piToolNameToMcpToolName: new Map() } });
+		const empty = buildCursorToolManifestText({ piBridgeEnabled: true, bridgeSnapshot: { tools: [], mcpToolNameToPiToolName: new Map() } });
 		expect(disabled).toContain("disabled");
 		expect(empty).toContain("no pi__* tools exposed");
 	});
