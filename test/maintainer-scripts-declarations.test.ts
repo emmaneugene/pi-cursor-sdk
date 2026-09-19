@@ -246,7 +246,7 @@ const _commonFlags: Record<string, unknown> = commonProbeFlags;
 const _readArgvValue: string = readArgvValue(["--model", "cursor"], 1, "--model", createScriptFail("test"));
 const _parsedArgv: Record<string, unknown> = parseArgv([], { defaults: {}, flags: {}, fail: createScriptFail("test") });
 const _sealedNodePath: string = sealedNodePath("/usr/local/bin/node", "/tmp/bin");
-const _smokeEnv: Record<string, string | undefined> = buildCursorSmokeEnv({ settingSources: "none", nativeToolDisplay: true });
+const _smokeEnv: Record<string, string | undefined> = buildCursorSmokeEnv({ settingSources: "none", nativeDisplay: "on" });
 const _smokeEnvPlan: { envEntries: Array<[string, string]> } = buildCursorSmokeEnvPlan({ settingSources: "none" });
 const _terminalHtml: string = buildTerminalHtml({
 	ansi: "ok",

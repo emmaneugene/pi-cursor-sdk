@@ -20,8 +20,7 @@ export declare function writeCursorSdkEventDebugUserConfig(
 ): string;
 export interface CursorSmokeUserConfigOptions {
 	settingSources?: string | null;
-	nativeToolDisplay?: boolean;
-	registerNativeTools?: boolean;
+	nativeDisplay?: "on" | "off";
 	bridge?: boolean;
 	exposeBuiltinTools?: boolean;
 	bridgeDebug?: boolean;

@@ -164,8 +164,7 @@ function buildPiRpcEnv(baseEnv = process.env, nodePath = process.execPath, agent
 		baseEnv,
 		nodePath,
 		settingSources: "none",
-		nativeToolDisplay: true,
-		registerNativeTools: true,
+		nativeDisplay: "on",
 		bridge: false,
 		agentDir,
 	});

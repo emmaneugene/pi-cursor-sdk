@@ -8,17 +8,6 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Ranked recommendations
 
-### 4. Smoke env: one native-display option, string-only resume mode (S14 + S15 scenarios)
-
-- **Verdict:** recommend
-- **Evidence:** `scripts/lib/cursor-smoke-env.mjs:117-123` merges `nativeToolDisplay` and `registerNativeTools` (any `false` wins) into one JSON key `tools.display.native`; every caller sets both to the same value (`scripts/lib/local-resume-smoke-harness.mjs:115-116`, `scripts/visual-tui-smoke.mjs:421-422`). `scripts/lib/local-resume-smoke-harness.mjs:103-107` coerces a `boolean` alias for `localResumeEnv` where `false` means `"unset"`, not `"off"`; no caller passes a boolean (`scripts/local-resume-smoke.mjs:562,574,591`).
-- **Current complexity:** two independent booleans permit the untested `true`+`false` pair; the names mirror retired env vars. The boolean union cannot express `"off"` vs `"unset"`.
-- **Proposed representation:** `nativeDisplay?: "on" | "off"`; `localResumeEnv?: "on" | "off" | "unset"`. ≈ −27 lines.
-- **Scope:** `scripts/lib/cursor-smoke-env.mjs` + `.d.mts`, `scripts/lib/local-resume-smoke-harness.mjs`, `scripts/local-resume-smoke.d.mts`, `scripts/visual-tui-smoke.mjs`, `test/maintainer-scripts-lib.test.ts`, `test/maintainer-scripts-declarations.test.ts`.
-- **Risks:** out-of-repo callers passing booleans; none in repo.
-- **Validation:** `test/maintainer-scripts-lib.test.ts`, `test/maintainer-scripts-declarations.test.ts`.
-- **Confidence:** medium-high
-
 ### 5. Turn pipeline dead plumbing (S05 + S06 merged)
 
 - **Verdict:** recommend
@@ -108,12 +97,12 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Best next slices (one small PR each)
 
-1. #4 smoke env option collapse (scripts + two tests).
+1. #5 turn pipeline dead plumbing.
 
 ## Cross-cutting patterns
 
 1. One entity, several containers: prepared-turn aliases, six lifecycle maps, five pool collections, and 13 counter fields.
-2. Compatibility shapes remain in legacy cleanup IDs and the boolean smoke-env alias.
+2. Compatibility shapes remain in legacy cleanup IDs.
 3. The generated model snapshot remains large relative to its runtime projection.
 4. `AGENTS.md` map drift (see #13).
 
@@ -134,7 +123,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S11 | Pi tool bridge | `cursor-pi-tool-bridge*.ts` | dead surface removed |
 | S12 | Usage accounting | `cursor-usage-accounting.ts`, `cursor-sdk-billed-usage.ts` | guard merge demoted |
 | S13 | Debug artifacts, output filter, scrubbing | `cursor-sdk-event-debug*.ts`, `shared/cursor-sdk-event-debug-env.*`, `cursor-sdk-output-filter.ts`, `shared/cursor-sdk-output-filter.*`, `cursor-sensitive-text.ts`, `shared/cursor-sensitive-text.*` | recommend (#10); allocation union rejected; output filter and scrubbing clean |
-| S14 | Maintainer smoke scripts | `scripts/*.mjs`, `scripts/*.sh`, `scripts/lib/*` (except `ensure-built.mjs`), `scripts/fixtures/*`, `.d.mts` siblings | recommend ×2 (#4); no unused entrypoints |
+| S14 | Maintainer smoke scripts | `scripts/*.mjs`, `scripts/*.sh`, `scripts/lib/*` (except `ensure-built.mjs`), `scripts/fixtures/*`, `.d.mts` siblings | smoke env options consolidated; no unused entrypoints |
 | S16 | Build, packaging, test helpers | `scripts/build.mjs`, `scripts/prepare.mjs`, `scripts/lib/ensure-built.mjs`, `package.json`, `tsconfig*.json`, `vitest.config.ts`, `test/helpers/*`, `test/fixtures/*` | recommend (#12); build race-safety removal rejected; harnesses compose, no unused fixtures |
 | S17 | Docs and `AGENTS.md` map | `AGENTS.md`, `README.md`, `docs/**` | recommend (#13) |
 

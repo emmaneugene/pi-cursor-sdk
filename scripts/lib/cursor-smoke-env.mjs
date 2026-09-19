@@ -94,8 +94,7 @@ export function writeCursorSdkEventDebugUserConfig(agentDir, sdkEvents = { enabl
 
 export function buildCursorSmokeUserConfig({
 	settingSources,
-	nativeToolDisplay,
-	registerNativeTools,
+	nativeDisplay,
 	bridge,
 	exposeBuiltinTools,
 	bridgeDebug,
@@ -114,13 +113,8 @@ export function buildCursorSmokeUserConfig({
 	if (transport !== undefined) {
 		config.local = { ...config.local, transport };
 	}
-	if (nativeToolDisplay !== undefined || registerNativeTools !== undefined) {
-		const native = nativeToolDisplay === false || registerNativeTools === false
-			? "off"
-			: nativeToolDisplay === true || registerNativeTools === true
-				? "on"
-				: undefined;
-		if (native) config.tools = { ...config.tools, display: { native } };
+	if (nativeDisplay !== undefined) {
+		config.tools = { ...config.tools, display: { native: nativeDisplay } };
 	}
 	if (bridge !== undefined || exposeBuiltinTools !== undefined || bridgeDebug !== undefined || bridgeDebugFile !== undefined) {
 		config.tools = {
@@ -149,8 +143,7 @@ export function buildCursorSmokeEnv({
 	baseEnv = process.env,
 	nodePath = process.execPath,
 	settingSources,
-	nativeToolDisplay,
-	registerNativeTools,
+	nativeDisplay,
 	bridge,
 	exposeBuiltinTools,
 	bridgeDebug,
@@ -167,8 +160,7 @@ export function buildCursorSmokeEnv({
 	if (agentDir) {
 		writeCursorSdkUserConfig(agentDir, buildCursorSmokeUserConfig({
 			settingSources,
-			nativeToolDisplay,
-			registerNativeTools,
+			nativeDisplay,
 			bridge,
 			exposeBuiltinTools,
 			bridgeDebug,

@@ -37,6 +37,7 @@ import {
 } from "../shared/cursor-setting-sources.mjs";
 import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
 import { createScriptFail } from "../scripts/lib/cursor-script-fail.mjs";
+import { buildLocalResumeSmokeEnv } from "../scripts/local-resume-smoke.mjs";
 
 function processExists(pid: number): boolean {
 	try {
@@ -127,8 +128,7 @@ describe("maintainer scripts shared lib", () => {
 				},
 				nodePath: "/opt/node/bin/node",
 				settingSources: "none",
-				nativeToolDisplay: true,
-				registerNativeTools: true,
+				nativeDisplay: "on",
 				bridge: false,
 				exposeBuiltinTools: false,
 				agentDir,
@@ -149,6 +149,9 @@ describe("maintainer scripts shared lib", () => {
 					bridge: { enabled: false, exposeBuiltins: false },
 				},
 			});
+			buildCursorSmokeEnv({ baseEnv: { PATH: "/usr/bin" }, nativeDisplay: "off", agentDir });
+			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8")).tools.display).toEqual({ native: "off" });
+
 			const withBridgeDebug = buildCursorSmokeEnv({
 				baseEnv: { PATH: "/usr/bin" },
 				nodePath: "/opt/node/bin/node",
@@ -197,6 +200,22 @@ describe("maintainer scripts shared lib", () => {
 		});
 		expect(plan.envEntries).toEqual([]);
 		expect(plan.env.PI_CURSOR_NATIVE_TOOL_DISPLAY).toBeUndefined();
+	});
+
+	it("uses explicit string modes for local-resume smoke config", () => {
+		const root = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-local-resume-env-"));
+		try {
+			for (const [mode, expectedResume] of [["on", true], ["off", false], ["unset", undefined]] as const) {
+				const artifactDir = join(root, mode);
+				buildLocalResumeSmokeEnv(artifactDir, { baseEnv: { PATH: "/usr/bin" }, localResumeEnv: mode });
+				const config = JSON.parse(readFileSync(join(artifactDir, "agent", "cursor-sdk.json"), "utf8"));
+				expect(config.local.resume).toBe(expectedResume);
+				expect(config.tools.display).toEqual({ native: "off" });
+			}
+			expect(() => buildLocalResumeSmokeEnv(root, { localResumeEnv: false as never })).toThrow("unknown localResumeEnv mode: false");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it("keeps setting-source parsing aligned with provider runtime", () => {

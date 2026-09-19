@@ -99,23 +99,16 @@ export function buildLocalResumeSmokeEnv(
 ) {
 	const agentDir = join(artifactDir, "agent");
 	mkdirSync(agentDir, { recursive: true });
-	const resumeMode =
-		localResumeEnv === true
-			? "on"
-			: localResumeEnv === false
-				? "unset"
-				: localResumeEnv;
-	if (resumeMode !== "on" && resumeMode !== "off" && resumeMode !== "unset") {
+	if (localResumeEnv !== "on" && localResumeEnv !== "off" && localResumeEnv !== "unset") {
 		fail(`unknown localResumeEnv mode: ${String(localResumeEnv)}`);
 	}
 	const env = buildCursorSmokeEnv({
 		baseEnv,
 		settingSources: "none",
 		bridge,
-		nativeToolDisplay: false,
-		registerNativeTools: false,
+		nativeDisplay: "off",
 		exposeBuiltinTools,
-		localResume: resumeMode === "unset" ? undefined : resumeMode === "on",
+		localResume: localResumeEnv === "unset" ? undefined : localResumeEnv === "on",
 		eventDebugDir: join(artifactDir, "debug"),
 		agentDir,
 	});
