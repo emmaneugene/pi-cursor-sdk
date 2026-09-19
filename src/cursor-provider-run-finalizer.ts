@@ -1,10 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { cursorLiveRuns } from "./cursor-provider-live-run-drain.js";
-import {
-	classifyCursorRunEmission,
-	getCursorRunAbortMessage,
-	type CursorRunOutcome,
-} from "./cursor-provider-run-outcome.js";
+import type { CursorRunOutcome } from "./cursor-provider-run-outcome.js";
 import {
 	formatCursorSdkAbortMessage,
 	resolveCursorSdkAbortCause,
@@ -43,24 +39,23 @@ function applyLiveRunOutcome(
 ): void {
 	if (prepared.runtime.liveRun.disposed) return;
 	const { liveRun } = prepared.runtime;
-	switch (classifyCursorRunEmission(outcome)) {
+	switch (outcome.kind) {
 		case "finished":
 			prepared.lifecycle.commitSend(context, prepared.meta.bootstrap);
 			if (prepared.meta.resumeNotice) liveRun.resumeNotice = prepared.meta.resumeNotice;
-			cursorLiveRuns.markFinished(liveRun, outcome.kind === "finished" ? outcome.finalText : "");
+			cursorLiveRuns.markFinished(liveRun, outcome.finalText);
 			break;
 		case "cancelled":
-			cursorLiveRuns.markCancelled(liveRun, getCursorRunAbortMessage(outcome));
+			cursorLiveRuns.markCancelled(liveRun, outcome.abortMessage);
 			break;
-		case "failed":
-			cursorLiveRuns.markError(liveRun, outcome.kind === "error" ? outcome.errorMessage : "Cursor SDK run failed.");
+		case "error":
+			cursorLiveRuns.markError(liveRun, outcome.errorMessage);
 			break;
 	}
 }
 
 export interface CursorLiveRunCompletion {
 	waitCompletion: Promise<void>;
-	prepared: CursorProviderTurnPrepareResult;
 }
 
 export interface CursorRunFinalizerParams {
@@ -100,7 +95,6 @@ export class CursorRunFinalizer {
 			optionsApiKey: runnerParams.options?.apiKey,
 			sdkEventDebug,
 			cacheContextWindow: true,
-			contextWindowAgentId: liveRun.agent.agentId,
 		})
 			.then(async (finalized) => {
 				applyLiveRunOutcome(finalized.outcome, prepared, runnerParams.context);
@@ -119,7 +113,7 @@ export class CursorRunFinalizer {
 		// Mark the pooled local agent busy as soon as the SDK run exists so auto-compaction summarization
 		// (and other concurrent acquires) wait for run.wait() instead of hitting AgentBusyError.
 		prepared.lifecycle.trackRunCompletion(waitCompletion);
-		return { waitCompletion, prepared };
+		return { waitCompletion };
 	}
 
 	async applyTerminalEvent(event: CursorTurnTerminalEvent): Promise<void> {
@@ -165,19 +159,19 @@ export class CursorRunFinalizer {
 	): Promise<void> {
 		const { stream, partial, model, context } = this.params.runnerParams;
 		prepared.runtime.turnCoordinator.closeTraceBlock();
-		switch (classifyCursorRunEmission(outcome)) {
+		switch (outcome.kind) {
 			case "cancelled":
 				await prepared.lifecycle.abandon();
-				this.pushTerminalError(partial, "aborted", getCursorRunAbortMessage(outcome));
+				this.pushTerminalError(partial, "aborted", outcome.abortMessage);
 				break;
-			case "failed":
+			case "error":
 				await prepared.lifecycle.abandon();
-				this.pushTerminalError(partial, "error", outcome.kind === "error" ? outcome.errorMessage : "Cursor SDK run failed.");
+				this.pushTerminalError(partial, "error", outcome.errorMessage);
 				break;
 			case "finished":
 				prepared.lifecycle.commitSend(context, prepared.meta.bootstrap);
 				prepared.runtime.turnCoordinator.flushText(
-					outcome.kind === "finished" && hasUsableText(outcome.finalText) ? [outcome.finalText] : [],
+					hasUsableText(outcome.finalText) ? [outcome.finalText] : [],
 				);
 				applyCursorUsage(partial, model, context, prepared.meta.promptInputTokens, {
 					turn: prepared.runtime.turnCoordinator.lastSdkTurnUsage,

@@ -31,8 +31,9 @@ function recordDebug(action: () => void): void {
 export async function sendCursorProviderTurn(sendParams: SendCursorProviderTurnParams): Promise<CursorProviderTurnSendResult> {
 	const { params, prepared, sdkEventDebug, sdkProcessErrorGuard, throwIfAborted } = sendParams;
 	const { options } = params;
-	const { agent, cwd, payload, meta, runtime } = prepared;
+	const { cwd, payload, meta, runtime, sessionAgentLease } = prepared;
 	const { turnCoordinator, liveRun } = runtime;
+	const agent = sessionAgentLease.agent;
 
 	let completed = false;
 	let sdkRun: Awaited<ReturnType<typeof agent.send>> | null = null;
@@ -53,7 +54,7 @@ export async function sendCursorProviderTurn(sendParams: SendCursorProviderTurnP
 		throwIfAborted();
 		let cursorAgentMessageOffset: number | undefined;
 		try {
-			cursorAgentMessageOffset = await countCursorAgentMessages(agent.agentId, cwd, prepared.sessionAgentLease.store);
+			cursorAgentMessageOffset = await countCursorAgentMessages(agent.agentId, cwd, sessionAgentLease.store);
 		} catch (error) {
 			recordDebug(() => sdkEventDebug?.recordError("cursor_agent_message_count", error));
 		}

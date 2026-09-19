@@ -77,15 +77,11 @@ export type CursorProviderTurnRuntime = DirectCursorProviderTurnRuntime | LiveCu
  * keeping parallel liveRun/turnCoordinator/resource bags in sync by convention.
  */
 export interface CursorProviderTurnPrepareResult {
-	agent: SDKAgent;
 	cwd: string;
 	payload: CursorProviderTurnSendPayload;
 	meta: CursorProviderTurnSendMeta;
-	contextWindowAgentId: string;
-	textDeltas: string[];
 	restoreCursorSdkOutputFilter: () => void;
 	lifecycle: CursorProviderTurnLifecycle;
-	sessionAgentScopeKey: string;
 	sessionAgentLease: SessionCursorAgentLease;
 	localForce: CursorResolvedSetting<boolean>;
 	runtime: CursorProviderTurnRuntime;

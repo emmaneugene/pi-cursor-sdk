@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	classifyCursorRunEmission,
-	isCursorRunFinishedSuccessfully,
-	resolveCursorRunOutcome,
-} from "../src/cursor-provider-run-outcome.js";
+import { resolveCursorRunOutcome } from "../src/cursor-provider-run-outcome.js";
 
 function makeWaitResult(status: "finished" | "cancelled" | "error", result?: string) {
 	return {
@@ -25,8 +21,7 @@ describe("cursor-provider-run-outcome", () => {
 			emittedText: "",
 		});
 		expect(outcome.kind).toBe("cancelled");
-		expect(isCursorRunFinishedSuccessfully(outcome)).toBe(false);
-		expect(classifyCursorRunEmission(outcome)).toBe("cancelled");
+		if (outcome.kind === "cancelled") expect(outcome.abortMessage.length).toBeGreaterThan(0);
 	});
 
 	it("normalizes signal-aborted error waits to cancelled outcomes", () => {
@@ -37,7 +32,7 @@ describe("cursor-provider-run-outcome", () => {
 			emittedText: "",
 		});
 		expect(outcome.kind).toBe("cancelled");
-		expect(classifyCursorRunEmission(outcome)).toBe("cancelled");
+		if (outcome.kind === "cancelled") expect(outcome.abortMessage.length).toBeGreaterThan(0);
 	});
 
 	it("never produces finished outcomes with signalAborted", () => {
@@ -52,20 +47,22 @@ describe("cursor-provider-run-outcome", () => {
 		}
 	});
 
-	it("classifies SDK cancelled and error statuses for both emission strategies", () => {
+	it("classifies SDK cancelled and error statuses", () => {
 		const cancelled = resolveCursorRunOutcome({
 			waitResult: makeWaitResult("cancelled"),
 			textDeltas: [],
 			emittedText: "",
 		});
-		expect(classifyCursorRunEmission(cancelled)).toBe("cancelled");
+		expect(cancelled.kind).toBe("cancelled");
+		if (cancelled.kind === "cancelled") expect(cancelled.abortMessage.length).toBeGreaterThan(0);
 
-		const failed = resolveCursorRunOutcome({
+		const errored = resolveCursorRunOutcome({
 			waitResult: makeWaitResult("error", "boom"),
 			textDeltas: [],
 			emittedText: "",
 		});
-		expect(classifyCursorRunEmission(failed)).toBe("failed");
+		expect(errored.kind).toBe("error");
+		if (errored.kind === "error") expect(errored.errorMessage).toContain("boom");
 	});
 
 	it("uses local auth guidance for terminal errors", () => {
@@ -83,8 +80,6 @@ describe("cursor-provider-run-outcome", () => {
 			textDeltas: ["final"],
 			emittedText: "",
 		});
-		expect(isCursorRunFinishedSuccessfully(outcome)).toBe(true);
-		expect(classifyCursorRunEmission(outcome)).toBe("finished");
 		expect(outcome.kind).toBe("finished");
 		if (outcome.kind === "finished") {
 			expect(outcome.finalText).toBe("final answer");

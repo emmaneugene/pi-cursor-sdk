@@ -4,7 +4,6 @@ import { getCheckpointContextWindow, saveCachedContextWindow } from "./context-w
 import type { CursorSdkEventDebugSink } from "./cursor-sdk-event-debug.js";
 import type { CursorSdkTurnCoordinator } from "./cursor-provider-turn-coordinator.js";
 import {
-	isCursorRunFinishedSuccessfully,
 	resolveCursorRunOutcome,
 	type CursorRunOutcome,
 } from "./cursor-provider-run-outcome.js";
@@ -49,11 +48,11 @@ export interface BuildCursorRunOutcomeParams {
 export function buildCursorRunOutcomeFromWait(params: BuildCursorRunOutcomeParams): CursorRunOutcome {
 	const { waitResult, prepared } = params;
 	const { turnCoordinator, liveRun } = prepared.runtime;
-	const { textDeltas } = prepared;
+	const { textDeltas } = turnCoordinator;
 	return resolveCursorRunOutcome({
 		waitResult,
 		signalAborted: params.signal?.aborted,
-		textDeltas: liveRun?.textDeltas ?? textDeltas,
+		textDeltas,
 		emittedText: liveRun?.emittedText ?? textDeltas.join(""),
 		planTextCandidate: turnCoordinator.planTextCandidate,
 		selectFinalTextOptions: liveRun ? undefined : { allowPartialPrefix: true },
@@ -104,8 +103,6 @@ export interface AwaitFinalizeCursorRunOutcomeParams {
 	sdkEventDebug?: CursorSdkEventDebugSink;
 	waitResult?: Awaited<ReturnType<Awaited<ReturnType<SDKAgent["send"]>>["wait"]>>;
 	cacheContextWindow?: boolean;
-	/** Session agent id for checkpoint cache; defaults to run.agentId when omitted. */
-	contextWindowAgentId?: string;
 }
 
 export interface FinalizedCursorRunOutcome {
@@ -125,7 +122,7 @@ export async function awaitFinalizeCursorRunOutcome(params: AwaitFinalizeCursorR
 		optionsApiKey: params.optionsApiKey,
 	});
 	const billed = await attachCursorSdkBilledTurnUsage({
-		agent: params.prepared.agent,
+		agent: params.prepared.sessionAgentLease.agent,
 		agentId: params.run.agentId,
 	});
 	params.prepared.runtime.billedTurnUsage = billed.turn;
@@ -137,7 +134,7 @@ export async function awaitFinalizeCursorRunOutcome(params: AwaitFinalizeCursorR
 	} catch {
 		// Debug reporting must never affect provider execution.
 	}
-	if (isCursorRunFinishedSuccessfully(outcome)) {
+	if (outcome.kind === "finished") {
 		await replayCursorTranscriptWebToolCalls(
 			params.run.agentId,
 			params.prepared.cwd,
@@ -155,7 +152,7 @@ export async function awaitFinalizeCursorRunOutcome(params: AwaitFinalizeCursorR
 	}
 	if (params.cacheContextWindow !== false) {
 		await cacheSdkContextWindow(
-			params.contextWindowAgentId ?? params.run.agentId,
+			params.prepared.sessionAgentLease.agent.agentId,
 			params.modelId,
 			params.prepared.cwd,
 			params.prepared.sessionAgentLease.store,

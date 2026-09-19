@@ -8,19 +8,6 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Ranked recommendations
 
-### 5. Turn pipeline dead plumbing (S05 + S06 merged)
-
-- **Verdict:** recommend
-- **Evidence:**
-  - `src/cursor-provider-turn-types.ts:79-91` duplicates `agent`, `contextWindowAgentId`, `textDeltas`, `sessionAgentScopeKey` that `sessionAgentLease` and `runtime.turnCoordinator` already own. `src/cursor-provider-turn-prepare.ts:218-271` populates them; `src/cursor-provider-turn-finalize.ts:56` selects `liveRun?.textDeltas ?? textDeltas`; `src/cursor-provider-turn-runner.ts:142` passes `prepared.contextWindowAgentId`; `src/cursor-provider-run-finalizer.ts:61-64` stores `prepared` in `CursorLiveRunCompletion` but cleanup reads only `waitCompletion`.
-  - `src/cursor-provider-run-outcome.ts:140-155` re-projects `outcome.kind` into `CursorRunEmission` (`error` → `failed`) and `getCursorRunAbortMessage` accepts any outcome; `src/cursor-provider-run-finalizer.ts:46-56, 168-180` switch on the projection and re-check the original discriminant; `src/cursor-provider-turn-finalize.ts:140` wraps the check in `isCursorRunFinishedSuccessfully`.
-- **Current complexity:** aliases can diverge in fixtures or future edits; the second terminal vocabulary defeats TypeScript narrowing and produces unreachable fallback branches.
-- **Proposed representation:** lease and coordinator authoritative; derive context-window agent ID from the lease agent; switch on `outcome.kind` directly and use `outcome.abortMessage` only in the `cancelled` branch. Delete `CursorRunEmission`, `classifyCursorRunEmission`, `getCursorRunAbortMessage`, `isCursorRunFinishedSuccessfully`, the four aliases, and `CursorLiveRunCompletion.prepared`. ≈ −40 to −55 lines.
-- **Scope:** `cursor-provider-turn-types.ts`, `-turn-prepare.ts`, `-turn-send.ts`, `-turn-finalize.ts`, `-turn-runner.ts`, `cursor-provider-run-outcome.ts`, `cursor-provider-run-finalizer.ts`; fixtures in `test/cursor-provider-run-finalizer.test.ts`, `test/cursor-provider-run-outcome.test.ts`.
-- **Risks:** central pipeline. Confirm the context-window checkpoint ID is always the leased session agent ID. Preserve the shared `textDeltas` array between live run and coordinator.
-- **Validation:** `test/cursor-provider-run-finalizer.test.ts`, `test/cursor-provider-turn-finalize.test.ts`, `test/cursor-provider-run-outcome.test.ts`, `test/cursor-provider-stream-*.test.ts`; typecheck exhaustiveness of both switches.
-- **Confidence:** high
-
 ### 6. Session-agent resume: normalize legacy cleanup candidates at the parser (S07)
 
 - **Verdict:** recommend
@@ -97,11 +84,11 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Best next slices (one small PR each)
 
-1. #5 turn pipeline dead plumbing.
+1. #6 session-agent resume parser normalization.
 
 ## Cross-cutting patterns
 
-1. One entity, several containers: prepared-turn aliases, six lifecycle maps, five pool collections, and 13 counter fields.
+1. One entity, several containers: six lifecycle maps, five pool collections, and 13 counter fields.
 2. Compatibility shapes remain in legacy cleanup IDs.
 3. The generated model snapshot remains large relative to its runtime projection.
 4. `AGENTS.md` map drift (see #13).
@@ -114,7 +101,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S02 | Model discovery, caches, snapshot | `model-discovery.ts`, `model-list-cache.ts`, `cursor-fallback-models.generated.ts`, `bundled-context-windows.ts`, `context-window-cache.ts`, `shared/cursor-model-selection-identities.*`, `scripts/refresh-cursor-model-snapshots.mjs` | recommend ×2 (#7a, #7b) |
 | S03 | Config, state controls, HTTP/1.1 | `cursor-config.ts`, `cursor-state.ts`, `cursor-runtime-state.ts`, `cursor-http1.ts`, `cursor-setting-sources.ts`, `shared/cursor-setting-sources.*`, `cursor-api-key.ts`, `cursor-task-presentation.ts` | recommend (#8) |
 | S04 | Prompt/context, bootstrap surfaces | `context.ts`, `cursor-context-tools.ts`, `cursor-tool-manifest.ts`, `cursor-bridge-contract.ts`, `cursor-skill-tool.ts`, `cursor-provider-overflow.ts` | plan-flag finding rejected |
-| S05 | Turn pipeline, outcomes, errors | `cursor-provider.ts`, `cursor-provider-turn-{runner,prepare,send,finalize,emit,types}.ts`, `cursor-provider-run-{outcome,finalizer}.ts`, `cursor-run-final-text.ts`, `cursor-provider-errors.ts`, `cursor-mcp-timeout-override.ts`, `cursor-sdk-process-error-guard.ts` | recommend ×2 (#5) |
+| S05 | Turn pipeline, outcomes, errors | `cursor-provider.ts`, `cursor-provider-turn-{runner,prepare,send,finalize,emit,types}.ts`, `cursor-provider-run-{outcome,finalizer}.ts`, `cursor-run-final-text.ts`, `cursor-provider-errors.ts`, `cursor-mcp-timeout-override.ts`, `cursor-sdk-process-error-guard.ts` | turn plumbing removed |
 | S06 | Turn coordinator, normalization | `cursor-provider-turn-{coordinator,shell-output,tool-ledger,sdk-normalizer,display-router,lifecycle-emitter}.ts`, `cursor-tool-lifecycle.ts`, `cursor-partial-content-emitter.ts`, `cursor-incomplete-tool-visibility.ts`, `cursor-display-only-trace.ts` | recommend (#9) |
 | S07 | Session agents, resume, store, scope | `cursor-session-agent*.ts`, `cursor-session-store.ts`, `cursor-session-scope.ts`, `cursor-session-compaction-prep.ts`, `cursor-session-send-policy.ts`, `cursor-session-turn-queue.ts`, `cursor-durable-fs.ts`, `cursor-sdk-platform-package.ts` | recommend (#6); pool slot-map demoted |
 | S08 | Live run coordinator, drain, routing | `cursor-live-run-coordinator.ts`, `cursor-provider-live-run-drain.ts`, `cursor-live-run-accounting.ts`, `cursor-native-replay-routing.ts` | **skip** — a `running/finished/cancelled/error` union would add 40–80 lines and touch out-of-boundary mutators |
@@ -135,7 +122,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Demoted — S07 pool slot-map (`cursor-session-agent.ts:148-153`, five per-scope collections):** the collections have different lifetimes; a slot with many optional fields may relocate complexity and risks acquire/dispose races. Treat as a design spike.
 - **Demoted — S12 guard merge in `applyCursorUsage`:** the repeated guards mark distinct billed/local/partition/occupancy trust boundaries.
 - **Demoted — S01 refresh catalog:** bug, not simplification (#7c).
-- **Merged:** S05 + S06 turn plumbing (#5).
+- **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records remain #9.
 
 ## Limitations
 

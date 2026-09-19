@@ -250,7 +250,6 @@ async function prepareCursorLocalProviderTurn(
 
 		completed = true;
 		return {
-			agent,
 			cwd,
 			payload: sendPayload,
 			meta: {
@@ -265,9 +264,6 @@ async function prepareCursorLocalProviderTurn(
 				modelSelection: selection,
 				...(sessionAgentLease.resumeNotice ? { resumeNotice: sessionAgentLease.resumeNotice } : {}),
 			},
-			contextWindowAgentId: agent.agentId,
-			textDeltas,
-			sessionAgentScopeKey,
 			sessionAgentLease,
 			localForce: resolvedConfig.local.force,
 			restoreCursorSdkOutputFilter,

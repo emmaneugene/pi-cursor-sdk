@@ -27,8 +27,8 @@ describe("CursorRunFinalizer", () => {
 		const trackRunCompletion = vi.fn();
 		const disposeLifecycle = vi.fn().mockResolvedValue(undefined);
 		mockAwaitFinalizeCursorRunOutcome.mockRejectedValueOnce(new Error("run wait failed"));
+		const textDeltas: string[] = [];
 		const prepared: CursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime } = {
-			agent: { agentId: "agent-1" } as SDKAgent,
 			cwd: process.cwd(),
 			payload: { text: "hello" },
 			meta: {
@@ -43,9 +43,6 @@ describe("CursorRunFinalizer", () => {
 				modelSelection: { id: "composer-2.5" },
 			},
 			localForce: { value: false, source: "builtin" },
-			contextWindowAgentId: "agent-1",
-			textDeltas: [],
-			sessionAgentScopeKey: "scope-1",
 			sessionAgentLease: {
 				scopeKey: "scope-1",
 				poolKey: "pool-1",
@@ -73,7 +70,7 @@ describe("CursorRunFinalizer", () => {
 					sessionAgentScopeKey: "scope-1",
 					accounting: createCursorLiveRunAccountingState(0),
 					pendingEvents: [],
-					textDeltas: [],
+					textDeltas,
 					emittedText: "",
 					recordedToolDisplayIds: [],
 					done: false,
@@ -87,7 +84,7 @@ describe("CursorRunFinalizer", () => {
 					cwd: process.cwd(),
 					useNativeToolReplay: true,
 					nativeReplayId: "replay-1",
-					textDeltas: [],
+					textDeltas,
 				}),
 			},
 		};
@@ -127,6 +124,7 @@ describe("CursorRunFinalizer", () => {
 		});
 
 		await finalizer.cleanup(prepared, undefined, liveCompletion);
+		expect(prepared.runtime.liveRun.textDeltas).toBe(prepared.runtime.turnCoordinator.textDeltas);
 		expect(mockAwaitFinalizeCursorRunOutcome).toHaveBeenCalledTimes(1);
 		expect(trackRunCompletion).toHaveBeenCalledTimes(1);
 		await expect(trackRunCompletion.mock.calls[0]?.[0]).resolves.toBeUndefined();
@@ -151,7 +149,6 @@ describe("CursorRunFinalizer", () => {
 			textDeltas: [],
 		});
 		const prepared: CursorProviderTurnPrepareResult = {
-			agent: { agentId: "agent-1" } as SDKAgent,
 			cwd: process.cwd(),
 			payload: { text: "hello" },
 			meta: {
@@ -166,9 +163,6 @@ describe("CursorRunFinalizer", () => {
 				modelSelection: { id: "composer-2.5" },
 			},
 			localForce: { value: false, source: "builtin" },
-			contextWindowAgentId: "agent-1",
-			textDeltas: [],
-			sessionAgentScopeKey: "scope-1",
 			sessionAgentLease: {
 				scopeKey: "scope-1",
 				poolKey: "pool-1",
@@ -257,7 +251,6 @@ describe("CursorRunFinalizer", () => {
 			textDeltas: [],
 		});
 		const prepared: CursorProviderTurnPrepareResult = {
-			agent: { agentId: "agent-1" } as SDKAgent,
 			cwd: process.cwd(),
 			payload: { text: "hello" },
 			meta: {
@@ -272,9 +265,6 @@ describe("CursorRunFinalizer", () => {
 				modelSelection: { id: "composer-2.5" },
 			},
 			localForce: { value: false, source: "builtin" },
-			contextWindowAgentId: "agent-1",
-			textDeltas: [],
-			sessionAgentScopeKey: "scope-1",
 			sessionAgentLease: {
 				scopeKey: "scope-1",
 				poolKey: "pool-1",

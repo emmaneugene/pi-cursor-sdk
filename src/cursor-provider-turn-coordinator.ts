@@ -50,7 +50,7 @@ export class CursorSdkTurnCoordinator {
 	private readonly cwd: string;
 	private readonly resolvedApiKey?: string;
 	private readonly liveRun?: CursorLiveRun;
-	private readonly textDeltas: string[];
+	readonly textDeltas: string[];
 
 	private readonly debugRecorder?: CursorSdkEventDebugRecorder;
 	private readonly ledger = new CursorToolCompletionLedger();

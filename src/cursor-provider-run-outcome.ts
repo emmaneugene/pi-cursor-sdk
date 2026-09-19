@@ -59,10 +59,6 @@ function hasCursorAssistantText(
 	);
 }
 
-export function isCursorRunFinishedSuccessfully(outcome: CursorRunOutcome): boolean {
-	return outcome.kind === "finished";
-}
-
 function buildCursorRunAbortMessage(signalAborted: boolean | undefined, sdkStatusCancelled: boolean): string {
 	return formatCursorSdkAbortMessage(
 		resolveCursorSdkAbortCause({
@@ -135,22 +131,4 @@ export function resolveCursorRunOutcome(params: ResolveCursorRunOutcomeParams): 
 		incompleteTools,
 		assistantTextProduced,
 	};
-}
-
-export type CursorRunEmission = "finished" | "cancelled" | "failed";
-
-export function classifyCursorRunEmission(outcome: CursorRunOutcome): CursorRunEmission {
-	switch (outcome.kind) {
-		case "finished":
-			return "finished";
-		case "cancelled":
-			return "cancelled";
-		case "error":
-			return "failed";
-	}
-}
-
-export function getCursorRunAbortMessage(outcome: CursorRunOutcome): string {
-	if (outcome.kind === "cancelled") return outcome.abortMessage;
-	return buildCursorRunAbortMessage(false, outcome.waitResult.status === "cancelled");
 }
