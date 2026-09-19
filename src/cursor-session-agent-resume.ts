@@ -46,7 +46,6 @@ export interface CursorSessionAgentResumeEntryData {
 	sendState: SessionCursorAgentSendState;
 	createdAt: string;
 	storeIdentity?: CursorSessionStoreIdentity;
-	cleanupCandidateAgentIds?: string[];
 	cleanupCandidates?: CursorSessionAgentCleanupCandidate[];
 }
 
@@ -138,16 +137,30 @@ function parseStoreIdentity(value: unknown): CursorSessionStoreIdentity | undefi
 	return { version: 1, stateRoot: record.stateRoot };
 }
 
-function parseCleanupCandidates(value: unknown): CursorSessionAgentCleanupCandidate[] | undefined {
-	if (!Array.isArray(value)) return undefined;
-	const candidates = value.flatMap((item): CursorSessionAgentCleanupCandidate[] => {
+function parseCleanupCandidates(value: unknown): CursorSessionAgentCleanupCandidate[] {
+	if (!Array.isArray(value)) return [];
+	return value.flatMap((item): CursorSessionAgentCleanupCandidate[] => {
 		const record = asRecord(item);
 		if (!isCursorLocalAgentId(record?.agentId)) return [];
 		const storeIdentity = record.storeIdentity === undefined ? undefined : parseStoreIdentity(record.storeIdentity);
 		if (record.storeIdentity !== undefined && !storeIdentity) return [];
 		return [{ agentId: record.agentId, ...(storeIdentity ? { storeIdentity } : {}) }];
 	});
-	return candidates.length ? candidates : undefined;
+}
+
+function mergeCleanupCandidates(legacyIds: unknown, recorded: unknown): CursorSessionAgentCleanupCandidate[] | undefined {
+	const merged = new Map<string, CursorSessionAgentCleanupCandidate>();
+	if (Array.isArray(legacyIds)) {
+		for (const agentId of legacyIds) {
+			if (!isCursorLocalAgentId(agentId) || merged.has(agentId)) continue;
+			merged.set(agentId, { agentId });
+		}
+	}
+	for (const candidate of parseCleanupCandidates(recorded)) {
+		const existing = merged.get(candidate.agentId);
+		if (!existing?.storeIdentity || candidate.storeIdentity) merged.set(candidate.agentId, candidate);
+	}
+	return merged.size ? [...merged.values()] : undefined;
 }
 
 export function parseCursorSessionAgentResumeEntryData(value: unknown): CursorSessionAgentResumeEntryData | undefined {
@@ -172,10 +185,7 @@ export function parseCursorSessionAgentResumeEntryData(value: unknown): CursorSe
 	if (record.repoRoot !== undefined && typeof record.repoRoot !== "string") return undefined;
 	const storeIdentity = parseStoreIdentity(record.storeIdentity);
 	if (record.version === RESUME_ENTRY_VERSION && !storeIdentity) return undefined;
-	const cleanupCandidateAgentIds = Array.isArray(record.cleanupCandidateAgentIds)
-		? record.cleanupCandidateAgentIds.filter(isCursorLocalAgentId)
-		: undefined;
-	const cleanupCandidates = parseCleanupCandidates(record.cleanupCandidates);
+	const cleanupCandidates = mergeCleanupCandidates(record.cleanupCandidateAgentIds, record.cleanupCandidates);
 	return {
 		version: record.version,
 		runtime: "local",
@@ -195,7 +205,6 @@ export function parseCursorSessionAgentResumeEntryData(value: unknown): CursorSe
 		},
 		createdAt: record.createdAt,
 		...(storeIdentity ? { storeIdentity } : {}),
-		...(cleanupCandidateAgentIds?.length ? { cleanupCandidateAgentIds: [...new Set(cleanupCandidateAgentIds)] } : {}),
 		...(cleanupCandidates ? { cleanupCandidates } : {}),
 	};
 }

@@ -23,25 +23,28 @@ import {
 
 export const CURSOR_SESSION_AGENT_CLEANUP_ENTRY_TYPE = "cursor-sdk-agent-cleanup";
 
-type CleanupAction = "dry-run" | "delete";
-type CleanupPhase = "intent" | "result";
-
 export interface CursorSessionAgentCleanupFailure {
 	agentId: string;
 	error: string;
 	retryable?: boolean;
 }
 
-export interface CursorSessionAgentCleanupEntryData {
-	action: CleanupAction;
-	phase?: CleanupPhase;
+interface CursorSessionAgentCleanupEntryBase {
 	runtime: "local";
 	timestamp: string;
 	candidateAgentIds: string[];
 	protectedAgentIds?: string[];
-	deletedAgentIds?: string[];
-	failedAgentIds?: CursorSessionAgentCleanupFailure[];
 }
+
+export type CursorSessionAgentCleanupEntryData =
+	| (CursorSessionAgentCleanupEntryBase & { action: "dry-run" })
+	| (CursorSessionAgentCleanupEntryBase & { action: "delete"; phase: "intent" })
+	| (CursorSessionAgentCleanupEntryBase & {
+		action: "delete";
+		phase: "result";
+		deletedAgentIds?: string[];
+		failedAgentIds?: CursorSessionAgentCleanupFailure[];
+	});
 
 export interface CursorSessionAgentCleanupPlan {
 	candidateAgentIds: string[];
@@ -110,9 +113,24 @@ function parseCleanupEntryData(value: unknown): CursorSessionAgentCleanupEntryDa
 	if (typeof record.timestamp !== "string") return undefined;
 	if (record.phase !== undefined && record.phase !== "intent" && record.phase !== "result") return undefined;
 	if (record.action === "dry-run" && record.phase !== undefined) return undefined;
-	const candidateAgentIds = Array.isArray(record.candidateAgentIds) ? record.candidateAgentIds.filter((id): id is string => typeof id === "string") : [];
-	const protectedAgentIds = Array.isArray(record.protectedAgentIds) ? record.protectedAgentIds.filter((id): id is string => typeof id === "string") : undefined;
-	const deletedAgentIds = Array.isArray(record.deletedAgentIds) ? record.deletedAgentIds.filter((id): id is string => typeof id === "string") : undefined;
+	const candidateAgentIds = uniqueSorted(
+		(Array.isArray(record.candidateAgentIds) ? record.candidateAgentIds.filter((id): id is string => typeof id === "string") : [])
+			.filter(isCursorLocalAgentId),
+	);
+	const protectedAgentIds = Array.isArray(record.protectedAgentIds)
+		? uniqueSorted(record.protectedAgentIds.filter((id): id is string => typeof id === "string").filter(isCursorLocalAgentId))
+		: undefined;
+	const base = {
+		runtime: "local" as const,
+		timestamp: record.timestamp,
+		candidateAgentIds,
+		...(protectedAgentIds?.length ? { protectedAgentIds } : {}),
+	};
+	if (record.action === "dry-run") return { action: "dry-run", ...base };
+	if (record.phase === "intent") return { action: "delete", phase: "intent", ...base };
+	const deletedAgentIds = Array.isArray(record.deletedAgentIds)
+		? uniqueSorted(record.deletedAgentIds.filter((id): id is string => typeof id === "string").filter(isCursorLocalAgentId))
+		: undefined;
 	const failedAgentIds = Array.isArray(record.failedAgentIds)
 		? record.failedAgentIds.flatMap((item): CursorSessionAgentCleanupFailure[] => {
 			const failure = asRecord(item);
@@ -122,13 +140,10 @@ function parseCleanupEntryData(value: unknown): CursorSessionAgentCleanupEntryDa
 		})
 		: undefined;
 	return {
-		action: record.action,
-		...(record.phase ? { phase: record.phase } : {}),
-		runtime: "local",
-		timestamp: record.timestamp,
-		candidateAgentIds: uniqueSorted(candidateAgentIds.filter(isCursorLocalAgentId)),
-		...(protectedAgentIds?.length ? { protectedAgentIds: uniqueSorted(protectedAgentIds.filter(isCursorLocalAgentId)) } : {}),
-		...(deletedAgentIds?.length ? { deletedAgentIds: uniqueSorted(deletedAgentIds.filter(isCursorLocalAgentId)) } : {}),
+		action: "delete",
+		phase: "result",
+		...base,
+		...(deletedAgentIds?.length ? { deletedAgentIds } : {}),
 		...(failedAgentIds?.length ? { failedAgentIds } : {}),
 	};
 }
@@ -151,11 +166,9 @@ function readUnavailableAgentIds(entries: readonly SessionEntry[]): Set<string> 
 			deleted.add(agentId);
 			pending.delete(agentId);
 		}
-		if (data.phase === "result") {
-			for (const failure of data.failedAgentIds ?? []) {
-				pending.delete(failure.agentId);
-				if (failure.retryable === false) permanentlyFailed.add(failure.agentId);
-			}
+		for (const failure of data.failedAgentIds ?? []) {
+			pending.delete(failure.agentId);
+			if (failure.retryable === false) permanentlyFailed.add(failure.agentId);
 		}
 	}
 	return new Set([...deleted, ...pending, ...permanentlyFailed, ...nondurableCleanupResultAgentIds]);
@@ -177,11 +190,7 @@ function readCursorSessionAgentCleanupPlanDetails(
 	const candidates = new Map<string, CursorSessionAgentCleanupCandidate>();
 	for (const resume of readResumeEntries(entries)) {
 		if (!resumeEntryMatchesCleanupScope(resume, scope)) continue;
-		const recordedCandidates: CursorSessionAgentCleanupCandidate[] = [
-			...(resume.cleanupCandidateAgentIds ?? []).map((agentId) => ({ agentId })),
-			...(resume.cleanupCandidates ?? []),
-		];
-		for (const candidate of recordedCandidates) {
+		for (const candidate of resume.cleanupCandidates ?? []) {
 			if (!isCursorLocalAgentId(candidate.agentId) || protectedAgentIds.has(candidate.agentId) || unavailable.has(candidate.agentId)) continue;
 			const existing = candidates.get(candidate.agentId);
 			if (!existing?.storeIdentity || candidate.storeIdentity) candidates.set(candidate.agentId, candidate);
@@ -223,13 +232,13 @@ async function getSdkOperations(): Promise<LocalResumeCleanupSdkOperations> {
 function cleanupEntryVerificationKey(data: CursorSessionAgentCleanupEntryData): string {
 	return JSON.stringify({
 		action: data.action,
-		phase: data.phase,
+		phase: data.action === "delete" ? data.phase : undefined,
 		runtime: data.runtime,
 		timestamp: data.timestamp,
 		candidateAgentIds: data.candidateAgentIds,
 		protectedAgentIds: data.protectedAgentIds ?? [],
-		deletedAgentIds: data.deletedAgentIds ?? [],
-		failedAgentIds: data.failedAgentIds ?? [],
+		deletedAgentIds: data.action === "delete" && data.phase === "result" ? data.deletedAgentIds ?? [] : [],
+		failedAgentIds: data.action === "delete" && data.phase === "result" ? data.failedAgentIds ?? [] : [],
 	});
 }
 

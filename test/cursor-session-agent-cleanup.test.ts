@@ -45,12 +45,12 @@ const cleanupScope = {
 	cwd: "/tmp/project",
 };
 
-function resumeEntry(id: string, data: CursorSessionAgentResumeEntryData): SessionEntry {
+function resumeEntry(id: string, data: unknown): SessionEntry {
 	return {
 		type: "custom",
 		id,
 		parentId: null,
-		timestamp: data.createdAt,
+		timestamp: "2026-07-08T00:00:00.000Z",
 		customType: CURSOR_SESSION_AGENT_RESUME_ENTRY_TYPE,
 		data,
 	};
@@ -69,15 +69,16 @@ function messageEntry(id: string, parentId: string | null, role: "user" | "assis
 }
 
 function parseCleanupPhase(value: unknown): string | undefined {
-	return cleanupTestUtils.parseCleanupEntryData(value)?.phase;
+	const data = cleanupTestUtils.parseCleanupEntryData(value);
+	return data?.action === "delete" ? data.phase : undefined;
 }
 
-function cleanupEntry(id: string, data: CursorSessionAgentCleanupEntryData, parentId: string | null = null): SessionEntry {
+function cleanupEntry(id: string, data: unknown, parentId: string | null = null): SessionEntry {
 	return {
 		type: "custom",
 		id,
 		parentId,
-		timestamp: data.timestamp,
+		timestamp: "2026-07-08T00:00:00.000Z",
 		customType: CURSOR_SESSION_AGENT_CLEANUP_ENTRY_TYPE,
 		data,
 	};
@@ -111,9 +112,10 @@ describe("cursor-session-agent-cleanup", () => {
 
 	it("plans only recorded cleanup candidates and protects the active branch agent", () => {
 		const oldEntry = resumeEntry("r1", resumeData("agent-old"));
-		const activeEntry = resumeEntry("r2", resumeData("agent-active", {
+		const activeEntry = resumeEntry("r2", {
+			...resumeData("agent-active"),
 			cleanupCandidateAgentIds: ["agent-old", "agent-old", "agent-*", "bc-cloud"],
-		}));
+		});
 
 		const entries = linearEntries([oldEntry, activeEntry]);
 		expect(readCursorSessionAgentCleanupPlan(entries, entries, cleanupScope)).toEqual({
@@ -141,7 +143,7 @@ describe("cursor-session-agent-cleanup", () => {
 		const replacement = resumeEntry("r-new", resumeData("agent-new", {
 			poolKey: "pool-2",
 			branchPathHash: forkHash,
-			cleanupCandidateAgentIds: ["agent-old"],
+			cleanupCandidates: [{ agentId: "agent-old" }],
 		}));
 		replacement.parentId = "a-fork";
 		const entries = [rootUser, rootAssistant, original, siblingUser, forkUser, forkAssistant, replacement];
@@ -166,7 +168,7 @@ describe("cursor-session-agent-cleanup", () => {
 	it("fails closed without deleting when a corrupted session has multiple roots", async () => {
 		const oldEntry = resumeEntry("root-old", resumeData("agent-old"));
 		const replacement = resumeEntry("root-new", resumeData("agent-new", {
-			cleanupCandidateAgentIds: ["agent-old"],
+			cleanupCandidates: [{ agentId: "agent-old" }],
 		}));
 		const entries = [oldEntry, replacement];
 		expect(readCursorSessionAgentCleanupPlan(entries, [replacement], cleanupScope)).toEqual({
@@ -182,8 +184,8 @@ describe("cursor-session-agent-cleanup", () => {
 	});
 
 	it("rejects cloud and malformed resume records before cleanup planning", () => {
-		const cloudEntry = resumeEntry("r1", resumeData("bc-cloud-agent", { cleanupCandidateAgentIds: ["agent-old"] }));
-		const malformedEntry = resumeEntry("r2", resumeData("agent-*", { cleanupCandidateAgentIds: ["agent-other"] }));
+		const cloudEntry = resumeEntry("r1", resumeData("bc-cloud-agent", { cleanupCandidates: [{ agentId: "agent-old" }] }));
+		const malformedEntry = resumeEntry("r2", resumeData("agent-*", { cleanupCandidates: [{ agentId: "agent-other" }] }));
 
 		expect(readCursorSessionAgentCleanupPlan([cloudEntry, malformedEntry], [cloudEntry], cleanupScope)).toEqual({
 			candidateAgentIds: [],
@@ -203,12 +205,68 @@ describe("cursor-session-agent-cleanup", () => {
 			timestamp: "2026-07-08T00:00:00.000Z",
 			candidateAgentIds: ["agent-old"],
 		})).toBeUndefined();
+		expect(cleanupTestUtils.parseCleanupEntryData({
+			action: "delete",
+			runtime: "local",
+			timestamp: "2026-07-08T00:00:00.000Z",
+			candidateAgentIds: ["agent-old"],
+			deletedAgentIds: ["agent-old"],
+			failedAgentIds: [{ agentId: "agent-failed", error: "boom" }],
+		})).toEqual({
+			action: "delete",
+			phase: "result",
+			runtime: "local",
+			timestamp: "2026-07-08T00:00:00.000Z",
+			candidateAgentIds: ["agent-old"],
+			deletedAgentIds: ["agent-old"],
+			failedAgentIds: [{ agentId: "agent-failed", error: "boom" }],
+		});
+	});
+
+	it("hides permanently failed IDs recorded on a legacy unphased delete", () => {
+		const entries = linearEntries([
+			resumeEntry("r1", resumeData("agent-old")),
+			resumeEntry("r2", resumeData("agent-active", {
+				cleanupCandidates: [{ agentId: "agent-old" }, { agentId: "agent-failed" }],
+			})),
+			cleanupEntry("c1", {
+				action: "delete",
+				runtime: "local",
+				timestamp: "2026-07-08T00:01:00.000Z",
+				candidateAgentIds: ["agent-old", "agent-failed"],
+				deletedAgentIds: ["agent-old"],
+				failedAgentIds: [{ agentId: "agent-failed", error: "boom", retryable: false }],
+			}),
+		]);
+		expect(readCursorSessionAgentCleanupPlan(entries, entries.slice(0, 2), cleanupScope)).toEqual({
+			candidateAgentIds: [],
+			protectedAgentIds: ["agent-active"],
+		});
+	});
+
+	it("plans the same candidates from legacy id lists and current objects", () => {
+		const current = linearEntries([
+			resumeEntry("r1", resumeData("agent-old")),
+			resumeEntry("r2", resumeData("agent-active", { cleanupCandidates: [{ agentId: "agent-old" }] })),
+		]);
+		const legacy = linearEntries([
+			resumeEntry("r1", resumeData("agent-old")),
+			resumeEntry("r2", { ...resumeData("agent-active"), cleanupCandidateAgentIds: ["agent-old"] }),
+		]);
+		expect(readCursorSessionAgentCleanupPlan(legacy, legacy, cleanupScope))
+			.toEqual(readCursorSessionAgentCleanupPlan(current, current, cleanupScope));
 	});
 
 	it("reconciles durable intents, successful results, failed results, and legacy delete entries", () => {
 		const oldEntry = resumeEntry("r1", resumeData("agent-old"));
 		const activeEntry = resumeEntry("r2", resumeData("agent-active", {
-			cleanupCandidateAgentIds: ["agent-old", "agent-pending", "agent-deleted", "agent-failed", "agent-invalid"],
+			cleanupCandidates: [
+				{ agentId: "agent-old" },
+				{ agentId: "agent-pending" },
+				{ agentId: "agent-deleted" },
+				{ agentId: "agent-failed" },
+				{ agentId: "agent-invalid" },
+			],
 		}));
 		const legacyDeleted = cleanupEntry("c1", {
 			action: "delete",
@@ -253,9 +311,9 @@ describe("cursor-session-agent-cleanup", () => {
 			scopeKey: "/tmp/other-session.jsonl",
 			sessionFile: "/tmp/other-session.jsonl",
 			sessionId: "other-session",
-			cleanupCandidateAgentIds: ["agent-foreign"],
+			cleanupCandidates: [{ agentId: "agent-foreign" }],
 		}));
-		const activeEntry = resumeEntry("r2", resumeData("agent-active", { cleanupCandidateAgentIds: ["agent-old"] }));
+		const activeEntry = resumeEntry("r2", resumeData("agent-active", { cleanupCandidates: [{ agentId: "agent-old" }] }));
 
 		expect(readCursorSessionAgentCleanupPlan([copiedEntry, activeEntry], [activeEntry], cleanupScope)).toEqual({
 			candidateAgentIds: ["agent-old"],
@@ -268,7 +326,7 @@ describe("cursor-session-agent-cleanup", () => {
 	});
 
 	it("dry-runs without deleting and records exact candidates", async () => {
-		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidateAgentIds: ["agent-old"] }))]);
+		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidates: [{ agentId: "agent-old" }] }))]);
 		const appendEntry = vi.fn();
 		const deleteAgent = vi.fn();
 		cleanupTestUtils.setSdkOperations({ delete: deleteAgent });
@@ -284,11 +342,10 @@ describe("cursor-session-agent-cleanup", () => {
 	});
 
 	it("records exact intent before deleting and records the result afterward", async () => {
-		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidateAgentIds: ["agent-old"] }))]);
+		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidates: [{ agentId: "agent-old" }] }))]);
 		const callOrder: string[] = [];
 		const appendEntry = vi.fn((_type: string, value?: unknown) => {
-			const data = value as CursorSessionAgentCleanupEntryData;
-			callOrder.push(`append:${data.phase}`);
+			callOrder.push(`append:${parseCleanupPhase(value)}`);
 		});
 		const deleteAgent = vi.fn(async () => { callOrder.push("delete:agent-old"); });
 		cleanupTestUtils.setSdkOperations({ delete: deleteAgent });
@@ -377,7 +434,7 @@ describe("cursor-session-agent-cleanup", () => {
 			manager.appendCustomEntry(CURSOR_SESSION_AGENT_RESUME_ENTRY_TYPE, resumeData("agent-old", scoped));
 			manager.appendCustomEntry(CURSOR_SESSION_AGENT_RESUME_ENTRY_TYPE, resumeData("agent-active", {
 				...scoped,
-				cleanupCandidateAgentIds: ["agent-old"],
+				cleanupCandidates: [{ agentId: "agent-old" }],
 			}));
 			const order: string[] = [];
 			const deleteAgent = vi.fn(async () => {
@@ -416,7 +473,7 @@ describe("cursor-session-agent-cleanup", () => {
 			manager.appendCustomEntry(CURSOR_SESSION_AGENT_RESUME_ENTRY_TYPE, resumeData("agent-old", scoped));
 			manager.appendCustomEntry(CURSOR_SESSION_AGENT_RESUME_ENTRY_TYPE, resumeData("agent-active", {
 				...scoped,
-				cleanupCandidateAgentIds: ["agent-old"],
+				cleanupCandidates: [{ agentId: "agent-old" }],
 			}));
 			const deleteAgent = vi.fn();
 			cleanupTestUtils.setSdkOperations({ delete: deleteAgent });
@@ -451,7 +508,7 @@ describe("cursor-session-agent-cleanup", () => {
 				resumeEntry("r1", resumeData("agent-old", { scopeKey: sessionFile, sessionFile, sessionId: "session-1", cwd: linkDir })),
 				resumeEntry("r2", resumeData("agent-active", {
 					scopeKey: sessionFile, sessionFile, sessionId: "session-1", cwd: linkDir,
-					cleanupCandidateAgentIds: ["agent-old"],
+					cleanupCandidates: [{ agentId: "agent-old" }],
 				})),
 			]);
 			const appendEntry = vi.fn((_type: string, value?: unknown) => {
@@ -483,7 +540,7 @@ describe("cursor-session-agent-cleanup", () => {
 	});
 
 	it("performs zero deletes when durable intent append fails", async () => {
-		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidateAgentIds: ["agent-old"] }))]);
+		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidates: [{ agentId: "agent-old" }] }))]);
 		const appendEntry = vi.fn(() => { throw new Error("disk full"); });
 		const deleteAgent = vi.fn();
 		const ctx = makeContext(entries);
@@ -496,11 +553,10 @@ describe("cursor-session-agent-cleanup", () => {
 	});
 
 	it("keeps a durable intent when result append fails after a delete", async () => {
-		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidateAgentIds: ["agent-old"] }))]);
+		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old")), resumeEntry("r2", resumeData("agent-active", { cleanupCandidates: [{ agentId: "agent-old" }] }))]);
 		const appendEntry = vi.fn((_type: string, value?: unknown) => {
-			const data = value as CursorSessionAgentCleanupEntryData;
-			if (data.phase === "result") throw new Error("disk full");
-			entries.push(cleanupEntry("c-intent", data, entries.at(-1)?.id ?? null));
+			if (parseCleanupPhase(value) === "result") throw new Error("disk full");
+			entries.push(cleanupEntry("c-intent", value, entries.at(-1)?.id ?? null));
 		});
 		const deleteAgent = vi.fn().mockResolvedValue(undefined);
 		const ctx = makeContext(entries);
@@ -519,13 +575,13 @@ describe("cursor-session-agent-cleanup", () => {
 	it("keeps failed IDs unresolved when result append succeeds but result fsync fails", async () => {
 		const entries = linearEntries([
 			resumeEntry("r1", resumeData("agent-old")),
-			resumeEntry("r2", resumeData("agent-active", { cleanupCandidateAgentIds: ["agent-old"] })),
+			resumeEntry("r2", resumeData("agent-active", { cleanupCandidates: [{ agentId: "agent-old" }] })),
 		]);
 		let appendId = 0;
 		const appendEntry = vi.fn((_type: string, value?: unknown) => {
 			entries.push(cleanupEntry(`c${++appendId}`, value as CursorSessionAgentCleanupEntryData, entries.at(-1)?.id ?? null));
 		});
-		cleanupTestUtils.setAppendDurability((data) => data.phase === "intent");
+		cleanupTestUtils.setAppendDurability((data) => data.action === "delete" && data.phase === "intent");
 		cleanupTestUtils.setSdkOperations({ delete: vi.fn().mockRejectedValue(new Error("still busy")) });
 		const ctx = makeContext(entries);
 
@@ -538,7 +594,7 @@ describe("cursor-session-agent-cleanup", () => {
 
 	it("records partial success so only failed IDs remain retryable", async () => {
 		const entries = linearEntries([resumeEntry("r1", resumeData("agent-old-1")), resumeEntry("r2", resumeData("agent-active", {
-			cleanupCandidateAgentIds: ["agent-old-1", "agent-old-2"],
+			cleanupCandidates: [{ agentId: "agent-old-1" }, { agentId: "agent-old-2" }],
 		}))]);
 		let appendId = 0;
 		const appendEntry = vi.fn((_type: string, value?: unknown) => {

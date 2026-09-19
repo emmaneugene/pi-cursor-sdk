@@ -8,17 +8,6 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Ranked recommendations
 
-### 6. Session-agent resume: normalize legacy cleanup candidates at the parser (S07)
-
-- **Verdict:** recommend
-- **Evidence:** `src/cursor-session-agent-resume.ts:49-50` keeps both `cleanupCandidateAgentIds` and `cleanupCandidates`; `:175-199` preserves both after parsing; `src/cursor-session-agent-cleanup.ts:181-182` merges both again. `cursor-session-agent-cleanup.ts:35-43` cleanup action/phase/result optionals permit combinations current writers never produce.
-- **Current complexity:** compatibility wire shapes leak past the parser; downstream code carries two candidate representations.
-- **Proposed representation:** parser emits one `cleanupCandidates`; cleanup entries become `dry-run | delete-intent | delete-result`, mapping legacy unphased deletes to `delete-result` at parse time. Writers accept only current forms. ≈ −10 to −25 lines.
-- **Scope:** `src/cursor-session-agent-resume.ts`, `src/cursor-session-agent-cleanup.ts`.
-- **Risks:** old session files must stay readable; preserve ordering, dedup, and legacy unphased delete semantics.
-- **Validation:** `test/cursor-session-agent-resume.test.ts`, `test/cursor-session-agent-cleanup.test.ts`, `test/cursor-session-agent-local-resume.test.ts`; add legacy-vs-current normalization equivalence.
-- **Confidence:** high
-
 ### 7. Model catalog (S02, S01)
 
 - **Verdict:** recommend (7a, 7b); correctness note (7c)
@@ -84,12 +73,12 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Best next slices (one small PR each)
 
-1. #6 session-agent resume parser normalization.
+1. #7a single model-cache read.
 
 ## Cross-cutting patterns
 
 1. One entity, several containers: six lifecycle maps, five pool collections, and 13 counter fields.
-2. Compatibility shapes remain in legacy cleanup IDs.
+2. Compatibility shapes stay at the resume parser, not in downstream cleanup.
 3. The generated model snapshot remains large relative to its runtime projection.
 4. `AGENTS.md` map drift (see #13).
 
@@ -103,7 +92,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S04 | Prompt/context, bootstrap surfaces | `context.ts`, `cursor-context-tools.ts`, `cursor-tool-manifest.ts`, `cursor-bridge-contract.ts`, `cursor-skill-tool.ts`, `cursor-provider-overflow.ts` | plan-flag finding rejected |
 | S05 | Turn pipeline, outcomes, errors | `cursor-provider.ts`, `cursor-provider-turn-{runner,prepare,send,finalize,emit,types}.ts`, `cursor-provider-run-{outcome,finalizer}.ts`, `cursor-run-final-text.ts`, `cursor-provider-errors.ts`, `cursor-mcp-timeout-override.ts`, `cursor-sdk-process-error-guard.ts` | turn plumbing removed |
 | S06 | Turn coordinator, normalization | `cursor-provider-turn-{coordinator,shell-output,tool-ledger,sdk-normalizer,display-router,lifecycle-emitter}.ts`, `cursor-tool-lifecycle.ts`, `cursor-partial-content-emitter.ts`, `cursor-incomplete-tool-visibility.ts`, `cursor-display-only-trace.ts` | recommend (#9) |
-| S07 | Session agents, resume, store, scope | `cursor-session-agent*.ts`, `cursor-session-store.ts`, `cursor-session-scope.ts`, `cursor-session-compaction-prep.ts`, `cursor-session-send-policy.ts`, `cursor-session-turn-queue.ts`, `cursor-durable-fs.ts`, `cursor-sdk-platform-package.ts` | recommend (#6); pool slot-map demoted |
+| S07 | Session agents, resume, store, scope | `cursor-session-agent*.ts`, `cursor-session-store.ts`, `cursor-session-scope.ts`, `cursor-session-compaction-prep.ts`, `cursor-session-send-policy.ts`, `cursor-session-turn-queue.ts`, `cursor-durable-fs.ts`, `cursor-sdk-platform-package.ts` | cleanup candidates normalized; pool slot-map demoted |
 | S08 | Live run coordinator, drain, routing | `cursor-live-run-coordinator.ts`, `cursor-provider-live-run-drain.ts`, `cursor-live-run-accounting.ts`, `cursor-native-replay-routing.ts` | **skip** — a `running/finished/cancelled/error` union would add 40–80 lines and touch out-of-boundary mutators |
 | S09 | Tool registry, transcript formatting | `cursor-tool-presentation-registry.ts`, `cursor-transcript-*.ts`, `cursor-tool-transcript.ts`, `cursor-tool-result-display-readers.ts`, `cursor-tool-visibility.ts`, `cursor-native-tool-names.ts`, `cursor-display-text.ts`, `cursor-record-utils.ts`, `cursor-edit-diff.ts`, `cursor-compact-tool-summary.ts`, `cursor-web-tool-*.ts`, `cursor-agent-message-web-tools.ts`, `cursor-replay-source-names.ts` | read preview consolidated |
 | S10 | Native replay cards | `cursor-native-tool-display-*.ts`, `cursor-native-replay-trace.ts`, `cursor-replay-{activity-builders,summary-args,tool-details}.ts` | recommend (#11) |
@@ -123,6 +112,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Demoted — S12 guard merge in `applyCursorUsage`:** the repeated guards mark distinct billed/local/partition/occupancy trust boundaries.
 - **Demoted — S01 refresh catalog:** bug, not simplification (#7c).
 - **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records remain #9.
+- **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
 
 ## Limitations
 

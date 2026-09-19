@@ -86,10 +86,25 @@ describe("cursor-session-agent-resume", () => {
 		]) {
 			expect(parseCursorSessionAgentResumeEntryData({ ...valid, agentId }), agentId).toBeUndefined();
 		}
+		const fromLegacyIds = parseCursorSessionAgentResumeEntryData({
+			...valid,
+			cleanupCandidateAgentIds: ["agent-old", "agent-old", "bc-cloud-1", "agent-*", "agent-with_under"],
+		});
+		expect(fromLegacyIds).not.toHaveProperty("cleanupCandidateAgentIds");
+		expect(fromLegacyIds?.cleanupCandidates).toEqual([{ agentId: "agent-old" }, { agentId: "agent-with_under" }]);
 		expect(parseCursorSessionAgentResumeEntryData({
 			...valid,
-			cleanupCandidateAgentIds: ["agent-old", "bc-cloud-1", "agent-*", "agent-with_under"],
-		})?.cleanupCandidateAgentIds).toEqual(["agent-old", "agent-with_under"]);
+			cleanupCandidateAgentIds: ["agent-old", "agent-other"],
+			cleanupCandidates: [
+				{ agentId: "agent-old", storeIdentity: { version: 1, stateRoot: "/tmp/store" } },
+				{ agentId: "agent-third" },
+				{ agentId: "agent-old" },
+			],
+		})?.cleanupCandidates).toEqual([
+			{ agentId: "agent-old", storeIdentity: { version: 1, stateRoot: "/tmp/store" } },
+			{ agentId: "agent-other" },
+			{ agentId: "agent-third" },
+		]);
 	});
 
 	it("restores only resume handles recorded on the active pi branch prefix", async () => {

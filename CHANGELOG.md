@@ -9,6 +9,7 @@
 - Resolve read fallback content once per transcript or display build, including consistent empty-file previews.
 - Replace duplicate smoke native-display flags and the ambiguous boolean resume alias with explicit string modes.
 - Drop turn-result aliases and the second emission vocabulary; checkpoint context windows from the leased session agent.
+- Normalize legacy resume cleanup IDs and unphased delete logs at parse time.
 
 ## 0.5.1 - 2026-09-13
 
