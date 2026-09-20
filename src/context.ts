@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
-import type { Context, Message, ToolCall } from "@earendil-works/pi-ai";
+import {
+	getCurrentSystemPrompt,
+	getCurrentTools,
+	normalizeContext,
+	toToolDeclaration,
+	type Context,
+	type Message,
+	type ToolCall,
+} from "@earendil-works/pi-ai";
 import { convertToLlm } from "@earendil-works/pi-coding-agent";
 import type { AgentModeOption, SDKImage } from "@cursor/sdk";
 import { CURSOR_PI_BRIDGE_PREFERENCE_TEXT } from "./cursor-bridge-contract.js";
@@ -82,7 +90,8 @@ function getCursorBootstrapTailSections(
 }
 
 function normalizePiContextMessages(messages: Context["messages"]): Message[] {
-	return convertToLlm(messages as Parameters<typeof convertToLlm>[0]);
+	const conversation = messages.filter((message) => message.role !== "system");
+	return convertToLlm(conversation as Parameters<typeof convertToLlm>[0]);
 }
 
 function isTextBlock(block: { type: string }): block is { type: "text"; text: string } {
@@ -134,6 +143,20 @@ function formatToolCall(toolCall: ToolCall): string {
 
 function sanitizeSystemPromptForCursor(systemPrompt: string): string {
 	let sanitized = systemPrompt;
+
+	// Pi 0.86+ structures built-in prompt sections as tags. Keep project and skill
+	// sections, but replace Pi-only callable surfaces and generic harness guidance.
+	sanitized = sanitized.replace(
+		/<tools>[\s\S]*?<\/tools>\n*/g,
+		"<tools>\nPi tool catalog omitted: Cursor can call only Cursor SDK tools exposed in this run.\n</tools>\n",
+	);
+	sanitized = sanitized.replace(
+		/<rules>[\s\S]*?<\/rules>\n*/g,
+		"<rules>\n- Be concise in your responses.\n- Show file paths clearly when working with files.\n</rules>\n",
+	);
+	sanitized = sanitized.replace(/<docs>[\s\S]*?<\/docs>\n*/g, "");
+
+	// Keep compatibility with unstructured prompts from older Pi versions.
 	sanitized = sanitized.replace(
 		/Available tools:\n[\s\S]*?\n\nIn addition to the tools above, you may have access to other custom tools depending on the project\.\n\n/g,
 		"Pi tool catalog omitted: Cursor can call only Cursor SDK tools exposed in this run.\n\n",
@@ -254,6 +277,7 @@ export function estimateCursorContextTokens(context: Context, options: CursorPro
 
 interface CursorContextFingerprintPayload {
 	systemHash: string;
+	toolsHash: string;
 	messageHashes: string[];
 }
 
@@ -263,6 +287,8 @@ function hashCursorContextValue(value: string): string {
 
 function serializeMessageForFingerprint(message: Message, index: number): string {
 	switch (message.role) {
+		case "system":
+			return hashCursorContextValue(`system:${message.timestamp}:${JSON.stringify(message)}`);
 		case "user": {
 			const text =
 				typeof message.content === "string"
@@ -324,7 +350,12 @@ function serializeRawPiMessageForFingerprint(message: Context["messages"][number
 function parseCursorContextFingerprint(fingerprint: string): CursorContextFingerprintPayload | undefined {
 	try {
 		const parsed = JSON.parse(fingerprint) as CursorContextFingerprintPayload;
-		if (!parsed || typeof parsed.systemHash !== "string" || !Array.isArray(parsed.messageHashes)) return undefined;
+		if (
+			!parsed ||
+			typeof parsed.systemHash !== "string" ||
+			typeof parsed.toolsHash !== "string" ||
+			!Array.isArray(parsed.messageHashes)
+		) return undefined;
 		if (!parsed.messageHashes.every((entry) => typeof entry === "string")) return undefined;
 		return parsed;
 	} catch {
@@ -333,9 +364,15 @@ function parseCursorContextFingerprint(fingerprint: string): CursorContextFinger
 }
 
 export function computeCursorContextFingerprint(context: Context): string {
+	const transcript = normalizeContext(context);
 	const payload: CursorContextFingerprintPayload = {
-		systemHash: hashCursorContextValue(context.systemPrompt ?? ""),
-		messageHashes: context.messages.map((message, index) => serializeRawPiMessageForFingerprint(message, index)),
+		systemHash: hashCursorContextValue(getCurrentSystemPrompt(transcript.messages)),
+		toolsHash: hashCursorContextValue(
+			JSON.stringify(getCurrentTools(transcript.messages).map(toToolDeclaration)),
+		),
+		messageHashes: transcript.messages
+			.filter((message) => message.role !== "system")
+			.map((message, index) => serializeRawPiMessageForFingerprint(message, index)),
 	};
 	return JSON.stringify(payload);
 }
@@ -350,10 +387,12 @@ export function shouldBootstrapCursorContext(
 	const current = parseCursorContextFingerprint(computeCursorContextFingerprint(context));
 	if (!current) return true;
 	if (current.systemHash !== previous.systemHash) return true;
+	if (current.toolsHash !== previous.toolsHash) return true;
 	if (current.messageHashes.length < previous.messageHashes.length) return true;
 	if (current.messageHashes.length > previous.messageHashes.length) {
-		for (let index = previous.messageHashes.length; index < context.messages.length; index += 1) {
-			const role = (context.messages[index] as { role?: string }).role;
+		const conversation = context.messages.filter((message) => message.role !== "system");
+		for (let index = previous.messageHashes.length; index < conversation.length; index += 1) {
+			const role = (conversation[index] as { role?: string }).role;
 			if (role === "branchSummary" || role === "compactionSummary") return true;
 		}
 	}
@@ -365,7 +404,8 @@ export function shouldBootstrapCursorContext(
 
 export function buildCursorIncrementalPrompt(context: Context, options: CursorPromptOptions = {}): CursorPrompt {
 	// Incremental sends omit Pi system instructions and the full tool boundary; the session agent retains both from bootstrap.
-	const messages = normalizePiContextMessages(context.messages);
+	const transcript = normalizeContext(context);
+	const messages = normalizePiContextMessages(transcript.messages);
 	const latestUserMessageIndex = getLatestUserMessageIndex(messages);
 	const latestUserMessage = latestUserMessageIndex >= 0 ? messages[latestUserMessageIndex] : undefined;
 	const latestUserText = latestUserMessage ? formatMessage(latestUserMessage) : undefined;
@@ -391,6 +431,7 @@ export function buildCursorIncrementalPrompt(context: Context, options: CursorPr
 }
 
 export function buildCursorPrompt(context: Context, options: CursorPromptOptions = {}): CursorPrompt {
+	const transcript = normalizeContext(context);
 	const sectionsBeforeMessages: string[] = [getCursorToolBoundaryText({
 		agentMode: options.agentMode,
 		hasToolManifest: Boolean(options.toolManifest),
@@ -400,11 +441,12 @@ export function buildCursorPrompt(context: Context, options: CursorPromptOptions
 		sectionsBeforeMessages.push(options.toolManifest);
 	}
 
-	if (context.systemPrompt) {
-		sectionsBeforeMessages.push(`System instructions from pi:\n${sanitizeSystemPromptForCursor(context.systemPrompt)}`);
+	const systemPrompt = getCurrentSystemPrompt(transcript.messages);
+	if (systemPrompt) {
+		sectionsBeforeMessages.push(`System instructions from pi:\n${sanitizeSystemPromptForCursor(systemPrompt)}`);
 	}
 
-	const messages = normalizePiContextMessages(context.messages);
+	const messages = normalizePiContextMessages(transcript.messages);
 	const messageSections = messages
 		.map((msg, index) => {
 			const text = formatMessage(msg);

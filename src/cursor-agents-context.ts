@@ -1,6 +1,6 @@
 import type {
-	BuildSystemPromptOptions,
 	ExtensionContext,
+	NormalizedBuildSystemPromptOptions,
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
@@ -11,7 +11,7 @@ import type { SettingSource } from "@cursor/sdk";
 /** Opening tag prefix pi `buildSystemPrompt()` uses for each context file (path attribute only). */
 export const PI_PROJECT_INSTRUCTIONS_OPEN_PREFIX = '<project_instructions path="';
 const PI_PROJECT_INSTRUCTIONS_CLOSE = "</project_instructions>";
-const PI_PROJECT_CONTEXT_OPEN = "\n\n<project_context>\n\nProject-specific instructions and guidelines:\n\n";
+const PI_PROJECT_CONTEXT_OPEN = "\n\n<project_context>\nProject-specific instructions and guidelines:\n\n";
 const PI_PROJECT_CONTEXT_CLOSE = "</project_context>\n";
 
 function normalizeContextPath(filePath: string): string {
@@ -112,7 +112,11 @@ export function serializePiProjectInstructionsBlock(file: PiAgentsContextFile): 
 /** Exact pi `buildSystemPrompt()` serialization for the full project context section. */
 export function serializePiProjectContextSection(contextFiles: readonly PiAgentsContextFile[]): string {
 	if (contextFiles.length === 0) return "";
-	return `${PI_PROJECT_CONTEXT_OPEN}${contextFiles.map(serializePiProjectInstructionsBlock).join("")}${PI_PROJECT_CONTEXT_CLOSE}`;
+	const blocks = contextFiles
+		.map(serializePiProjectInstructionsBlock)
+		.join("")
+		.replace(/\n$/, "");
+	return `${PI_PROJECT_CONTEXT_OPEN}${blocks}${PI_PROJECT_CONTEXT_CLOSE}`;
 }
 
 /** Remove pi context blocks that overlap Cursor setting sources. */
@@ -144,7 +148,7 @@ export function removePiAgentsContextFromSystemPrompt(
 export function resolveCursorFacingSystemPrompt(
 	systemPrompt: string,
 	model: ExtensionContext["model"],
-	systemPromptOptions?: BuildSystemPromptOptions,
+	systemPromptOptions?: NormalizedBuildSystemPromptOptions,
 	settingSourcesRaw?: string,
 	agentDir?: string,
 	config: CursorSdkConfig = loadCursorSdkUserConfig(),

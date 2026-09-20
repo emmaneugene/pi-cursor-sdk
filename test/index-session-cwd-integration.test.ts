@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { normalizeContext } from "@earendil-works/pi-ai";
 
 vi.mock("../src/model-discovery.js", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../src/model-discovery.js")>();
@@ -108,7 +109,7 @@ describe("extension session cwd integration", () => {
 			const streamSimple = pi._registered[0]?.config.streamSimple;
 			expect(streamSimple).toBe(streamCursorLazy);
 
-			await collectEvents(streamSimple!(makeModel("composer-2.5"), makeContext(), { apiKey: "test-key" }));
+			await collectEvents(streamSimple!(makeModel("composer-2.5"), normalizeContext(makeContext()), { apiKey: "test-key" }));
 
 			expect(mockedAgentCreate).toHaveBeenCalledWith(
 				expect.objectContaining({

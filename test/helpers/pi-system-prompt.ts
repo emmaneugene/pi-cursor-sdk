@@ -1,24 +1,42 @@
-import type { BuildSystemPromptOptions } from "@earendil-works/pi-coding-agent";
-import {
-	serializePiProjectContextSection,
-	type PiAgentsContextFile,
-} from "../../src/cursor-agents-context.js";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type {
+	BuildSystemPromptOptions,
+	NormalizedBuildSystemPromptOptions,
+} from "@earendil-works/pi-coding-agent";
+import { createDefaultSystemPromptOptions } from "./context-fixtures.js";
+import type { PiAgentsContextFile } from "../../src/cursor-agents-context.js";
+
+type PiBuildSystemPrompt = (options: BuildSystemPromptOptions) => string;
+let cachedBuildSystemPrompt: PiBuildSystemPrompt | undefined;
+
+export function buildInstalledPiSystemPrompt(options: BuildSystemPromptOptions): string {
+	if (!cachedBuildSystemPrompt) {
+		const piMain = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
+		const piPackageRoot = dirname(dirname(piMain));
+		const require = createRequire(piMain);
+		cachedBuildSystemPrompt = require(join(piPackageRoot, "dist/core/system-prompt.js"))
+			.buildSystemPrompt as PiBuildSystemPrompt;
+	}
+	return cachedBuildSystemPrompt(options);
+}
 
 export function makeSystemPromptOptions(
 	contextFiles: PiAgentsContextFile[],
 	cwd = "/repo",
-): BuildSystemPromptOptions {
-	return { cwd, contextFiles, selectedTools: [] };
+): NormalizedBuildSystemPromptOptions {
+	return {
+		...createDefaultSystemPromptOptions(cwd),
+		contextFiles,
+		selectedTools: [],
+	};
 }
 
-/** Minimal pi-like system prompt containing only the project_context subset this feature owns. */
+/** Real installed-pi system prompt for the supplied project context files. */
 export function buildPiSystemPromptWithContextFiles(
 	contextFiles: PiAgentsContextFile[],
 	cwd = "/repo",
 ): string {
-	let prompt =
-		"You are an expert coding assistant operating inside pi, a coding agent harness.\n\nGuidelines:\n- Be concise in your responses";
-	prompt += serializePiProjectContextSection(contextFiles);
-	prompt += `\nCurrent date: 2026-01-01\nCurrent working directory: ${cwd}`;
-	return prompt;
+	return buildInstalledPiSystemPrompt(makeSystemPromptOptions(contextFiles, cwd));
 }

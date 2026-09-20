@@ -14,7 +14,15 @@ import {
 	buildCursorSessionSendPrompt,
 	planCursorSessionSend,
 } from "../src/cursor-session-send-policy.js";
-import type { Context, UserMessage, AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
+import {
+	normalizeContext,
+	type AssistantMessage,
+	type Context,
+	type ToolResultMessage,
+	type UserMessage,
+} from "@earendil-works/pi-ai";
+import { getActiveContextToolNames } from "../src/cursor-context-tools.js";
+import { buildInstalledPiSystemPrompt } from "./helpers/pi-system-prompt.js";
 
 describe("buildCursorPrompt", () => {
 	it("includes system prompt", () => {
@@ -25,6 +33,41 @@ describe("buildCursorPrompt", () => {
 		const result = buildCursorPrompt(ctx);
 		expect(result.text).toContain("System instructions from pi:");
 		expect(result.text).toContain("You are helpful.");
+	});
+
+	it("resolves transcript-backed prompt updates without rendering system messages as conversation", () => {
+		const transcript = normalizeContext({
+			systemPrompt: "Base instruction.",
+			messages: [{ role: "user", content: "hello", timestamp: 1 }],
+		});
+		transcript.messages.push({
+			role: "system",
+			content: "New instruction.",
+			timestamp: 2,
+		});
+
+		const result = buildCursorPrompt(transcript);
+
+		expect(result.text).toContain("Base instruction.\n\nNew instruction.");
+		expect(result.text.match(/New instruction\./g)).toHaveLength(1);
+	});
+
+	it("resolves transcript-backed tool updates for native replay routing", () => {
+		const readTool = {
+			name: "read",
+			description: "Read files",
+			parameters: Type.Object({ path: Type.String() }),
+		};
+		const transcript = normalizeContext({ messages: [], tools: [readTool] });
+		transcript.messages.push({
+			role: "system",
+			content: "",
+			toolsRemoved: [{ name: "read" }],
+			toolsAdded: [{ ...readTool, name: "grep" }],
+			timestamp: 2,
+		});
+
+		expect([...(getActiveContextToolNames(transcript) ?? [])]).toEqual(["grep"]);
 	});
 
 	it("omits pi tool catalogs while preserving local skill catalogs for Cursor-facing system instructions", () => {
@@ -70,6 +113,22 @@ describe("buildCursorPrompt", () => {
 		expect(result.text).not.toContain("custom_private_tool");
 		expect(result.text).toContain("private-skill");
 		expect(result.text).not.toContain("Semantic code intelligence priority");
+	});
+
+	it("omits tagged Pi 0.86 tool, rule, and docs sections from a real built prompt", () => {
+		const systemPrompt = buildInstalledPiSystemPrompt({
+			cwd: "/repo",
+			selectedTools: ["read", "bash"],
+			contextFiles: [{ path: "/repo/AGENTS.md", content: "Project instruction stays." }],
+		});
+
+		const result = buildCursorPrompt({ systemPrompt, messages: [] });
+
+		expect(result.text).toContain("Pi tool catalog omitted");
+		expect(result.text).toContain("Project instruction stays.");
+		expect(result.text).not.toContain("<docs>");
+		expect(result.text).not.toContain("Use the read tool to read files");
+		expect(result.text).not.toContain("Follow existing code conventions");
 	});
 
 	it("formats user and assistant messages", () => {
@@ -712,6 +771,56 @@ describe("cursor session prompt assembly", () => {
 		expect(plan).toMatchObject({ mode: "bootstrap", reason: "context_divergence" });
 		expect(prompt.text).toContain("System instructions from pi:\nCurrent invariant instruction.");
 		expect(prompt.text).not.toContain("Previous invariant instruction.");
+	});
+
+	it("rebootstraps when transcript-backed instructions or tools change", () => {
+		const readTool = {
+			name: "read",
+			description: "Read files",
+			parameters: Type.Object({ path: Type.String() }),
+		};
+		const prior = normalizeContext({
+			systemPrompt: "Base instruction.",
+			messages: [{ role: "user", content: "Hello", timestamp: 1 }],
+			tools: [readTool],
+		});
+		const updated = normalizeContext({
+			systemPrompt: "Base instruction.",
+			messages: [{ role: "user", content: "Hello", timestamp: 1 }],
+			tools: [readTool],
+		});
+		updated.messages.push({
+			role: "system",
+			content: "Follow the new constraint.",
+			toolsRemoved: [{ name: "read" }],
+			timestamp: 2,
+		});
+		const sendState = {
+			bootstrapped: true,
+			contextFingerprint: computeCursorContextFingerprint(prior),
+			incrementalSendCount: 0,
+		};
+
+		expect(shouldBootstrapCursorContext(sendState, updated)).toBe(true);
+		expect(planCursorSessionSend(sendState, updated)).toMatchObject({
+			mode: "bootstrap",
+			reason: "context_divergence",
+		});
+	});
+
+	it("rebootstraps once from a pre-0.86 fingerprint without a tools hash", () => {
+		const context: Context = {
+			messages: [{ role: "user", content: "Hello", timestamp: 1 }],
+		};
+		const legacyFingerprint = JSON.stringify({
+			systemHash: "legacy",
+			messageHashes: [],
+		});
+
+		expect(shouldBootstrapCursorContext({
+			bootstrapped: true,
+			contextFingerprint: legacyFingerprint,
+		}, context)).toBe(true);
 	});
 
 	it("omits invariant bootstrap instructions from incremental prompts", () => {

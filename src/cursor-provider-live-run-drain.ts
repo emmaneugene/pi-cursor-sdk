@@ -3,6 +3,7 @@ import {
 	type AssistantMessage,
 	type AssistantMessageEventStream,
 	type Context,
+	type JsonObject,
 	type Model,
 } from "@earendil-works/pi-ai";
 import { scheduler } from "node:timers/promises";
@@ -42,6 +43,11 @@ type CursorLiveRunDrainOutcome = "tool_use" | "stop" | "error" | "aborted" | "ch
 type LiveRunPreSendOutcome = "stream_ended" | "continue_send";
 
 let cursorNativeReplayCounter = 0;
+
+function toJsonObject(value: Record<string, unknown> | undefined): JsonObject {
+	if (!value) return {};
+	return JSON.parse(JSON.stringify(value)) as JsonObject;
+}
 
 export async function abandonSessionCursorAgent(scopeKey: string | undefined): Promise<void> {
 	if (!scopeKey) return;
@@ -176,17 +182,18 @@ function emitCursorNativeToolUseTurn(
 	const shouldTerminate = run.done && !run.finalText?.trim() && !cursorLiveRuns.peekEvent(run);
 	for (const tool of tools) {
 		const contentIndex = partial.content.length;
+		const args = toJsonObject(tool.args);
 		partial.content.push({
 			type: "toolCall",
 			id: tool.id,
 			name: tool.toolName,
-			arguments: tool.args,
+			arguments: args,
 		});
 		stream.push({ type: "toolcall_start", contentIndex, partial });
-		stream.push({ type: "toolcall_delta", contentIndex, delta: JSON.stringify(tool.args), partial });
+		stream.push({ type: "toolcall_delta", contentIndex, delta: JSON.stringify(args), partial });
 		const block = partial.content[contentIndex];
 		if (block.type === "toolCall") stream.push({ type: "toolcall_end", contentIndex, toolCall: block, partial });
-		if (recordCursorNativeToolDisplay({ ...tool, terminate: shouldTerminate })) {
+		if (recordCursorNativeToolDisplay({ ...tool, args, terminate: shouldTerminate })) {
 			run.recordedToolDisplayIds.push(tool.id);
 			debugRecorder?.recordDrainEvent("native_tool_display_recorded", {
 				toolId: tool.id,
@@ -231,14 +238,15 @@ function emitCursorBridgeToolUseTurn(
 ): void {
 	for (const request of requests) {
 		const contentIndex = partial.content.length;
+		const args = toJsonObject(request.args);
 		partial.content.push({
 			type: "toolCall",
 			id: request.piToolCallId,
 			name: request.piToolName,
-			arguments: request.args,
+			arguments: args,
 		});
 		stream.push({ type: "toolcall_start", contentIndex, partial });
-		stream.push({ type: "toolcall_delta", contentIndex, delta: JSON.stringify(request.args), partial });
+		stream.push({ type: "toolcall_delta", contentIndex, delta: JSON.stringify(args), partial });
 		const block = partial.content[contentIndex];
 		if (block.type === "toolCall") stream.push({ type: "toolcall_end", contentIndex, toolCall: block, partial });
 	}
