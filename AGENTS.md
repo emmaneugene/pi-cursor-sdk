@@ -10,6 +10,10 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-extension-factory-guard.ts` owns the tokenized process-owner claim/release so a child session cannot dispose the parent bridge, rewrite parent session scope, or replace the parent pooled SDK agent.
 - `src/cursor-provider-runtime-context.ts` carries the nested child's explicit scope, cwd, bridge, replay, and resume policy through provider turns.
 - `src/model-discovery.ts` discovers Cursor models, builds pi model metadata, stores per-model metadata, and defines fallback models.
+- `src/model-list-cache.ts` owns the on-disk Cursor model catalog cache and classifies a matching file as `fresh` or `stale`.
+- `src/cursor-fallback-models.generated.ts` is the bundled fallback catalog snapshot used when live discovery and cache both miss.
+- `src/cursor-api-key.ts` owns Cursor API key resolution for discovery and provider turns.
+- `src/cursor-sdk-runtime.ts` owns `@cursor/sdk` loading for runtime callers.
 - `shared/cursor-model-selection-identities.mjs` owns canonical selectable model/context/fast identities and context-window key normalization shared by runtime discovery and the snapshot generator; its `.d.mts` file owns the TypeScript contract.
 - `src/cursor-provider.ts` is a thin `streamCursor()` wrapper that delegates turn execution to the turn runner.
 - `src/cursor-provider-turn-runner.ts` orchestrates provider turns (pre-send drain, prepare, send, finalize, emit, cleanup).
@@ -18,7 +22,9 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-provider-turn-finalize.ts` owns unified `awaitFinalizeCursorRunOutcome()` (wait, transcript replay, incomplete tools, artifacts, context cache).
 - `src/cursor-provider-turn-emit.ts` owns live vs direct emission from finalized outcomes.
 - `src/cursor-provider-turn-types.ts` owns immutable turn phase data and explicit phase result types; phase-local cleanup stays inside the owning phase.
-- `src/cursor-provider-run-outcome.ts` owns the discriminated `CursorRunOutcome` model and terminal emission classification.
+- `src/cursor-provider-run-outcome.ts` owns the discriminated `CursorRunOutcome` model (`finished` / `cancelled` / `error`).
+- `src/cursor-sdk-process-error-guard.ts` owns SDK process-error suppression around a turn send.
+- `src/cursor-provider-overflow.ts` rewrites Cursor context-window failures into the `context_length_exceeded` form pi uses for compact-retry.
 - `src/cursor-provider-run-finalizer.ts` owns live-run wait completion, outcome application, debug finalization, and SDK abort-suppression disposal.
 - `src/cursor-run-final-text.ts` owns final assistant text selection for run outcomes and live-run drain.
 - `src/cursor-provider-errors.ts` owns scrubbed Cursor SDK run failure detail, abort reason formatting, and provider error sanitization.
@@ -28,6 +34,8 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-http1.ts` owns branch-scoped local HTTP/1.1 session state, global-preference override tracking, and extension-owned SDK configuration/null reset.
 - `src/cursor-sdk-platform-package.ts` owns bundled Cursor SDK platform-package resolution for ripgrep, the tree-sitter vendor directory, and `cursorsandbox`, plus the local-agent argv[1] host-entry so the SDK locator can see that package.
 - `src/cursor-session-agent.ts` owns session-scoped SDK agent pooling, explicit nested-child pool scopes, transport-aware pool identity, send-state commits, busy tracking for in-flight SDK `run.wait()` work, and scoped acquire/dispose state.
+- `src/cursor-session-agent-resume.ts` owns local resume handle persist/parse for `cursor-sdk-agent-resume` session entries.
+- `src/cursor-session-turn-queue.ts` serializes in-flight provider turns per session scope.
 - `src/cursor-session-agent-lineage.ts` owns non-resumable per-session local agent lineage custom entries independent of local resume.
 - `src/cursor-session-agent-lifecycle.ts` owns lazy session-agent lifecycle invalidation on model select, compaction, tree navigation, shutdown, and scope changes, including shutdown-time HTTP transport reset before module reload.
 - `src/cursor-session-compaction-prep.ts` owns `prepareCursorSessionForCompaction()` (release scoped live runs, reset pooled agent, suppress summarizer resume-handle persist) wired from `session_before_compact` in `src/index.ts`.
@@ -58,7 +66,9 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-tool-presentation-registry.ts` is the canonical typed registry for Cursor tool names, labels, visibility, lifecycle, replay metadata (legacy wrapper names, wrapper labels, side-effect policy, call-summary policy), web remapping, alias normalization, and bridge exclusions for internal replay wrappers only (`cursor`, `cursor_*`); sibling modules derive from it.
 - `src/cursor-transcript-tool-specs.ts` owns per-tool transcript formatters and pi display builders keyed by normalized tool name; its display implementation keys must match registry entries exactly (`CURSOR_TOOL_DISPLAY_SPEC_KEYS`).
 - `src/cursor-pi-tool-bridge-types.ts` owns shared bridge/MCP type contracts.
+- `src/cursor-pi-tool-bridge-constants.ts` owns the loopback MCP server name, endpoint root, and bridge tool-call id pattern.
 - `src/cursor-live-run-coordinator.ts` owns live Cursor run registry/scope matching, queued events, drain leases, idle disposal timers, and release cleanup.
+- `src/cursor-live-run-accounting.ts` owns live-run token occupancy state used after drain.
 - `src/cursor-pi-tool-bridge.ts` re-exports bridge registration and snapshot helpers; exposes active pi tools through owner and nested-child loopback MCP bridge registries without cross-session shutdown.
 - `src/cursor-pi-tool-bridge-snapshot.ts` owns bridge snapshot building and surface signatures.
 - `src/cursor-pi-tool-bridge-config.ts` owns `tools.bridge` resolution from user JSON.
@@ -68,6 +78,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-pi-tool-bridge-diagnostics.ts` owns bridge debug diagnostics serialization and stderr logging.
 - `src/cursor-pi-tool-bridge-mcp.ts` owns MCP name/schema conversion and pi-to-MCP content helpers for the bridge.
 - `src/cursor-model-lifecycle.ts` owns the canonical effective Cursor model lifecycle/sync helper for `session_start`, `before_agent_start`, `model_select` with event-model override, and `turn_start`; callers keep Cursor-only filtering explicit.
+- `src/cursor-model.ts` owns the `cursor` provider id and Cursor-model identity helpers.
 - `src/cursor-fallback-warning.ts` owns per-session Cursor fallback catalog warning activation.
 - `src/cursor-native-tool-display-registration.ts` owns native replay tool registration and model-scoped activation.
 - `src/cursor-native-replay-routing.ts` owns canonical native replay disposition (`queue_replay` / `inactive_trace` / `transcript_trace`) and context-tool partitioning for drain.
@@ -75,15 +86,25 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-context-tools.ts` owns `context.tools` snapshot helpers at provider stream start.
 - `src/cursor-display-text.ts` owns shared single-line sanitization and 240-char truncation for replay/trace display.
 - `src/cursor-native-tool-display-replay.ts` owns replay card rendering and diff/preview formatting.
+- `src/cursor-replay-tool-details.ts` owns parsed replay-detail variants (`nativeEdit` / `nativeWrite` / `activity` / `generateImage` / `genericFallback`).
+- `src/cursor-replay-activity-builders.ts`, `src/cursor-replay-summary-args.ts`, and `src/cursor-replay-source-names.ts` own activity-card construction, summary args, and source-name classification.
+- `src/cursor-native-tool-names.ts` owns native and replay tool-name sets.
 - `src/cursor-native-tool-display-tools.ts` owns native/replay tool definition factories and replay execute wrappers.
 - `src/cursor-native-tool-display-state.ts` owns native replay display state, `tools.display.native` gating, and record/consume helpers.
 - `src/cursor-tool-result-display-readers.ts` owns canonical result readers shared by transcript/replay paths, including MCP-like content display normalization.
 - `src/cursor-tool-transcript.ts` owns the raw `unknown toolCall -> transcript/display` façade; `src/cursor-transcript-tool-specs.ts`, `src/cursor-transcript-utils.ts`, and `src/cursor-transcript-tool-formatters.ts` implement spec dispatch and formatting.
+- `src/cursor-compact-tool-summary.ts` owns compact one-line tool summaries.
+- `src/cursor-display-only-trace.ts` owns display-only thinking traces that do not change assistant text.
+- `src/cursor-web-tool-args.ts` and `src/cursor-web-tool-activity.ts` own web-search/fetch arg and activity display.
+- `src/cursor-agent-message-web-tools.ts` owns transcript web-tool call loading after an agent-message offset.
 - `src/cursor-mcp-timeout-override.ts` owns Cursor SDK MCP timeout overrides: 3600s default for `callTool`, 10s default for verified initialize/listTools paths on first send, and SDK-default behavior for unknown MCP protocol stacks.
 - `src/cursor-config.ts` owns user-only `~/.pi/agent/cursor-sdk.json` loading, parsing, CLI/session/user/builtin precedence, and fast-default persistence.
 - `src/cursor-durable-fs.ts` owns the canonical no-follow regular-file open (`openExistingRegularFileNoFollow`) and read-write fsync (`fsyncExistingRegularFile`) helpers used to durably fsync session files without following an attacker-replaced symlink; `src/cursor-session-agent-cleanup.ts` consumes it instead of duplicating the identity-check logic.
 - `src/cursor-state.ts` owns Cursor fast/mode controls, `/cursor-http` session/user persistence, `/cursor-tools`, local config refresh/cleanup wiring, and stable state re-exports.
 - `src/cursor-runtime-state.ts` owns effective Cursor runtime status helpers.
+- `src/cursor-task-presentation.ts` owns `tools.display.taskPresentation` (`task` / `subagent` / `subagent-meta`).
+- `src/cursor-active-tools.ts` owns the empty pi-tool-list check used when Cursor skills/tools must hide.
+- `src/cursor-skill-tool.ts` owns the Cursor `cursor_activate_skill` tool and skill-catalog prompt section.
 - `src/context.ts`, `src/context-window-cache.ts`, and `src/bundled-context-windows.ts` handle prompt conversion and context-window caches.
 - `src/cursor-bridge-contract.ts` owns pi bridge naming, preference text, and MCP description helpers.
 - `src/cursor-tool-manifest.ts` owns bootstrap callable-surface manifest text (`tools.manifest`, default on).
@@ -92,6 +113,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `test/helpers/cursor-provider-harness.ts` owns Cursor SDK provider mocks/stream helpers and re-exports pi-harness fixtures for provider tests.
 - `docs/cursor-model-ux-spec.md` is the maintainer design source of truth for Cursor model UX. Keep it aligned with behavior changes.
 - `docs/cursor-testing-lessons.md` is the maintainer source of truth for regression testing lessons (auth.json, isolated smoke harnesses, JSONL replay scans, plan-mode replay traps).
+- `docs/evidence/cursor-system-prompts-2026-08-02/` is the dated Cursor local-agent system-prompt capture; do not add new dated dumps there. Fold or delete superseded evidence instead.
 - `docs/cursor-dogfood-checklist.md` is the minimal one-session dogfood checklist (baseline user config, JSONL ID patterns, bootstrap manifest, edit diff card).
 
 ## Operating rules

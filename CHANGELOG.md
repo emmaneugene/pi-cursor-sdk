@@ -17,6 +17,7 @@
 - Ship the maintainer `scripts/` tree as one package `files` entry.
 - Count Cursor SDK debug artifacts with named buckets instead of 13 parallel fields.
 - Type expandable native replay cards as activity or generate-image details.
+- Fill the `AGENTS.md` repository map and delete superseded July local-resume evidence dumps.
 
 ## 0.5.1 - 2026-09-13
 
