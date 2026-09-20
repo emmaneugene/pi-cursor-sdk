@@ -215,6 +215,24 @@ describe("discoverModels model-list cache", () => {
 		expect(issues[0]?.reason).toBe("cached-after-error");
 	});
 
+	it("uses a stale catalog when the live list cannot be projected", async () => {
+		writeStoredCursorApiKey("cache-key");
+		writeFileSync(cacheTestUtils.getCachePath(), JSON.stringify({
+			version: 1,
+			fetchedAt: Date.now() - cacheTestUtils.DEFAULT_TTL_MS - 1000,
+			keyFingerprint: fingerprintApiKey("cache-key"),
+			models: [MODEL],
+		}));
+		mockedList.mockResolvedValueOnce([{ id: 1 } as never]);
+		const issues: CursorModelFallbackIssue[] = [];
+
+		const models = await discoverModels({ onFallback: (issue) => issues.push(issue) });
+
+		expect(models.map((model) => model.id)).toEqual(["composer-2"]);
+		expect(issues[0]?.reason).toBe("cached-after-error");
+		expect(issues[0]?.errorMessage).toContain("could not be projected");
+	});
+
 	it("omits an empty cached-catalog error detail", async () => {
 		writeStoredCursorApiKey("cache-key");
 		mockedList.mockResolvedValueOnce([MODEL]);

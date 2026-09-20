@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
 	getCursorModelSelectionIdentities,
 	normalizeCursorContextWindowEntries,
+	parseCursorModelCatalogItem,
+	projectCursorModelCatalog,
 } from "../shared/cursor-model-selection-identities.mjs";
 import { BUNDLED_CONTEXT_WINDOWS } from "../src/bundled-context-windows.js";
 import { FALLBACK_MODEL_ITEMS } from "../src/cursor-fallback-models.generated.js";
@@ -35,6 +37,19 @@ describe("Cursor model-selection identities", () => {
 			{ piModelId: "model-a", defaultContext: "1m", contextWindowKey: "model-a@1m" },
 			{ piModelId: "model-b", defaultContext: undefined, contextWindowKey: "model-b" },
 		]);
+	});
+
+	it("projects live and cached catalog shapes by dropping aliases and display-name labels", () => {
+		expect(parseCursorModelCatalogItem(models[0])).toEqual({
+			id: "model-a",
+			displayName: "Model A",
+			parameters: [
+				{ id: "context", values: [{ value: "1m" }] },
+				{ id: "fast", values: [{ value: "true" }, { value: "false" }] },
+			],
+			variants: [{ displayName: "Default", isDefault: true, params: [{ id: "context", value: "1m" }, { id: "fast", value: "false" }] }],
+		});
+		expect(projectCursorModelCatalog(models)?.every((item) => !("aliases" in item))).toBe(true);
 	});
 
 	it("canonicalizes default-context evidence and drops aliases and variants", () => {
@@ -71,5 +86,8 @@ describe("Cursor model-selection identities", () => {
 	it("keeps every bundled key canonical and reachable in the fallback catalog", () => {
 		const bundled = new Map(Object.entries(BUNDLED_CONTEXT_WINDOWS));
 		expect(normalizeCursorContextWindowEntries(FALLBACK_MODEL_ITEMS, bundled, "bundled snapshot")).toEqual(bundled);
+		expect(JSON.stringify(FALLBACK_MODEL_ITEMS)).not.toContain('"aliases"');
+		expect(JSON.stringify(FALLBACK_MODEL_ITEMS)).not.toContain('"description"');
+		expect(FALLBACK_MODEL_ITEMS.some((item) => JSON.stringify(item.parameters ?? []).includes('"displayName"'))).toBe(false);
 	});
 });

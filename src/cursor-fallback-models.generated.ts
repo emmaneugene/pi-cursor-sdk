@@ -10,19 +10,15 @@ export const FALLBACK_MODEL_ITEMS = [
 		parameters: [
 			{
 				id: "optimize_for",
-				displayName: "Optimize For",
 				values: [
 					{
-						value: "intelligence",
-						displayName: "Intelligence"
+						value: "intelligence"
 					},
 					{
-						value: "balanced",
-						displayName: "Balance"
+						value: "balanced"
 					},
 					{
-						value: "cost",
-						displayName: "Cost"
+						value: "cost"
 					}
 				]
 			}
@@ -61,15 +57,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-fable-5",
 		displayName: "Claude Fable 5",
-		aliases: [
-			"fable",
-			"fable-5",
-			"fable-5"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -81,41 +71,32 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "300k",
-						displayName: "300K"
+						value: "300k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			}
@@ -467,16 +448,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-haiku-4-5",
 		displayName: "Claude Haiku 4.5",
-		aliases: [
-			"haiku-latest",
-			"haiku",
-			"haiku-4.5",
-			"haiku-4-5"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -512,15 +486,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-opus-4-5",
 		displayName: "Claude Opus 4.5",
-		aliases: [
-			"opus",
-			"opus-4.5",
-			"opus-4-5"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -556,15 +524,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-opus-4-6",
 		displayName: "Claude Opus 4.6",
-		aliases: [
-			"opus",
-			"opus-4.6",
-			"opus-4-6"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -576,37 +538,29 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "200k",
-						displayName: "200K"
+						value: "200k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			}
@@ -890,14 +844,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-opus-4-7",
 		displayName: "Claude Opus 4.7",
-		aliases: [
-			"opus-4.7",
-			"opus-4-7"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -909,54 +858,43 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "300k",
-						displayName: "300K"
+						value: "300k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -1968,16 +1906,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-opus-4-8",
 		displayName: "Claude Opus 4.8",
-		aliases: [
-			"opus-latest",
-			"opus",
-			"opus-4.8",
-			"opus-4-8"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -1989,54 +1920,43 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "300k",
-						displayName: "300K"
+						value: "300k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -3048,15 +2968,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-opus-5",
 		displayName: "Claude Opus 5",
-		aliases: [
-			"opus-latest",
-			"opus",
-			"opus-5"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -3068,54 +2982,43 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "300k",
-						displayName: "300K"
+						value: "300k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -3927,14 +3830,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-sonnet-4",
 		displayName: "Claude Sonnet 4",
-		aliases: [
-			"sonnet",
-			"sonnet-4"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -3946,11 +3844,9 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "200k",
-						displayName: "200K"
+						value: "200k"
 					}
 				]
 			}
@@ -3988,15 +3884,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-sonnet-4-5",
 		displayName: "Claude Sonnet 4.5",
-		aliases: [
-			"sonnet",
-			"sonnet-4.5",
-			"sonnet-4-5"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -4008,11 +3898,9 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "200k",
-						displayName: "200K"
+						value: "200k"
 					}
 				]
 			}
@@ -4050,16 +3938,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-sonnet-4-6",
 		displayName: "Claude Sonnet 4.6",
-		aliases: [
-			"sonnet-latest",
-			"sonnet",
-			"sonnet-4.6",
-			"sonnet-4-6"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -4071,37 +3952,29 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "200k",
-						displayName: "200K"
+						value: "200k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			}
@@ -4385,14 +4258,9 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "claude-sonnet-5",
 		displayName: "Claude Sonnet 5",
-		aliases: [
-			"sonnet-latest",
-			"sonnet-5"
-		],
 		parameters: [
 			{
 				id: "thinking",
-				displayName: "Thinking",
 				values: [
 					{
 						value: "false"
@@ -4404,41 +4272,32 @@ export const FALLBACK_MODEL_ITEMS = [
 			},
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "300k",
-						displayName: "300K"
+						value: "300k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			}
@@ -4793,14 +4652,12 @@ export const FALLBACK_MODEL_ITEMS = [
 		parameters: [
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -4830,22 +4687,15 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "composer-2.5",
 		displayName: "Composer 2.5",
-		aliases: [
-			"composer-latest",
-			"composer",
-			"composer-2-5"
-		],
 		parameters: [
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -4875,9 +4725,6 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "default",
 		displayName: "Auto",
-		aliases: [
-			"auto"
-		],
 		variants: [
 			{
 				params: [],
@@ -4889,9 +4736,6 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gemini-2.5-flash",
 		displayName: "Gemini 2.5 Flash",
-		aliases: [
-			"gemini-flash"
-		],
 		variants: [
 			{
 				params: [],
@@ -4914,12 +4758,6 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gemini-3.1-pro",
 		displayName: "Gemini 3.1 Pro",
-		aliases: [
-			"gemini-latest",
-			"gemini-pro-latest",
-			"gemini",
-			"gemini-pro"
-		],
 		variants: [
 			{
 				params: [],
@@ -4931,10 +4769,6 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gemini-3.5-flash",
 		displayName: "Gemini 3.5 Flash",
-		aliases: [
-			"gemini-flash-latest",
-			"gemini-flash"
-		],
 		variants: [
 			{
 				params: [],
@@ -4946,30 +4780,21 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gemini-3.6-flash",
 		displayName: "Gemini 3.6 Flash",
-		aliases: [
-			"gemini-flash-latest",
-			"gemini-flash"
-		],
 		parameters: [
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "minimal",
-						displayName: "Minimal"
+						value: "minimal"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					}
 				]
 			}
@@ -5017,26 +4842,18 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gemini-3.7-flash",
 		displayName: "Gemini 3.7 Flash",
-		aliases: [
-			"gemini-flash-latest",
-			"gemini-flash"
-		],
 		parameters: [
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					}
 				]
 			}
@@ -5078,15 +4895,12 @@ export const FALLBACK_MODEL_ITEMS = [
 		parameters: [
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			}
@@ -5116,9 +4930,6 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5-mini",
 		displayName: "GPT-5 Mini",
-		aliases: [
-			"gpt-mini"
-		],
 		variants: [
 			{
 				params: [],
@@ -5130,25 +4941,18 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.1",
 		displayName: "GPT-5.1",
-		aliases: [
-			"gpt"
-		],
 		parameters: [
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					}
 				]
 			}
@@ -5187,42 +4991,32 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.2",
 		displayName: "GPT-5.2",
-		aliases: [
-			"gpt"
-		],
 		parameters: [
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "extra-high",
-						displayName: "Extra High"
+						value: "extra-high"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -5338,44 +5132,32 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.3-codex",
 		displayName: "Codex 5.3",
-		aliases: [
-			"codex-latest",
-			"codex",
-			"codex-5.3"
-		],
 		parameters: [
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "extra-high",
-						displayName: "Extra High"
+						value: "extra-high"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -5491,60 +5273,46 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.4",
 		displayName: "GPT-5.4",
-		aliases: [
-			"gpt"
-		],
 		parameters: [
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "272k",
-						displayName: "272K"
+						value: "272k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "none",
-						displayName: "None"
+						value: "none"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "extra-high",
-						displayName: "Extra High"
+						value: "extra-high"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -5811,34 +5579,24 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.4-mini",
 		displayName: "GPT-5.4 Mini",
-		aliases: [
-			"gpt-mini-latest",
-			"gpt-mini"
-		],
 		parameters: [
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "none",
-						displayName: "None"
+						value: "none"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					}
 				]
 			}
@@ -5895,34 +5653,24 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.4-nano",
 		displayName: "GPT-5.4 Nano",
-		aliases: [
-			"gpt-nano-latest",
-			"gpt-nano"
-		],
 		parameters: [
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "none",
-						displayName: "None"
+						value: "none"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					}
 				]
 			}
@@ -5979,60 +5727,46 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.5",
 		displayName: "GPT-5.5",
-		aliases: [
-			"gpt-5-5"
-		],
 		parameters: [
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "272k",
-						displayName: "272K"
+						value: "272k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "none",
-						displayName: "None"
+						value: "none"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "extra-high",
-						displayName: "Extra High"
+						value: "extra-high"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -6299,64 +6033,49 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.6-luna",
 		displayName: "GPT-5.6 Luna",
-		aliases: [
-			"gpt-5-6-luna"
-		],
 		parameters: [
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "272k",
-						displayName: "272K"
+						value: "272k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "none",
-						displayName: "None"
+						value: "none"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -6674,67 +6393,49 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.6-sol",
 		displayName: "GPT-5.6 Sol",
-		aliases: [
-			"gpt-latest",
-			"gpt",
-			"gpt-5-6-sol",
-			"gpt-5.6"
-		],
 		parameters: [
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "272k",
-						displayName: "272K"
+						value: "272k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "none",
-						displayName: "None"
+						value: "none"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -7052,64 +6753,49 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "gpt-5.6-terra",
 		displayName: "GPT-5.6 Terra",
-		aliases: [
-			"gpt-5-6-terra"
-		],
 		parameters: [
 			{
 				id: "context",
-				displayName: "Context",
 				values: [
 					{
-						value: "272k",
-						displayName: "272K"
+						value: "272k"
 					},
 					{
-						value: "1m",
-						displayName: "1M"
+						value: "1m"
 					}
 				]
 			},
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "none",
-						displayName: "None"
+						value: "none"
 					},
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast"
+						value: "true"
 					}
 				]
 			}
@@ -7430,32 +7116,26 @@ export const FALLBACK_MODEL_ITEMS = [
 		parameters: [
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast​"
+						value: "true"
 					}
 				]
 			}
@@ -7548,36 +7228,29 @@ export const FALLBACK_MODEL_ITEMS = [
 		parameters: [
 			{
 				id: "effort",
-				displayName: "Effort",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "medium",
-						displayName: "Medium"
+						value: "medium"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "xhigh",
-						displayName: "Extra High"
+						value: "xhigh"
 					}
 				]
 			},
 			{
 				id: "fast",
-				displayName: "Fast",
 				values: [
 					{
 						value: "false"
 					},
 					{
-						value: "true",
-						displayName: "Fast​​"
+						value: "true"
 					}
 				]
 			}
@@ -7693,10 +7366,6 @@ export const FALLBACK_MODEL_ITEMS = [
 	{
 		id: "kimi-k2.7-code",
 		displayName: "Kimi K2.7 Code",
-		aliases: [
-			"kimi-latest",
-			"kimi"
-		],
 		variants: [
 			{
 				params: [],
@@ -7711,19 +7380,15 @@ export const FALLBACK_MODEL_ITEMS = [
 		parameters: [
 			{
 				id: "reasoning",
-				displayName: "Reasoning",
 				values: [
 					{
-						value: "low",
-						displayName: "Low"
+						value: "low"
 					},
 					{
-						value: "high",
-						displayName: "High"
+						value: "high"
 					},
 					{
-						value: "max",
-						displayName: "Max"
+						value: "max"
 					}
 				]
 			}

@@ -5,6 +5,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ModelListItem } from "@cursor/sdk";
 import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 import { asRecord } from "./cursor-record-utils.js";
+import { projectCursorModelCatalog } from "../shared/cursor-model-selection-identities.mjs";
 
 const MODEL_LIST_CACHE_FILE = "cursor-sdk-model-list.json";
 const MODEL_LIST_CACHE_VERSION = 1;
@@ -43,56 +44,6 @@ export function fingerprintApiKey(apiKey: string): string {
 	return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
 }
 
-function isStringArray(value: unknown): value is string[] {
-	return Array.isArray(value) && value.every((entry) => typeof entry === "string");
-}
-
-function isModelParameterValue(value: unknown): value is NonNullable<ModelListItem["variants"]>[number]["params"][number] {
-	const record = asRecord(value);
-	return record !== undefined && typeof record.id === "string" && typeof record.value === "string";
-}
-
-function isModelParameterDefinitionValue(value: unknown): value is NonNullable<ModelListItem["parameters"]>[number]["values"][number] {
-	const record = asRecord(value);
-	return record !== undefined && typeof record.value === "string" && (record.displayName === undefined || typeof record.displayName === "string");
-}
-
-function isModelParameterDefinition(value: unknown): value is NonNullable<ModelListItem["parameters"]>[number] {
-	const record = asRecord(value);
-	if (!record) return false;
-	return (
-		typeof record.id === "string" &&
-		(record.displayName === undefined || typeof record.displayName === "string") &&
-		Array.isArray(record.values) &&
-		record.values.every(isModelParameterDefinitionValue)
-	);
-}
-
-function isModelVariant(value: unknown): value is NonNullable<ModelListItem["variants"]>[number] {
-	const record = asRecord(value);
-	if (!record) return false;
-	return (
-		Array.isArray(record.params) &&
-		record.params.every(isModelParameterValue) &&
-		typeof record.displayName === "string" &&
-		(record.description === undefined || typeof record.description === "string") &&
-		(record.isDefault === undefined || typeof record.isDefault === "boolean")
-	);
-}
-
-function isModelListItem(value: unknown): value is ModelListItem {
-	const record = asRecord(value);
-	if (!record) return false;
-	return (
-		typeof record.id === "string" &&
-		typeof record.displayName === "string" &&
-		(record.description === undefined || typeof record.description === "string") &&
-		(record.aliases === undefined || isStringArray(record.aliases)) &&
-		(record.parameters === undefined || (Array.isArray(record.parameters) && record.parameters.every(isModelParameterDefinition))) &&
-		(record.variants === undefined || (Array.isArray(record.variants) && record.variants.every(isModelVariant)))
-	);
-}
-
 function isValidFetchedAt(value: unknown): value is number {
 	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= Date.now() + MAX_CACHE_CLOCK_SKEW_MS;
 }
@@ -100,12 +51,13 @@ function isValidFetchedAt(value: unknown): value is number {
 function parseModelListCacheFile(value: unknown): ModelListCacheFile | undefined {
 	const record = asRecord(value);
 	if (!record) return undefined;
+	if (!Array.isArray(record.models)) return undefined;
+	const models = projectCursorModelCatalog(record.models);
 	if (
 		record.version !== MODEL_LIST_CACHE_VERSION ||
 		!isValidFetchedAt(record.fetchedAt) ||
 		typeof record.keyFingerprint !== "string" ||
-		!Array.isArray(record.models) ||
-		!record.models.every(isModelListItem)
+		!models
 	) {
 		return undefined;
 	}
@@ -113,7 +65,7 @@ function parseModelListCacheFile(value: unknown): ModelListCacheFile | undefined
 		version: record.version,
 		fetchedAt: record.fetchedAt,
 		keyFingerprint: record.keyFingerprint,
-		models: record.models,
+		models,
 	};
 }
 
@@ -147,6 +99,8 @@ export function loadCachedModelCatalog(
 
 export function saveModelListCache(keyFingerprint: string, models: ModelListItem[], config?: CursorSdkConfig): boolean {
 	if (isModelCacheDisabled(config)) return false;
+	const projected = projectCursorModelCatalog(models);
+	if (!projected) return false;
 	try {
 		const path = getCachePath();
 		mkdirSync(dirname(path), { recursive: true });
@@ -154,7 +108,7 @@ export function saveModelListCache(keyFingerprint: string, models: ModelListItem
 			version: MODEL_LIST_CACHE_VERSION,
 			fetchedAt: Date.now(),
 			keyFingerprint,
-			models,
+			models: projected,
 		};
 		writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`, { mode: 0o600 });
 		chmodSync(path, 0o600);

@@ -6,7 +6,7 @@ import type {
 } from "@cursor/sdk";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import type { ModelThinkingLevel, ThinkingLevelMap } from "@earendil-works/pi-ai";
-import { getCursorModelSelectionIdentities } from "../shared/cursor-model-selection-identities.mjs";
+import { getCursorModelSelectionIdentities, projectCursorModelCatalog } from "../shared/cursor-model-selection-identities.mjs";
 import { loadContextWindowCache } from "./context-window-cache.js";
 import { loadCursorSdk } from "./cursor-sdk-runtime.js";
 import { resolveCursorApiKey, resolveCursorRuntimeApiKey } from "./cursor-api-key.js";
@@ -339,15 +339,19 @@ export async function discoverModels(options: DiscoverModelsOptions = {}): Promi
 
 	try {
 		const { Cursor } = await loadCursorSdk();
-		const models = await Cursor.models.list({ apiKey });
-		if (models.length > 0) {
-			saveModelListCache(keyFingerprint, models);
-			return registerModelItems(models);
+		const listed = await Cursor.models.list({ apiKey });
+		if (!Array.isArray(listed) || listed.length === 0) {
+			return useFallbackModels(options, {
+				reason: "empty-model-list",
+				message: `Cursor model discovery returned no models. Using fallback Cursor models; verify ${AUTH_SETUP_HINT}. ${CATALOG_REFRESH_HINT}`,
+			});
 		}
-		return useFallbackModels(options, {
-			reason: "empty-model-list",
-			message: `Cursor model discovery returned no models. Using fallback Cursor models; verify ${AUTH_SETUP_HINT}. ${CATALOG_REFRESH_HINT}`,
-		});
+		const models = projectCursorModelCatalog(listed);
+		if (!models) {
+			throw new Error("Cursor model catalog could not be projected");
+		}
+		saveModelListCache(keyFingerprint, models);
+		return registerModelItems(models);
 	} catch (error) {
 		const errorMessage = sanitizeDiscoveryError(error, apiKey);
 		// Prefer a previously cached catalog over the generic bundled fallback when

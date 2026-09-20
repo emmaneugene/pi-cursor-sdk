@@ -4,31 +4,27 @@ Read-only audit of `pi-cursor-sdk` at `main`. 16 subsystem reviews (Grok 4.6, GP
 
 ## Summary
 
-The remaining runtime work has no single large structural simplification. The remaining recommendation is generated model snapshot projection. Folding the many <50-line modules into their callers would move lines, not delete them; no worker recommended it.
+The ranked audit recommendations are complete. Folding the many <50-line modules into their callers would move lines, not delete them; no worker recommended it.
 
 ## Ranked recommendations
 
-### 7. Model catalog (S02, S01)
-
-- **Verdict:** recommend (7b)
-- **7b Snapshot projection.** `scripts/refresh-cursor-model-snapshots.mjs:88-115` copies the full SDK DTO; `model-list-cache.ts:45-92` re-validates it; `model-discovery.ts` consumes only IDs, model display name, parameter IDs/values, variant params/default marker, variant display name. The generated file has 589 `displayName` fields and 30 alias blocks for 37 models. One shared parser/projector for live, cached, and snapshot input, dropping aliases, descriptions, and parameter/value display names. ≈ −300 to −600 generated lines, −10 to −30 handwritten. Risk: existing version-1 cache files must stay readable or need a version bump. Validation: `test/model-list-cache.test.ts`, `test/model-discovery*.test.ts`, `test/cursor-model-snapshot-context.test.ts`. Confidence medium.
+None remaining.
 
 ## Best next slices (one small PR each)
 
-1. #7b snapshot projection.
+None remaining.
 
 ## Cross-cutting patterns
 
 1. One entity, several containers: five pool collections.
 2. Compatibility shapes stay at the resume parser, not in downstream cleanup.
-3. The generated model snapshot remains large relative to its runtime projection.
 
 ## Subsystem coverage
 
 | ID | Subsystem | Boundary | Result |
 |---|---|---|---|
 | S01 | Entry, factory guard, lifecycle hooks | `index.ts`, `cursor-extension-factory-guard.ts`, `cursor-provider-runtime-context.ts`, `cursor-provider-lazy.ts`, `cursor-model-lifecycle.ts`, `cursor-fallback-warning.ts`, `cursor-agents-context*.ts`, `cursor-model.ts`, `cursor-sdk-runtime.ts`, `cursor-active-tools.ts` | refresh catalog now updates the nested-factory owner catalog |
-| S02 | Model discovery, caches, snapshot | `model-discovery.ts`, `model-list-cache.ts`, `cursor-fallback-models.generated.ts`, `bundled-context-windows.ts`, `context-window-cache.ts`, `shared/cursor-model-selection-identities.*`, `scripts/refresh-cursor-model-snapshots.mjs` | cache read consolidated; recommend (#7b) |
+| S02 | Model discovery, caches, snapshot | `model-discovery.ts`, `model-list-cache.ts`, `cursor-fallback-models.generated.ts`, `bundled-context-windows.ts`, `context-window-cache.ts`, `shared/cursor-model-selection-identities.*`, `scripts/refresh-cursor-model-snapshots.mjs` | cache read and catalog projection shared |
 | S03 | Config, state controls, HTTP/1.1 | `cursor-config.ts`, `cursor-state.ts`, `cursor-runtime-state.ts`, `cursor-http1.ts`, `cursor-setting-sources.ts`, `shared/cursor-setting-sources.*`, `cursor-api-key.ts`, `cursor-task-presentation.ts` | session preference persist/restore helpers shared |
 | S04 | Prompt/context, bootstrap surfaces | `context.ts`, `cursor-context-tools.ts`, `cursor-tool-manifest.ts`, `cursor-bridge-contract.ts`, `cursor-skill-tool.ts`, `cursor-provider-overflow.ts` | plan-flag finding rejected |
 | S05 | Turn pipeline, outcomes, errors | `cursor-provider.ts`, `cursor-provider-turn-{runner,prepare,send,finalize,emit,types}.ts`, `cursor-provider-run-{outcome,finalizer}.ts`, `cursor-run-final-text.ts`, `cursor-provider-errors.ts`, `cursor-mcp-timeout-override.ts`, `cursor-sdk-process-error-guard.ts` | turn plumbing removed |
@@ -54,7 +50,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Fixed — S01 refresh catalog:** `/cursor-refresh-models` now updates `activeCursorProviderModels` for nested factories.
 - **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records now use one pending map.
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
-- **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.
+- **Merged:** S02 single model-cache read (`loadCachedModelCatalog`) and shared catalog projection (aliases and label display names dropped; version-1 cache files still load).
 - **Merged:** S03 session preference restore/persist helpers in `cursor-state.ts`.
 - **Merged:** S17 `AGENTS.md` map lists the previously missing `src/` modules; July local-resume evidence dumps were deleted.
 - **Merged:** S10 expandable replay cards now take activity or generateImage details.

@@ -78,6 +78,48 @@ describe("model-list-cache", () => {
 		});
 	});
 
+	it("uses the model id when a version-1 cache omits displayName", () => {
+		writeFileSync(
+			__testUtils.getCachePath(),
+			JSON.stringify({
+				version: 1,
+				fetchedAt: Date.now(),
+				keyFingerprint: fp,
+				models: [{ id: "raw-id", variants: [{ params: [], displayName: "raw-id", isDefault: true }] }],
+			}),
+		);
+		expect(loadCachedModelCatalog(fp)?.models).toEqual([{
+			id: "raw-id",
+			displayName: "raw-id",
+			variants: [{ params: [], displayName: "raw-id", isDefault: true }],
+		}]);
+	});
+
+	it("loads a version-1 cache that still includes aliases and parameter display names", () => {
+		writeFileSync(
+			__testUtils.getCachePath(),
+			JSON.stringify({
+				version: 1,
+				fetchedAt: Date.now(),
+				keyFingerprint: fp,
+				models: [{
+					id: "composer-2",
+					displayName: "Composer 2",
+					description: "unused",
+					aliases: ["c2"],
+					parameters: [{ id: "fast", displayName: "Fast", values: [{ value: "true", displayName: "On" }] }],
+					variants: [{ params: [{ id: "fast", value: "true" }], displayName: "Composer 2", description: "unused", isDefault: true }],
+				}],
+			}),
+		);
+		expect(loadCachedModelCatalog(fp)?.models).toEqual([{
+			id: "composer-2",
+			displayName: "Composer 2",
+			parameters: [{ id: "fast", values: [{ value: "true" }] }],
+			variants: [{ params: [{ id: "fast", value: "true" }], displayName: "Composer 2", isDefault: true }],
+		}]);
+	});
+
 	it("ignores a corrupt cache file", () => {
 		writeFileSync(__testUtils.getCachePath(), "{ not json");
 		expect(loadCachedModelCatalog(fp)).toBeUndefined();
@@ -98,7 +140,6 @@ describe("model-list-cache", () => {
 	});
 
 	it.each([
-		["missing displayName", { id: "missing-display-name" }],
 		["parameter without values", { id: "raw-id", displayName: "Raw", parameters: [{ id: "context" }] }],
 		[
 			"parameter value without string value",

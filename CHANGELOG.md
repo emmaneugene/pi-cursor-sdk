@@ -18,6 +18,7 @@
 - Count Cursor SDK debug artifacts with named buckets instead of 13 parallel fields.
 - Type expandable native replay cards as activity or generate-image details.
 - Fill the `AGENTS.md` repository map and delete superseded July local-resume evidence dumps.
+- Project live, cached, and snapshot Cursor catalogs through one parser that drops aliases and label display names.
 
 ## 0.5.1 - 2026-09-13
 

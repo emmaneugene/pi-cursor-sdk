@@ -14,7 +14,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-fallback-models.generated.ts` is the bundled fallback catalog snapshot used when live discovery and cache both miss.
 - `src/cursor-api-key.ts` owns Cursor API key resolution for discovery and provider turns.
 - `src/cursor-sdk-runtime.ts` owns `@cursor/sdk` loading for runtime callers.
-- `shared/cursor-model-selection-identities.mjs` owns canonical selectable model/context/fast identities and context-window key normalization shared by runtime discovery and the snapshot generator; its `.d.mts` file owns the TypeScript contract.
+- `shared/cursor-model-selection-identities.mjs` owns catalog projection (IDs, names, parameter values), canonical selectable model/context/fast identities, and context-window key normalization shared by runtime discovery and the snapshot generator; its `.d.mts` file owns the TypeScript contract.
 - `src/cursor-provider.ts` is a thin `streamCursor()` wrapper that delegates turn execution to the turn runner.
 - `src/cursor-provider-turn-runner.ts` orchestrates provider turns (pre-send drain, prepare, send, finalize, emit, cleanup).
 - `src/cursor-provider-turn-prepare.ts` owns turn prepare (auth, MCP timeout install, effective local HTTP transport configuration, session agent, live-run setup, coordinator).

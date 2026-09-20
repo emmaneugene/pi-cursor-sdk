@@ -4,7 +4,7 @@ import { Cursor } from "@cursor/sdk";
 import { defaultApiKeyFromEnv, parseArgv } from "./lib/cursor-cli-args.mjs";
 import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
 import { createScriptFail } from "./lib/cursor-script-fail.mjs";
-import { normalizeCursorContextWindowEntries } from "../shared/cursor-model-selection-identities.mjs";
+import { normalizeCursorContextWindowEntries, projectCursorModelCatalog } from "../shared/cursor-model-selection-identities.mjs";
 
 const FALLBACK_MODELS_PATH = "src/cursor-fallback-models.generated.ts";
 const CONTEXT_WINDOWS_PATH = "src/bundled-context-windows.ts";
@@ -85,40 +85,6 @@ function parsePositiveInteger(value, label) {
 	return parsed;
 }
 
-function sanitizeModelItem(item) {
-	return stripUndefined({
-		id: item.id,
-		displayName: item.displayName,
-		description: item.description,
-		aliases: Array.isArray(item.aliases) ? [...item.aliases] : undefined,
-		parameters: Array.isArray(item.parameters)
-			? item.parameters.map((parameter) =>
-					stripUndefined({
-						id: parameter.id,
-						displayName: parameter.displayName,
-						values: Array.isArray(parameter.values)
-							? parameter.values.map((value) => stripUndefined({ value: value.value, displayName: value.displayName }))
-							: [],
-					}),
-				)
-			: undefined,
-		variants: Array.isArray(item.variants)
-			? item.variants.map((variant) =>
-					stripUndefined({
-						params: Array.isArray(variant.params) ? variant.params.map((param) => ({ id: param.id, value: param.value })) : [],
-						displayName: variant.displayName,
-						description: variant.description,
-						isDefault: variant.isDefault,
-					}),
-				)
-			: undefined,
-	});
-}
-
-function stripUndefined(value) {
-	return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
-}
-
 function stableStringify(value) {
 	return JSON.stringify(value, null, "\t").replace(/"([^"\\]+)":/g, "$1:");
 }
@@ -185,7 +151,9 @@ try {
 }
 if (!Array.isArray(rawModels) || rawModels.length === 0) fail("Cursor.models.list() returned no models");
 
-const models = rawModels.map(sanitizeModelItem).sort((a, b) => a.id.localeCompare(b.id));
+const models = projectCursorModelCatalog(rawModels);
+if (!models) fail("Cursor.models.list() returned an unusable catalog");
+models.sort((a, b) => a.id.localeCompare(b.id));
 const checkpointWindows = parseContextWindowsFile(args.contextWindowsPath);
 const fallbackSource = formatFallbackModels(models, sdkVersion);
 let contextWindowSource;
