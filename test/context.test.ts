@@ -21,7 +21,7 @@ import {
 	type ToolResultMessage,
 	type UserMessage,
 } from "@earendil-works/pi-ai";
-import { getActiveContextToolNames } from "../src/context-tools.js";
+import { getActiveContextToolNames } from "../src/native-replay-routing.js";
 import { buildInstalledPiSystemPrompt } from "./helpers/pi-system-prompt.js";
 
 describe("buildCursorPrompt", () => {

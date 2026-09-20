@@ -14,7 +14,6 @@ import { registerCursorFallbackIssueWarning } from "./model.js";
 import { registerCursorAgentsContextDedup } from "./agents-context.js";
 import { registerCursorOverflowNormalization } from "./provider-overflow.js";
 import { registerCursorSdkSessionProcessErrorGuard } from "./sdk-process-error-guard.js";
-import { prepareCursorSessionForCompaction } from "./session-compaction-prep.js";
 import { disposeSessionCursorAgent } from "./session-agent.js";
 import { getCursorSessionCwd } from "./session-scope.js";
 import type { CursorProviderRuntimeContext } from "./provider-runtime-context.js";
@@ -116,9 +115,6 @@ export default async function (pi: CursorExtensionApi) {
 		registerCursorSessionScope(pi);
 		registerCursorSessionAgentLineage(pi);
 		registerCursorSessionAgentLifecycle(pi);
-		pi.on("session_before_compact", async () => {
-			await prepareCursorSessionForCompaction();
-		});
 		registerCursorRuntimeControls(pi);
 		registerCursorNativeToolDisplay(pi);
 		registerCursorSkillTool(pi);

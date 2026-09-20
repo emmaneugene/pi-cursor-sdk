@@ -14,7 +14,7 @@ import {
 import type { CursorPiBridgeToolRequest } from "./pi-tool-bridge.js";
 import { buildCursorPrompt, estimateCursorPromptTokens } from "./context.js";
 import { getCursorPromptOptions } from "./usage-accounting.js";
-import { getActiveContextToolNames } from "./context-tools.js";
+import { getActiveContextToolNames } from "./native-replay-routing.js";
 import type { CursorLiveRun } from "./live-run-coordinator.js";
 import {
 	abandonSessionCursorAgent,

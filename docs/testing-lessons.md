@@ -57,7 +57,7 @@ Regression coverage:
 Native replay routing intentionally uses two layers:
 
 1. **Extension resync** (`before_agent_start`, `turn_start`) updates pi's active tool set via `syncRegisteredNativeCursorToolsForModel`. This fixes the common case where plan-mode execute strips `grep`/`find`/`cursor` before the next turn.
-2. **Provider routing** uses the **`context.tools` snapshot** captured when `streamCursor()` starts (`getActiveContextToolNames` in `src/context-tools.ts`). It does not read live `pi.getActiveTools()` mid-stream.
+2. **Provider routing** uses the **`context.tools` snapshot** captured when `streamCursor()` starts (`getActiveContextToolNames` in `src/native-replay-routing.ts`). It does not read live `pi.getActiveTools()` mid-stream.
 
 `src/native-replay-routing.ts` centralizes provider-side routing against the same `context.tools` snapshot:
 

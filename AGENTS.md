@@ -36,8 +36,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/session-agent.ts` owns session-scoped SDK agent pooling, explicit nested-child pool scopes, transport-aware pool identity, send-state commits, busy tracking for in-flight SDK `run.wait()` work, and scoped acquire/dispose state.
 - `src/session-turn-queue.ts` serializes in-flight provider turns per session scope.
 - `src/session-agent-lineage.ts` owns non-resumable per-session local agent lineage custom entries (`cursor-sdk-agent-lineage`) recorded at `Agent.send()`.
-- `src/session-agent-lifecycle.ts` owns lazy session-agent lifecycle invalidation on model select, compaction, tree navigation, shutdown, and scope changes, including shutdown-time HTTP transport reset before module reload.
-- `src/session-compaction-prep.ts` owns `prepareCursorSessionForCompaction()` (release scoped live runs, reset pooled agent) wired from `session_before_compact` in `src/index.ts`.
+- `src/session-agent-lifecycle.ts` owns lazy session-agent lifecycle invalidation on model select, compaction, tree navigation, shutdown, and scope changes, including `session_before_compact` live-run release plus pooled-agent reset (`prepareCursorSessionForCompaction`) and shutdown-time HTTP transport reset before module reload.
 - `src/session-send-policy.ts` owns session send planning (`bootstrap` vs `incremental`), periodic agent rebootstrap threshold, and prompt mode selection.
 - `src/provider-live-run-drain.ts` owns live-run drain/replay mirroring, pre-send continuation, and native replay turn emission.
 - `src/provider-turn-coordinator.ts` orchestrates SDK delta/step handling during a turn over focused collaborators.
@@ -77,9 +76,8 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/pi-tool-bridge-mcp.ts` owns MCP name/schema conversion and pi-to-MCP content helpers for the bridge.
 - `src/model.ts` owns the `cursor` provider id, Cursor-model identity helpers, the empty pi-tool-list check, model lifecycle registration, and fallback catalog warnings. Callers keep Cursor-only filtering explicit.
 - `src/native-tool-display-registration.ts` owns native replay tool registration and model-scoped activation.
-- `src/native-replay-routing.ts` owns canonical native replay disposition (`queue_replay` / `inactive_trace` / `transcript_trace`) and context-tool partitioning for drain.
+- `src/native-replay-routing.ts` owns canonical native replay disposition (`queue_replay` / `inactive_trace` / `transcript_trace`), `context.tools` snapshot names at provider stream start, and context-tool partitioning for drain.
 - `src/native-replay-trace.ts` owns inactive native replay trace formatting (`title: summary`).
-- `src/context-tools.ts` owns `context.tools` snapshot helpers at provider stream start.
 - `src/display-text.ts` owns shared single-line sanitization, 240-char truncation, and canonical edit-diff fallback resolution for replay/trace display.
 - `src/native-tool-display-replay.ts` owns replay card rendering and diff/preview formatting.
 - `src/replay-tool-details.ts` owns parsed replay-detail variants (`nativeEdit` / `nativeWrite` / `activity` / `generateImage` / `genericFallback`).
@@ -93,7 +91,6 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/agent-message-web-tools.ts` owns transcript web-tool call loading after an agent-message offset.
 - `src/mcp-timeout-override.ts` owns Cursor SDK MCP timeout overrides: 3600s default for `callTool`, 10s default for verified initialize/listTools paths on first send, and SDK-default behavior for unknown MCP protocol stacks.
 - `src/config.ts` owns user-only `~/.pi/agent/cursor-sdk.json` loading, parsing, CLI/session/user/builtin precedence, and fast-default persistence.
-- `src/durable-fs.ts` owns the canonical no-follow regular-file open (`openExistingRegularFileNoFollow`) and read-write fsync (`fsyncExistingRegularFile`) helpers used to durably fsync session files without following an attacker-replaced symlink.
 - `src/state.ts` owns Cursor fast/mode controls, `/cursor-http` session/user persistence, `/cursor-tools`, local config refresh/cleanup wiring, and stable state re-exports.
 - `src/runtime-state.ts` owns effective Cursor runtime status helpers.
 - `src/task-presentation.ts` owns `tools.display.taskPresentation` (`task` / `subagent` / `subagent-meta`).

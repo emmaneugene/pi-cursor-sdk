@@ -1,6 +1,6 @@
 import type { SDKAgent } from "@cursor/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { prepareCursorSessionForCompaction } from "../src/session-compaction-prep.js";
+import { prepareCursorSessionForCompaction } from "../src/session-agent-lifecycle.js";
 import { cursorLiveRuns } from "../src/provider-live-run-drain.js";
 import { __testUtils as cursorProviderTestUtils } from "../src/provider.js";
 import { acquireSessionCursorAgent, __testUtils as sessionAgentTestUtils } from "../src/session-agent.js";
