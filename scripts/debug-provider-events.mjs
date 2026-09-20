@@ -125,6 +125,16 @@ function defaultOutDir(cwd) {
 	return join(cwd, DEFAULT_OUT_BASE, stamp);
 }
 
+export function buildDebugProviderEventsChildEnv(envInput, options) {
+	// Clear first so stale maintainer-shell debug vars never leak into the child,
+	// then pin the run dir. Clearing after pinning would delete the pin itself.
+	const env = clearCursorSdkEventDebugEnv({ ...envInput });
+	env.CURSOR_API_KEY = options.apiKey;
+	env.PI_CODING_AGENT_DIR = options.agentDir;
+	env[CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV] = options.artifactDir;
+	return env;
+}
+
 function readCaptureSummary(artifactDir, stderr) {
 	const summaryPath = join(artifactDir, SUMMARY_ARTIFACT);
 	try {
@@ -217,11 +227,10 @@ export async function runDebugProviderEvents(args, envInput = process.env) {
 		"--session-dir",
 		sessionDir,
 	];
-	const env = clearCursorSdkEventDebugEnv({
-		...envInput,
-		CURSOR_API_KEY: args.apiKey,
-		PI_CODING_AGENT_DIR: agentDir,
-		[CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV]: artifactDir,
+	const env = buildDebugProviderEventsChildEnv(envInput, {
+		apiKey: args.apiKey,
+		agentDir,
+		artifactDir,
 	});
 
 	const child = spawn("pi", piArgs, {

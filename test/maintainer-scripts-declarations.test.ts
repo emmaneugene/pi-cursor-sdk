@@ -88,6 +88,7 @@ const DECLARATION_TYPE_ONLY_EXPORTS: Record<string, readonly string[]> = {
 		"CursorDebugCaptureCounts",
 		"CursorDebugCaptureSummary",
 		"CursorDebugProviderEventsArgs",
+		"CursorDebugProviderEventsChildEnvOptions",
 		"CursorDebugProviderEventsRunSummary",
 		"CursorPiSessionSnapshotState",
 	],

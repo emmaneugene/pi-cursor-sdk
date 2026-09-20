@@ -53,6 +53,17 @@ export declare function backfillPiSessionSnapshot(
 	sessionDir: string,
 ): CursorDebugCaptureSummary | undefined;
 
+export interface CursorDebugProviderEventsChildEnvOptions {
+	apiKey: string;
+	agentDir: string;
+	artifactDir: string;
+}
+
+export declare function buildDebugProviderEventsChildEnv(
+	envInput: NodeJS.ProcessEnv,
+	options: CursorDebugProviderEventsChildEnvOptions,
+): NodeJS.ProcessEnv;
+
 export declare function runDebugProviderEvents(
 	args: CursorDebugProviderEventsArgs,
 	env?: NodeJS.ProcessEnv,
