@@ -13,17 +13,6 @@ The remaining runtime work has no single large structural simplification. The re
 - **Verdict:** recommend (7b)
 - **7b Snapshot projection.** `scripts/refresh-cursor-model-snapshots.mjs:88-115` copies the full SDK DTO; `model-list-cache.ts:45-92` re-validates it; `model-discovery.ts` consumes only IDs, model display name, parameter IDs/values, variant params/default marker, variant display name. The generated file has 589 `displayName` fields and 30 alias blocks for 37 models. One shared parser/projector for live, cached, and snapshot input, dropping aliases, descriptions, and parameter/value display names. ≈ −300 to −600 generated lines, −10 to −30 handwritten. Risk: existing version-1 cache files must stay readable or need a version bump. Validation: `test/model-list-cache.test.ts`, `test/model-discovery*.test.ts`, `test/cursor-model-snapshot-context.test.ts`. Confidence medium.
 
-### 9. Lifecycle emitter per-call record (S06)
-
-- **Verdict:** recommend
-- **Evidence:** `src/cursor-provider-turn-lifecycle-emitter.ts:30-35` keeps six parallel collections per call; `maybeSchedule` (:66-94) writes four plus a timer; `cancel`/`clearLifecycleIdentity` (:97-127) reverse the pairs; the duplicate-progress-text skip (:80-88) deletes the timer and returns without clearing identity.
-- **Current complexity:** invalid combinations are representable (timer without reverse map, fingerprint owner with no timer and no emit).
-- **Proposed representation:** one `Map<callId, { fingerprint, progressText, timer }>` plus two uniqueness indexes and an `emitted` set; `cancel` drops one record and unindexes if the call still owns. ≈ −15 to −25 lines.
-- **Scope:** `src/cursor-provider-turn-lifecycle-emitter.ts` only; `maybeSchedule`/`cancel`/`clear` unchanged.
-- **Risks:** `duplicate-active-fingerprint` and `duplicate-active-progress-text` skip reasons are load-bearing; clearing identity on progress skip would let a later same-fingerprint call schedule.
-- **Validation:** `test/cursor-provider-tool-lifecycle.test.ts`, `test/cursor-tool-lifecycle.test.ts`, `test/cursor-provider-task-progress.test.ts`. Add an emitter unit test (none exists) for same-fingerprint skip, same-progress-text skip, cancel-then-reschedule.
-- **Confidence:** high
-
 ### 10. Debug sink counters (S13)
 
 - **Verdict:** recommend
@@ -64,7 +53,7 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Cross-cutting patterns
 
-1. One entity, several containers: six lifecycle maps, five pool collections, and 13 counter fields.
+1. One entity, several containers: five pool collections and 13 counter fields.
 2. Compatibility shapes stay at the resume parser, not in downstream cleanup.
 3. The generated model snapshot remains large relative to its runtime projection.
 4. `AGENTS.md` map drift (see #13).
@@ -78,7 +67,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S03 | Config, state controls, HTTP/1.1 | `cursor-config.ts`, `cursor-state.ts`, `cursor-runtime-state.ts`, `cursor-http1.ts`, `cursor-setting-sources.ts`, `shared/cursor-setting-sources.*`, `cursor-api-key.ts`, `cursor-task-presentation.ts` | session preference persist/restore helpers shared |
 | S04 | Prompt/context, bootstrap surfaces | `context.ts`, `cursor-context-tools.ts`, `cursor-tool-manifest.ts`, `cursor-bridge-contract.ts`, `cursor-skill-tool.ts`, `cursor-provider-overflow.ts` | plan-flag finding rejected |
 | S05 | Turn pipeline, outcomes, errors | `cursor-provider.ts`, `cursor-provider-turn-{runner,prepare,send,finalize,emit,types}.ts`, `cursor-provider-run-{outcome,finalizer}.ts`, `cursor-run-final-text.ts`, `cursor-provider-errors.ts`, `cursor-mcp-timeout-override.ts`, `cursor-sdk-process-error-guard.ts` | turn plumbing removed |
-| S06 | Turn coordinator, normalization | `cursor-provider-turn-{coordinator,shell-output,tool-ledger,sdk-normalizer,display-router,lifecycle-emitter}.ts`, `cursor-tool-lifecycle.ts`, `cursor-partial-content-emitter.ts`, `cursor-incomplete-tool-visibility.ts`, `cursor-display-only-trace.ts` | recommend (#9) |
+| S06 | Turn coordinator, normalization | `cursor-provider-turn-{coordinator,shell-output,tool-ledger,sdk-normalizer,display-router,lifecycle-emitter}.ts`, `cursor-tool-lifecycle.ts`, `cursor-partial-content-emitter.ts`, `cursor-incomplete-tool-visibility.ts`, `cursor-display-only-trace.ts` | lifecycle emitter uses one pending record per call |
 | S07 | Session agents, resume, store, scope | `cursor-session-agent*.ts`, `cursor-session-store.ts`, `cursor-session-scope.ts`, `cursor-session-compaction-prep.ts`, `cursor-session-send-policy.ts`, `cursor-session-turn-queue.ts`, `cursor-durable-fs.ts`, `cursor-sdk-platform-package.ts` | cleanup candidates normalized; pool slot-map demoted |
 | S08 | Live run coordinator, drain, routing | `cursor-live-run-coordinator.ts`, `cursor-provider-live-run-drain.ts`, `cursor-live-run-accounting.ts`, `cursor-native-replay-routing.ts` | **skip** — a `running/finished/cancelled/error` union would add 40–80 lines and touch out-of-boundary mutators |
 | S09 | Tool registry, transcript formatting | `cursor-tool-presentation-registry.ts`, `cursor-transcript-*.ts`, `cursor-tool-transcript.ts`, `cursor-tool-result-display-readers.ts`, `cursor-tool-visibility.ts`, `cursor-native-tool-names.ts`, `cursor-display-text.ts`, `cursor-record-utils.ts`, `cursor-edit-diff.ts`, `cursor-compact-tool-summary.ts`, `cursor-web-tool-*.ts`, `cursor-agent-message-web-tools.ts`, `cursor-replay-source-names.ts` | read preview consolidated |
@@ -98,7 +87,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Demoted — S07 pool slot-map (`cursor-session-agent.ts:148-153`, five per-scope collections):** the collections have different lifetimes; a slot with many optional fields may relocate complexity and risks acquire/dispose races. Treat as a design spike.
 - **Demoted — S12 guard merge in `applyCursorUsage`:** the repeated guards mark distinct billed/local/partition/occupancy trust boundaries.
 - **Fixed — S01 refresh catalog:** `/cursor-refresh-models` now updates `activeCursorProviderModels` for nested factories.
-- **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records remain #9.
+- **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records now use one pending map.
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
 - **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.
 - **Merged:** S03 session preference restore/persist helpers in `cursor-state.ts`.

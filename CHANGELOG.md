@@ -13,6 +13,7 @@
 - Load the Cursor model catalog cache once per discovery and classify it as fresh or stale.
 - Keep the owner catalog used by nested factories in sync after `/cursor-refresh-models`.
 - Share session preference restore and persist helpers in Cursor runtime controls.
+- Keep one pending record per deferred Cursor tool-lifecycle call.
 
 ## 0.5.1 - 2026-09-13
 

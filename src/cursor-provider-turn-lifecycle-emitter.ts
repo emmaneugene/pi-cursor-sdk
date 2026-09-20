@@ -19,6 +19,12 @@ export interface CursorToolLifecycleEmitterOptions {
 	isBridgeMcpToolCall: (toolCall: unknown) => boolean;
 }
 
+interface PendingLifecycleCall {
+	fingerprint: string;
+	progressText: string;
+	timer?: ReturnType<typeof setTimeout>;
+}
+
 export class CursorToolLifecycleEmitter {
 	private readonly liveRun?: CursorLiveRun;
 	private readonly resolvedApiKey?: string;
@@ -27,11 +33,9 @@ export class CursorToolLifecycleEmitter {
 	private readonly hasStartedToolCall: (callId: string) => boolean;
 	private readonly isBridgeMcpToolCall: (toolCall: unknown) => boolean;
 	private readonly emittedLifecycleCallIds = new Set<string>();
-	private readonly lifecycleTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	private readonly activeLifecycleFingerprintOwners = new Map<string, string>();
-	private readonly lifecycleFingerprintByCallId = new Map<string, string>();
-	private readonly activeLifecycleProgressTextOwners = new Map<string, string>();
-	private readonly lifecycleProgressTextByCallId = new Map<string, string>();
+	private readonly lifecycleByCallId = new Map<string, PendingLifecycleCall>();
+	private readonly fingerprintOwners = new Map<string, string>();
+	private readonly progressTextOwners = new Map<string, string>();
 
 	constructor(options: CursorToolLifecycleEmitterOptions) {
 		this.liveRun = options.liveRun;
@@ -51,7 +55,7 @@ export class CursorToolLifecycleEmitter {
 		if (!progressText) return;
 
 		const fingerprint = getStartedToolCallFingerprint(toolCall);
-		const existingOwner = this.activeLifecycleFingerprintOwners.get(fingerprint);
+		const existingOwner = this.fingerprintOwners.get(fingerprint);
 		if (existingOwner && existingOwner !== callId) {
 			this.debugRecorder?.recordCoordinatorEvent("tool_lifecycle_skip", {
 				callId,
@@ -63,20 +67,19 @@ export class CursorToolLifecycleEmitter {
 		}
 
 		this.cancel(callId);
-		this.activeLifecycleFingerprintOwners.set(fingerprint, callId);
-		this.lifecycleFingerprintByCallId.set(callId, fingerprint);
-		if (!this.activeLifecycleProgressTextOwners.has(progressText)) {
-			this.activeLifecycleProgressTextOwners.set(progressText, callId);
+		this.fingerprintOwners.set(fingerprint, callId);
+		if (!this.progressTextOwners.has(progressText)) {
+			this.progressTextOwners.set(progressText, callId);
 		}
-		this.lifecycleProgressTextByCallId.set(callId, progressText);
+		const pending: PendingLifecycleCall = { fingerprint, progressText };
 		const timer = setTimeout(() => {
-			this.lifecycleTimers.delete(callId);
+			delete pending.timer;
 			if (!this.hasStartedToolCall(callId)) {
 				this.clearLifecycleIdentity(callId);
 				return;
 			}
 			if (this.emittedLifecycleCallIds.has(callId)) return;
-			const progressOwner = this.activeLifecycleProgressTextOwners.get(progressText);
+			const progressOwner = this.progressTextOwners.get(progressText);
 			if (progressOwner && progressOwner !== callId && this.hasStartedToolCall(progressOwner)) {
 				this.debugRecorder?.recordCoordinatorEvent("tool_lifecycle_skip", {
 					callId,
@@ -86,43 +89,39 @@ export class CursorToolLifecycleEmitter {
 				});
 				return;
 			}
-			this.activeLifecycleProgressTextOwners.set(progressText, callId);
+			this.progressTextOwners.set(progressText, callId);
 			this.emit(callId, toolCall, progressText);
 		}, CURSOR_TOOL_LIFECYCLE_DEFER_MS);
 		timer.unref?.();
-		this.lifecycleTimers.set(callId, timer);
+		pending.timer = timer;
+		this.lifecycleByCallId.set(callId, pending);
 	}
 
 	cancel(callId: string): void {
-		const timer = this.lifecycleTimers.get(callId);
-		if (timer) {
-			clearTimeout(timer);
-			this.lifecycleTimers.delete(callId);
-		}
+		const pending = this.lifecycleByCallId.get(callId);
+		if (pending?.timer) clearTimeout(pending.timer);
 		this.clearLifecycleIdentity(callId);
 	}
 
 	clear(): void {
 		this.emittedLifecycleCallIds.clear();
-		for (const timer of this.lifecycleTimers.values()) clearTimeout(timer);
-		this.lifecycleTimers.clear();
-		this.activeLifecycleFingerprintOwners.clear();
-		this.lifecycleFingerprintByCallId.clear();
-		this.activeLifecycleProgressTextOwners.clear();
-		this.lifecycleProgressTextByCallId.clear();
+		for (const pending of this.lifecycleByCallId.values()) {
+			if (pending.timer) clearTimeout(pending.timer);
+		}
+		this.lifecycleByCallId.clear();
+		this.fingerprintOwners.clear();
+		this.progressTextOwners.clear();
 	}
 
 	private clearLifecycleIdentity(callId: string): void {
-		const fingerprint = this.lifecycleFingerprintByCallId.get(callId);
-		if (fingerprint && this.activeLifecycleFingerprintOwners.get(fingerprint) === callId) {
-			this.activeLifecycleFingerprintOwners.delete(fingerprint);
+		const pending = this.lifecycleByCallId.get(callId);
+		this.lifecycleByCallId.delete(callId);
+		if (pending?.fingerprint && this.fingerprintOwners.get(pending.fingerprint) === callId) {
+			this.fingerprintOwners.delete(pending.fingerprint);
 		}
-		this.lifecycleFingerprintByCallId.delete(callId);
-		const progressText = this.lifecycleProgressTextByCallId.get(callId);
-		if (progressText && this.activeLifecycleProgressTextOwners.get(progressText) === callId) {
-			this.activeLifecycleProgressTextOwners.delete(progressText);
+		if (pending?.progressText && this.progressTextOwners.get(pending.progressText) === callId) {
+			this.progressTextOwners.delete(pending.progressText);
 		}
-		this.lifecycleProgressTextByCallId.delete(callId);
 	}
 
 	private emit(callId: string, toolCall: unknown, progressText: string): void {
