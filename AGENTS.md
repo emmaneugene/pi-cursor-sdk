@@ -167,7 +167,7 @@ If validation fails:
 
 ## Planning and large changes
 
-Use a short written plan before multi-file behavior changes, SDK integration changes, or public UX changes. Use `PLANS.md` only if a task needs durable multi-session tracking; do not create one for routine edits.
+Use a short written plan before multi-file behavior changes, SDK integration changes, or public UX changes. Do not keep a repo-root `PLANS.md` for that; fold durable facts into current docs when the work is done.
 
 When plans, reviews, investigations, or generated smoke/debug artifacts are no longer the active source of truth, delete them or fold the durable facts into the current docs. Do not leave stale files under `docs/plans/`, `docs/reviews/`, `docs/investigations/`, `.artifacts/`, `.debug/`, or similar local artifact directories once they are superseded.
 
