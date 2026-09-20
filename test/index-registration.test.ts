@@ -66,7 +66,6 @@ describe("extension registration and discovery", () => {
 		const mockModels = [makeProviderModelConfig("composer-2", { name: "Cursor Composer 2" })];
 		mockedDiscover.mockResolvedValueOnce(mockModels);
 
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
 		await pi.runSessionStart();
@@ -214,7 +213,6 @@ describe("extension registration and discovery", () => {
 	});
 
 	it("keeps only canonical Cursor replay tools active for Cursor models", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -233,7 +231,6 @@ describe("extension registration and discovery", () => {
 	});
 
 	it("registers and resyncs Cursor-only tools before a turn when session startup did not know the model", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 		await extensionFactory(pi);
@@ -261,7 +258,6 @@ describe("extension registration and discovery", () => {
 	});
 
 	it("does not reactivate Cursor-only tools when pi tools are disabled", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionRegistrationPi({ activeTools: [] });
 		await extensionFactory(pi);
@@ -326,7 +322,6 @@ describe("extension registration and discovery", () => {
 	});
 
 	it("registers Cursor pi tool bridge state", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		mockedDiscover.mockResolvedValueOnce([]);
 		const pi = createExtensionPi();
 

@@ -192,6 +192,7 @@ describe("debug-sdk-events maintainer probe", () => {
 			}
 			for (const libFile of [
 				"cursor-cli-args.mjs",
+				"cursor-probe-capture.mjs",
 				"cursor-script-fail.mjs",
 				"cursor-sdk-output-filter.mjs",
 			]) {

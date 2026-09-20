@@ -295,7 +295,7 @@ export class CursorSdkTurnCoordinator {
 			fingerprint,
 		});
 
-		const action = this.displayRouter.routeCompletedToolCall(toolCall, options);
+		const action = this.displayRouter.routeCompletedToolCall(toolCall, display, options);
 		if (action) this.displayRouter.emitDisplayAction(action);
 	}
 }

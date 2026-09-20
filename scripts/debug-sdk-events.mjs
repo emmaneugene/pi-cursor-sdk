@@ -3,10 +3,9 @@
  * Maintainer-only Cursor SDK event capture probe.
  * Captures timestamped run.stream(), onDelta, and onStep surfaces for one run.
  */
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import {
 	apiKeySecretsFromProcess,
 	commonProbeFlags,
@@ -18,13 +17,14 @@ import {
 } from "./lib/cursor-cli-args.mjs";
 import { createScriptFail } from "./lib/cursor-script-fail.mjs";
 import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "./lib/cursor-sdk-output-filter.mjs";
-
-function isMainModule() {
-	if (!process.argv[1]) return false;
-	const current = fileURLToPath(import.meta.url);
-	const invoked = resolve(process.argv[1]);
-	return process.platform === "win32" ? current.toLowerCase() === invoked.toLowerCase() : current === invoked;
-}
+import {
+	ensureArtifactDir,
+	isProbeMainModule,
+	printJsonSummary,
+	RAW_PROBE_ARTIFACT_WARNING,
+	readInstalledPackageVersion,
+	writeJsonArtifact,
+} from "./lib/cursor-probe-capture.mjs";
 
 const require = createRequire(import.meta.url);
 const packageJson = require("../package.json");
@@ -40,17 +40,9 @@ const ARTIFACTS = {
 };
 
 const DEFAULT_MODEL = "grok-4.6";
-const RAW_ARTIFACT_WARNING =
-	"Raw artifact files may contain local paths, project text, tool args/results, or secrets from the workspace. Do not commit or share them.";
 
 function readSdkVersion() {
-	try {
-		const sdkEntry = require.resolve("@cursor/sdk");
-		const sdkPackagePath = join(dirname(sdkEntry), "../../package.json");
-		return JSON.parse(readFileSync(sdkPackagePath, "utf8")).version;
-	} catch {
-		return "unknown";
-	}
+	return readInstalledPackageVersion(require, "@cursor/sdk");
 }
 
 function artifactPath(artifactDir, name) {
@@ -86,7 +78,7 @@ Exit codes:
 Safety:
   - Never prints CURSOR_API_KEY or --api-key values.
   - Default artifact root is outside the repo (/tmp/...).
-  - ${RAW_ARTIFACT_WARNING}
+  - ${RAW_PROBE_ARTIFACT_WARNING}
   - Verify Cursor SDK behavior against the installed @cursor/sdk package and/or
     https://cursor.com/docs/sdk/typescript before drawing integration conclusions.`);
 }
@@ -246,17 +238,15 @@ export function buildSummary({
 				}
 			: undefined,
 		conversation: summarizeConversation(conversation),
-		warnings: [RAW_ARTIFACT_WARNING],
+		warnings: [RAW_PROBE_ARTIFACT_WARNING],
 	};
 }
 
-function printStdoutSummary(summary) {
-	console.log(JSON.stringify(summary, null, 2));
-}
+
 
 async function captureEvents(args) {
 	const artifactDir = args.out ?? defaultOutDir();
-	mkdirSync(artifactDir, { recursive: true });
+	ensureArtifactDir(artifactDir);
 	const startedAt = Date.now();
 	const metadata = {
 		capturedAt: new Date(startedAt).toISOString(),
@@ -267,9 +257,9 @@ async function captureEvents(args) {
 		packageVersion: packageJson.version,
 		sdkVersion: readSdkVersion(),
 		includeConversation: args.includeConversation,
-		warnings: [RAW_ARTIFACT_WARNING],
+		warnings: [RAW_PROBE_ARTIFACT_WARNING],
 	};
-	writeFileSync(artifactPath(artifactDir, "metadata"), `${JSON.stringify(metadata, null, 2)}\n`);
+	writeJsonArtifact(artifactPath(artifactDir, "metadata"), metadata);
 
 	const restoreOutputFilter = installCursorSdkOutputFilter();
 	const eventSink = createEventJsonlSink(artifactDir, startedAt);
@@ -301,7 +291,7 @@ async function captureEvents(args) {
 		});
 
 		const waitResult = await suppressCursorSdkOutput(() => run.wait());
-		writeFileSync(artifactPath(artifactDir, "waitResult"), `${JSON.stringify(waitResult, null, 2)}\n`);
+		writeJsonArtifact(artifactPath(artifactDir, "waitResult"), waitResult);
 
 		let conversation;
 		if (args.includeConversation) {
@@ -313,7 +303,7 @@ async function captureEvents(args) {
 					reason: run.unsupportedReason("conversation") ?? "conversation unsupported",
 				};
 			}
-			writeFileSync(artifactPath(artifactDir, "conversation"), `${JSON.stringify(conversation, null, 2)}\n`);
+			writeJsonArtifact(artifactPath(artifactDir, "conversation"), conversation);
 		}
 
 		const summary = buildSummary({
@@ -323,8 +313,8 @@ async function captureEvents(args) {
 			conversation,
 			includeConversation: args.includeConversation,
 		});
-		writeFileSync(artifactPath(artifactDir, "summary"), `${JSON.stringify(summary, null, 2)}\n`);
-		printStdoutSummary(summary);
+		writeJsonArtifact(artifactPath(artifactDir, "summary"), summary);
+		printJsonSummary(summary);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		fail(message, [args.apiKey]);
@@ -351,7 +341,7 @@ async function main(argv = process.argv.slice(2), env = process.env) {
 	await captureEvents(args);
 }
 
-if (isMainModule()) {
+if (isProbeMainModule(import.meta.url)) {
 	main().catch((error) => {
 		const message = error instanceof Error ? error.message : String(error);
 		fail(message, apiKeySecretsFromProcess());

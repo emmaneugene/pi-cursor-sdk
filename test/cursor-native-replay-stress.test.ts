@@ -83,7 +83,6 @@ describe("native replay stress", () => {
 	});
 
 	it("plan strip then turn_start resync replays grep when context.tools match active tools", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const pi = await createNativeToolDisplayPiForTest();
 		pi.setActiveTools(["read", "bash", "edit", "write"]);
 		await pi.runTurnStart({ model: CURSOR_MODEL });
@@ -103,7 +102,6 @@ describe("native replay stress", () => {
 	});
 
 	it("plan strip then turn_start resync replays neutral task activity when context.tools match active tools", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const pi = await createNativeToolDisplayPiForTest();
 		pi.setActiveTools(["read", "bash", "edit", "write"]);
 		await pi.runTurnStart({ model: CURSOR_MODEL });
@@ -122,7 +120,6 @@ describe("native replay stress", () => {
 	});
 
 	it("stale context.tools without grep still avoids toolUse (coordinator guard)", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		await createNativeToolDisplayPiForTest();
 		mockCreatedAgent({
 			agentId: "agent-1",
@@ -159,7 +156,6 @@ describe("native replay stress", () => {
 	});
 
 	it("inactive cursor edit maps to trace text, not broken toolUse", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		await createNativeToolDisplayPiForTest();
 		mockCreatedAgent({
 			agentId: "agent-1",
@@ -196,7 +192,6 @@ describe("native replay stress", () => {
 	});
 
 	it("find inactive in context uses trace fallback", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		await createNativeToolDisplayPiForTest();
 		mockCreatedAgent({
 			agentId: "agent-1",
@@ -229,7 +224,6 @@ describe("native replay stress", () => {
 	});
 
 	it("inactive MCP trace scrubs secrets from collapsed summary", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		await createNativeToolDisplayPiForTest();
 		const secret = "super-secret-key-12345";
 		mockCreatedAgent({
@@ -277,7 +271,6 @@ describe("native replay stress", () => {
 	});
 
 	it("incomplete started external tool uses inactive trace when cursor is not in context", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		await createNativeToolDisplayPiForTest();
 		mockCreatedAgent({
 			agentId: "agent-1",
@@ -313,8 +306,6 @@ describe("native replay stress", () => {
 	});
 
 	it("incomplete started external tool uses transcript trace when native replay is unavailable", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
-		process.env.PI_CURSOR_REGISTER_NATIVE_TOOLS = "0";
 		mockCreatedAgent({
 			agentId: "agent-1",
 			send: vi.fn(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {

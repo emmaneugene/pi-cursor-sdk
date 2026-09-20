@@ -51,7 +51,6 @@ describe("streamCursor native replay tool display", () => {
 	beforeEach(resetCursorProviderTestState);
 
 it("replays Cursor grep activity through native grep display", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -141,7 +140,6 @@ it("replays Cursor grep activity through native grep display", async () => {
 	});
 
 	it("replays Cursor web search MCP activity through neutral cursor activity cards", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -229,7 +227,6 @@ it("replays Cursor grep activity through native grep display", async () => {
 	});
 
 	it("replays Cursor WebSearch activity from local agent messages when stream deltas omit tool events", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -321,7 +318,6 @@ it("replays Cursor grep activity through native grep display", async () => {
 	});
 
 	it("replays path-only Cursor edit activity through neutral recorded cursor output without pi edit validation", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 		const dir = mkdtempSync(join(tmpdir(), "cursor-edit-replay-"));
@@ -426,7 +422,6 @@ it("replays Cursor grep activity through native grep display", async () => {
 	});
 
 	it("replays path-only Cursor write activity through neutral recorded cursor output without pi write validation", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 		const dir = mkdtempSync(join(tmpdir(), "cursor-write-path-only-replay-"));
@@ -520,7 +515,6 @@ it("replays Cursor grep activity through native grep display", async () => {
 	});
 
 	it("replays Cursor StrReplace through schema-valid recorded edit output without mutating files", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 		const dir = mkdtempSync(join(tmpdir(), "cursor-strreplace-replay-"));
@@ -616,7 +610,6 @@ it("replays Cursor grep activity through native grep display", async () => {
 	});
 
 	it("replays Cursor write activity through native-looking recorded write output without mutating files", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 		const dir = mkdtempSync(join(tmpdir(), "cursor-write-replay-"));

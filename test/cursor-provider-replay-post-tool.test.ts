@@ -45,7 +45,6 @@ describe("streamCursor native replay post-tool text", () => {
 	beforeEach(resetCursorProviderTestState);
 
 it("streams post-tool Cursor thinking and text while a native replay run is still active", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -145,7 +144,6 @@ it("streams post-tool Cursor thinking and text while a native replay run is stil
 	});
 
 	it("trims current-turn post-tool native replay final text when streamed text is only a word prefix", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -237,7 +235,6 @@ it("streams post-tool Cursor thinking and text while a native replay run is stil
 	});
 
 	it("queues post-tool thinking and text that arrive before the native tool-use turn closes", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -335,7 +332,6 @@ it("streams post-tool Cursor thinking and text while a native replay run is stil
 
 
 	it("does not duplicate text already emitted before a later native replay tool", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -476,7 +472,6 @@ it("streams post-tool Cursor thinking and text while a native replay run is stil
 
 
 	it("does not duplicate final result after an earlier post-tool text turn", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 

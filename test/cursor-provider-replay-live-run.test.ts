@@ -47,7 +47,6 @@ describe("streamCursor native replay live run", () => {
 	beforeEach(resetCursorProviderTestState);
 
 	it("uses bounded approximate usage on the final native replay stop turn when no turn-ended usage arrives", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -139,7 +138,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("waits for delayed turn-ended usage before emitting a native toolUse turn", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -264,7 +262,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("ignores later SDK usage after a split turn times out waiting for usage", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -365,7 +362,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("keeps delayed usage for inactive-only replay and applies it to the emitted final turn", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -436,7 +432,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("does not replay queued live-run tools that became inactive after the run started", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -513,7 +508,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("resumes an active live run when a steering user message follows tool results", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -612,7 +606,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("settles a scope-active live run directly when context has no matching tool results", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -673,7 +666,6 @@ describe("streamCursor native replay live run", () => {
 
 
 	it("does not let idle disposal release an active run while pre-send drain owns it", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		cursorProviderTestUtils.setCursorNativeReplayIdleDisposeMs(10);
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
@@ -736,7 +728,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("drops additional old-run tool batches when steering user input should start a fresh send", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -835,7 +826,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("awaits pooled-agent idle before compaction-style follow-up send", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -926,7 +916,6 @@ describe("streamCursor native replay live run", () => {
 	});
 
 	it("aborts while waiting for an active scoped live run and releases it once", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 

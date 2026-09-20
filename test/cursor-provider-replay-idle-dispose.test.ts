@@ -45,7 +45,6 @@ describe("streamCursor native replay idle dispose", () => {
 	beforeEach(resetCursorProviderTestState);
 
 it("disposes abandoned native replay runs after the idle timeout and abandons the session agent", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		cursorProviderTestUtils.setCursorNativeReplayIdleDisposeMs(1);
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
@@ -94,7 +93,6 @@ it("disposes abandoned native replay runs after the idle timeout and abandons th
 	});
 
 	it("cleans up pending native replay runs when replay aborts mid-flight and abandons the session agent", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -179,7 +177,6 @@ it("disposes abandoned native replay runs after the idle timeout and abandons th
 	});
 
 	it("cleans up pending native replay runs when the replay signal is already aborted before wait listener registration", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 

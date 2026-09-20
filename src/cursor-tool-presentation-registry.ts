@@ -40,13 +40,38 @@ import {
 	buildWebSearchReplaySummaryArgs,
 	type CursorReplayActivityBuildContext,
 } from "./cursor-replay-activity-builders.js";
-import { CURSOR_REPLAY_SOURCE_TOOL_NAMES, type CursorReplaySourceToolName } from "./cursor-replay-source-names.js";
 import type {
 	CursorReplayActivityDetailFields,
 	CursorReplayGenerateImageDetailFields,
 } from "./cursor-replay-tool-details.js";
 
 export const CURSOR_REPLAY_ACTIVITY_TOOL_NAME = "cursor" as const;
+
+// Single authority for the normalized SDK tool-name catalog. The presentation
+// specs below satisfy against this union, and the registry tests prove the
+// spec list matches it exactly, so neither side can drift silently.
+export const CURSOR_KNOWN_NORMALIZED_TOOL_NAMES = [
+	"read",
+	"grep",
+	"glob",
+	"ls",
+	"shell",
+	"edit",
+	"write",
+	"delete",
+	"readLints",
+	"updateTodos",
+	"createPlan",
+	"task",
+	"generateImage",
+	"mcp",
+	"semSearch",
+	"recordScreen",
+	"webSearch",
+	"webFetch",
+] as const;
+
+export type CursorNormalizedToolName = (typeof CURSOR_KNOWN_NORMALIZED_TOOL_NAMES)[number];
 
 const EMPTY_REPLAY_DETAIL_FIELDS = (): Record<string, never> => ({});
 const COLLAPSED_REPLAY_DETAIL_FIELDS = (): { collapseDetailsByDefault: true } => ({ collapseDetailsByDefault: true });
@@ -90,7 +115,7 @@ export interface CursorToolGenerateImageReplaySpec {
 }
 
 export interface CursorToolPresentationSpec {
-	normalizedName: CursorReplaySourceToolName;
+	normalizedName: CursorNormalizedToolName;
 	/** Raw SDK/host names that resolve to this tool via {@link normalizeCursorToolName}. */
 	nameAliases?: readonly string[];
 	displayLabel: string;
@@ -308,7 +333,6 @@ export const CURSOR_TOOL_PRESENTATION_SPECS = [
 
 type CursorToolPresentationSpecEntry = (typeof CURSOR_TOOL_PRESENTATION_SPECS)[number];
 
-export type CursorNormalizedToolName = CursorReplaySourceToolName;
 export type CursorReplayToolName = typeof CURSOR_REPLAY_ACTIVITY_TOOL_NAME;
 
 type CursorToolPresentationSpecWithNeutralActivity = Extract<
@@ -344,7 +368,17 @@ const WEB_KIND_BY_PATTERN = CURSOR_TOOL_PRESENTATION_SPECS.flatMap((spec) => {
 	return webNamePatterns.map((pattern) => ({ pattern, webKind }));
 });
 
-export const CURSOR_KNOWN_NORMALIZED_TOOL_NAMES: readonly CursorNormalizedToolName[] = CURSOR_REPLAY_SOURCE_TOOL_NAMES;
+const CURSOR_NORMALIZED_TOOL_NAME_SET: ReadonlySet<string> = new Set(CURSOR_KNOWN_NORMALIZED_TOOL_NAMES);
+
+export function isCursorReplaySourceToolName(name: string): name is CursorNormalizedToolName {
+	return CURSOR_NORMALIZED_TOOL_NAME_SET.has(name);
+}
+
+export type CursorReplayActivitySourceName = Exclude<CursorNormalizedToolName, "generateImage">;
+
+export function isCursorReplayActivitySourceName(name: string): name is CursorReplayActivitySourceName {
+	return name !== "generateImage" && isCursorReplaySourceToolName(name);
+}
 
 export function getCursorToolPresentationSpec(
 	name: string,
@@ -432,7 +466,7 @@ export function shouldShowCursorReplayCollapsedExpandHint(normalizedKey: string 
 }
 
 export function getCursorReplayCallSummary(
-	toolName: CursorReplayToolName | CursorReplaySourceToolName,
+	toolName: CursorReplayToolName | CursorNormalizedToolName,
 	args: CursorReplaySummaryArgs | undefined,
 ): string | undefined {
 	if (toolName === CURSOR_REPLAY_ACTIVITY_TOOL_NAME) {

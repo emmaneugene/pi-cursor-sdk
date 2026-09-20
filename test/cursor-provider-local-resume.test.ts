@@ -83,7 +83,6 @@ describe("streamCursor local resume", () => {
 	}
 
 	it("resumes with current bridge MCP and bootstraps the current Pi transcript", async () => {
-		process.env.PI_CURSOR_LOCAL_RESUME = "1";
 		registerBridgeForProviderTest({
 			active: ["mcp", "subagent"],
 			tools: [
@@ -126,7 +125,6 @@ describe("streamCursor local resume", () => {
 		{ reason: "incremental_threshold", fingerprint: (context: ReturnType<typeof makeContext>) => computeCursorContextFingerprint(context), count: 20 },
 		{ reason: "context_divergence", fingerprint: () => "stale-context", count: 0 },
 	])("replaces a resumed agent with Agent.create for $reason while preserving resume persistence", async ({ fingerprint, count }) => {
-		process.env.PI_CURSOR_LOCAL_RESUME = "1";
 		const context = makeContext();
 		const oldDispose = vi.fn().mockResolvedValue(undefined);
 		mockedResume.mockResolvedValueOnce(asMockSdkAgent({
@@ -153,7 +151,6 @@ describe("streamCursor local resume", () => {
 	});
 
 	it("does not pass a crafted cloud agent ID to local Agent.resume", async () => {
-		process.env.PI_CURSOR_LOCAL_RESUME = "1";
 		mockCreatedAgent({
 			agentId: "agent-new",
 			send: vi.fn().mockResolvedValue(asMockCursorRun({
@@ -172,7 +169,6 @@ describe("streamCursor local resume", () => {
 	});
 
 	it("falls back from local Agent.resume with a display-only continuity note", async () => {
-		process.env.PI_CURSOR_LOCAL_RESUME = "1";
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
 			agentId: "agent-new",
@@ -197,8 +193,6 @@ describe("streamCursor local resume", () => {
 	});
 
 	it("emits the resume fallback continuity note on the live native replay path", async () => {
-		process.env.PI_CURSOR_LOCAL_RESUME = "1";
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		await registerNativeToolDisplayForTest([]);
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",

@@ -40,8 +40,6 @@ describe("discoverModels model-list cache", () => {
 	beforeEach(() => {
 		process.env = { ...originalEnv };
 		delete process.env.CURSOR_API_KEY;
-		delete process.env.PI_CURSOR_SDK_DISABLE_MODEL_CACHE;
-		delete process.env.PI_CURSOR_SDK_MODEL_CACHE_TTL_MS;
 		tmpAgentDir = mkdtempSync(join(tmpdir(), "pi-cursor-discovery-cache-"));
 		process.env.PI_CODING_AGENT_DIR = tmpAgentDir;
 		process.argv = ["node", "vitest"];

@@ -79,10 +79,6 @@ describe("extension session cwd integration", () => {
 		await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
 		cursorExtensionFactoryGuardTestUtils.reset();
 		vi.clearAllMocks();
-		delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
-		delete process.env.PI_CURSOR_REGISTER_NATIVE_TOOLS;
-		delete process.env.PI_CURSOR_SETTING_SOURCES;
-		delete process.env.PI_CURSOR_HTTP_1_1;
 		cursorHttp1TestUtils.reset();
 		expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0);
 		cursorSessionScopeTestUtils.reset();

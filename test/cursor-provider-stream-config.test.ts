@@ -231,17 +231,10 @@ describe("streamCursor prompt and model config", () => {
 			send: mockSend,
 			[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
 		});
-		const previousManifest = process.env.PI_CURSOR_TOOL_MANIFEST;
-		delete process.env.PI_CURSOR_TOOL_MANIFEST;
 		const context = makeContext([{ role: "user", content: "return code only", timestamp: 1 }]);
 		context.tools = [];
 
-		try {
-			await collectEvents(streamCursor(makeModel("gpt-5.5"), context, { apiKey: "test-key", reasoning: "medium" }));
-		} finally {
-			if (previousManifest === undefined) delete process.env.PI_CURSOR_TOOL_MANIFEST;
-			else process.env.PI_CURSOR_TOOL_MANIFEST = previousManifest;
-		}
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), context, { apiKey: "test-key", reasoning: "medium" }));
 
 		const sentMessage = mockSend.mock.calls[0]?.[0] as { text: string };
 		expect(sentMessage.text).toContain("Cursor SDK tool boundary:");
@@ -254,8 +247,6 @@ describe("streamCursor prompt and model config", () => {
 	});
 
 	it("keeps pi bridge prompt guidance when the actual bridge exposes tools even if context tools are empty", async () => {
-		const previousManifest = process.env.PI_CURSOR_TOOL_MANIFEST;
-		delete process.env.PI_CURSOR_TOOL_MANIFEST;
 		registerBridgeForProviderTest({
 			active: ["sem_reindex"],
 			tools: [createTestToolInfo("sem_reindex", Type.Object({ target: Type.String() }), "Reindex semantic cache")],
@@ -276,12 +267,7 @@ describe("streamCursor prompt and model config", () => {
 		const context = makeContext([{ role: "user", content: "use bridge if needed", timestamp: 1 }]);
 		context.tools = [];
 
-		try {
-			await collectEvents(streamCursor(makeModel("gpt-5.5"), context, { apiKey: "test-key", reasoning: "medium" }));
-		} finally {
-			if (previousManifest === undefined) delete process.env.PI_CURSOR_TOOL_MANIFEST;
-			else process.env.PI_CURSOR_TOOL_MANIFEST = previousManifest;
-		}
+		await collectEvents(streamCursor(makeModel("gpt-5.5"), context, { apiKey: "test-key", reasoning: "medium" }));
 
 		const sentMessage = mockSend.mock.calls[0]?.[0] as { text: string };
 		expect(sentMessage.text).toContain("For exposed pi bridge tools");

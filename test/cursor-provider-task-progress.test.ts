@@ -26,7 +26,6 @@ describe("streamCursor Cursor task progress", () => {
 	beforeEach(resetCursorProviderTestState);
 
 	it("surfaces SDK task descriptions as thinking progress before completion in native replay", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -170,7 +169,6 @@ describe("streamCursor Cursor task progress", () => {
 	});
 
 	it("does not emit task progress for normal read or bash starts", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({ update: { type: "tool-call-started", toolCall: { name: "read", args: { path: "README.md" } }, callId: "read-1" } });
 			opts.onDelta({ update: { type: "tool-call-started", toolCall: { name: "bash", args: { command: "git status" } }, callId: "bash-1" } });
@@ -212,7 +210,6 @@ describe("streamCursor Cursor task progress", () => {
 	});
 
 	it("deduplicates repeated partial and started updates for the same task call ID", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({
 				update: {
@@ -270,7 +267,6 @@ describe("streamCursor Cursor task progress", () => {
 	});
 
 	it("scrubs and bounds task progress labels", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const secretKey = "cursor-task-secret-key-123";
 		const longDescription = `Bearer ${secretKey} ${"x".repeat(300)}`;
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
@@ -318,7 +314,6 @@ describe("streamCursor Cursor task progress", () => {
 	});
 
 	it("does not emit Cursor subagent progress for MCP envelope starts", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({
 				update: {

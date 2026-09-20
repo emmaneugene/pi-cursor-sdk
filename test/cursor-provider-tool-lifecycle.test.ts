@@ -51,7 +51,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	beforeEach(resetCursorProviderTestState);
 
 	it("surfaces deferred MCP lifecycle progress then a single completed replay card", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -129,7 +128,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("deduplicates duplicate lifecycle starts while keeping completed shell results", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const shellCall = { name: "shell", args: { command: "npm test" } };
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({ update: { type: "tool-call-started", toolCall: shellCall, callId: "shell-1" } });
@@ -172,7 +170,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("surfaces safe distinct shell lifecycle labels while keeping completed shell results", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const shellCalls = [
 			{ callId: "shell-1", toolCall: { name: "shell", input: { command: "npm test" } } },
 			{ callId: "shell-2", toolCall: { name: "shell", input: { command: "git status" } } },
@@ -221,7 +218,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("surfaces scrubbed shell lifecycle progress even when commands include paths", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const shellCall = { name: "shell", args: { command: "cd /Users/test/project && gh pr view 114" } };
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({ update: { type: "tool-call-started", toolCall: shellCall, callId: "shell-unsafe" } });
@@ -261,7 +257,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("does not emit lifecycle progress for fast read completions", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "0";
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({ update: { type: "tool-call-started", toolCall: { name: "read", args: { path: "README.md" } }, callId: "read-1" } });
 			opts.onDelta({
@@ -295,7 +290,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("does not emit lifecycle progress for fast lifecycle-eligible MCP completions", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const mockSend = vi.fn().mockImplementation(async (_msg: unknown, opts: { onDelta: CursorDeltaHandler }) => {
 			opts.onDelta({
 				update: {
@@ -342,7 +336,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("does not emit lifecycle progress for delayed pi bridge MCP calls", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		registerBridgeForProviderTest({
 			active: ["sem_reindex"],
 			tools: [createTestToolInfo("sem_reindex", Type.Object({ target: Type.String() }), "Reindex semantic cache")],
@@ -475,7 +468,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("does not append deferred lifecycle progress after live background run.wait resolves before slow debug capture", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: "/tmp/pi-cursor-sdk-lifecycle-live-wait-finished" });
 		const captureSpy = mockSlowDebugCapture();
 		await registerNativeToolDisplayForTest([]);
@@ -521,7 +513,6 @@ describe("streamCursor Cursor tool lifecycle", () => {
 	});
 
 	it("does not append deferred lifecycle progress after live background run.wait rejection", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const restore = installCursorSdkEventDebugUserConfig({ enabled: true }, { runDir: "/tmp/pi-cursor-sdk-lifecycle-wait-fail" });
 		const captureSpy = mockSlowDebugCapture();
 		await registerNativeToolDisplayForTest([]);

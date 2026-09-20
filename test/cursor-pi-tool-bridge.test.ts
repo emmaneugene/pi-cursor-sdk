@@ -95,9 +95,6 @@ function collectBridgeDiagnosticOutput() {
 
 describe("cursor pi tool bridge flags and snapshots", () => {
 	afterEach(async () => {
-		delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
-		delete process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS;
-		delete process.env.PI_CURSOR_PI_TOOL_BRIDGE_DEBUG;
 		nativeToolDisplayTestUtils.reset();
 		await __testUtils.resetRegisteredBridgeForTests();
 	});
@@ -296,9 +293,6 @@ describe("cursor pi tool bridge flags and snapshots", () => {
 
 describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 	afterEach(async () => {
-		delete process.env.PI_CURSOR_PI_TOOL_BRIDGE;
-		delete process.env.PI_CURSOR_EXPOSE_BUILTIN_TOOLS;
-		delete process.env.PI_CURSOR_PI_TOOL_BRIDGE_DEBUG;
 		nativeToolDisplayTestUtils.reset();
 		await __testUtils.resetRegisteredBridgeForTests();
 	});

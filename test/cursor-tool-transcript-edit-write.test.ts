@@ -256,7 +256,6 @@ describe("formatCursorToolTranscript edit and write", () => {
 	});
 
 	it("includes nested Cursor task conversation tool-call summaries when the SDK returns them", () => {
-		process.env.PI_CURSOR_TASK_PRESENTATION = "subagent-meta";
 		try {
 			const taskDisplay = buildCursorPiToolDisplay(
 				{
@@ -312,12 +311,10 @@ describe("formatCursorToolTranscript edit and write", () => {
 			expect(text).toContain("pi-cursor-sdk");
 			expect(text).toContain("Package name is pi-cursor-sdk.");
 		} finally {
-			delete process.env.PI_CURSOR_TASK_PRESENTATION;
 		}
 	});
 
 	it("uses Cursor task result descriptions for replay summaries and transcript headers", () => {
-		process.env.PI_CURSOR_TASK_PRESENTATION = "subagent-meta";
 		try {
 			const taskDisplay = buildCursorPiToolDisplay({
 				name: "task",
@@ -331,12 +328,10 @@ describe("formatCursorToolTranscript edit and write", () => {
 			expect(taskDisplay.args.activitySummary).toBe("Inspect fallback description: done");
 			expect(taskDisplay.result.content[0].text).toContain("subagent Inspect fallback description");
 		} finally {
-			delete process.env.PI_CURSOR_TASK_PRESENTATION;
 		}
 	});
 
 	it("suppresses invalid Cursor subagent agent IDs", () => {
-		process.env.PI_CURSOR_TASK_PRESENTATION = "subagent-meta";
 		try {
 			const taskDisplay = buildCursorPiToolDisplay({
 				name: "task",
@@ -353,12 +348,10 @@ describe("formatCursorToolTranscript edit and write", () => {
 			expect(taskDisplay.args).not.toHaveProperty("agentId");
 			expect(taskDisplay.args.activitySummary).toBe("Inspect package.json · Explore · composer-2.5-fast");
 		} finally {
-			delete process.env.PI_CURSOR_TASK_PRESENTATION;
 		}
 	});
 
 	it("can render SDK task activity as an explicit Cursor subagent card with metadata", () => {
-		process.env.PI_CURSOR_TASK_PRESENTATION = "subagent-meta";
 		try {
 			const taskDisplay = buildCursorPiToolDisplay({
 				name: "task",
@@ -403,7 +396,6 @@ describe("formatCursorToolTranscript edit and write", () => {
 			expect(taskDisplay.result.content[0].text).not.toContain("type=builtin");
 			expect(taskDisplay.result.content[0].text).toContain("Found two auth risks.");
 		} finally {
-			delete process.env.PI_CURSOR_TASK_PRESENTATION;
 		}
 	});
 });

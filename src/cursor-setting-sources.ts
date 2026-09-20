@@ -2,8 +2,6 @@ import type { SettingSource } from "@cursor/sdk";
 import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
 
 export const DEFAULT_CURSOR_SETTING_SOURCES = ["all"] as const satisfies readonly SettingSource[];
-/** Retained for script compatibility. Runtime configuration does not read this variable. */
-export const CURSOR_SETTING_SOURCES_ENV = "PI_CURSOR_SETTING_SOURCES";
 
 export function resolveCursorSettingSources(raw?: string): SettingSource[] {
 	const trimmed = raw?.trim();

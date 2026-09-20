@@ -55,10 +55,7 @@ describe("cursor-sdk-agent-lineage SessionManager persistence contract", () => {
 		lineageTestUtils.reset();
 	});
 
-	it("persists failed-send lineage to JSONL under PI_CURSOR_LOCAL_RESUME=0 and survives SessionManager reopen", async () => {
-		const previousResume = process.env.PI_CURSOR_LOCAL_RESUME;
-		process.env.PI_CURSOR_LOCAL_RESUME = "0";
-		try {
+	it("persists failed-send lineage to JSONL and survives SessionManager reopen", async () => {
 			const sessionId = "lineage-persist-contract";
 			const manager = SessionManager.create(tempDir, tempDir, { id: sessionId });
 			manager.appendMessage({ role: "user", content: "start", timestamp: 1 });
@@ -112,10 +109,5 @@ describe("cursor-sdk-agent-lineage SessionManager persistence contract", () => {
 				sessionId,
 				runtime: "local",
 			});
-			expect(process.env.PI_CURSOR_LOCAL_RESUME).toBe("0");
-		} finally {
-			if (previousResume === undefined) delete process.env.PI_CURSOR_LOCAL_RESUME;
-			else process.env.PI_CURSOR_LOCAL_RESUME = previousResume;
-		}
 	});
 });

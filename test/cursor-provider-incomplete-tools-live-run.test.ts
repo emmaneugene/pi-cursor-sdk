@@ -25,7 +25,6 @@ describe("streamCursor incomplete native replay tools", () => {
 	beforeEach(resetCursorProviderTestState);
 
 	it("surfaces incomplete started Cursor tools on abort when a completed native replay tool is already queued", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -73,7 +72,6 @@ describe("streamCursor incomplete native replay tools", () => {
 	});
 
 	it("surfaces incomplete started Cursor tools when aborting a scoped native live run", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -115,7 +113,6 @@ describe("streamCursor incomplete native replay tools", () => {
 		// indistinguishable from lost completions. On a successful text-producing
 		// run such starts are suppressed, so no error card is queued and the turn
 		// does not split.
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -155,7 +152,6 @@ describe("streamCursor incomplete native replay tools", () => {
 	});
 
 	it("does not replay a stale incomplete edit after the completed edit used a different delta id", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -234,7 +230,6 @@ describe("streamCursor incomplete native replay tools", () => {
 	});
 
 	it("suppresses incomplete Cursor glob tools when the run finishes with text", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -273,7 +268,6 @@ describe("streamCursor incomplete native replay tools", () => {
 	});
 
 	it("surfaces incomplete Cursor glob tools when the run finishes without text", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 

@@ -251,7 +251,7 @@ describe("resolveCursorFacingSystemPrompt", () => {
 		).toBe(prompt);
 	});
 
-	it("leaves prompt unchanged when PI_CURSOR_SETTING_SOURCES=none", () => {
+	it("leaves prompt unchanged when settingSources=none", () => {
 		const prompt = buildPiSystemPromptWithContextFiles([GLOBAL_FILE, PROJECT_FILE]);
 		expect(
 			resolveCursorFacingSystemPrompt(

@@ -76,9 +76,6 @@ function makeGenericConnectNodeNetworkConnectError(): Error & { rawMessage: stri
 
 describe("streamCursor connect timeout boundary", () => {
 	beforeEach(resetCursorProviderTestState);
-	afterEach(() => {
-		delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
-	});
 
 	it("surfaces ConnectError from run.wait on the text-only path without unhandled rejections", async () => {
 		const { rejections, restore } = trackUnhandledRejections();
@@ -108,7 +105,6 @@ describe("streamCursor connect timeout boundary", () => {
 	});
 
 	it("surfaces ConnectError from background run.wait on the live-run path without unhandled rejections", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		await registerNativeToolDisplayForTest([]);
 		const { rejections, restore } = trackUnhandledRejections();
 		const connectError = makeConnectTimeoutError();

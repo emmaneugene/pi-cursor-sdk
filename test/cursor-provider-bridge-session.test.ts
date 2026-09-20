@@ -422,7 +422,6 @@ describe("streamCursor session agent", () => {
 	});
 
 	it("injects bootstrap callable-surface manifest into the first send when enabled", async () => {
-		process.env.PI_CURSOR_TOOL_MANIFEST = "1";
 		const mockSend = vi.fn().mockResolvedValue({
 			id: "run-1",
 			agentId: "agent-1",

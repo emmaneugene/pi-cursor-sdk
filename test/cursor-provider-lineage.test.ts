@@ -118,11 +118,8 @@ describe("cursor provider lineage", () => {
 		);
 	});
 
-	it("records lineage when local resume is disabled at the provider boundary", async () => {
-		const previous = process.env.PI_CURSOR_LOCAL_RESUME;
-		process.env.PI_CURSOR_LOCAL_RESUME = "0";
-		try {
-			const pi = createPiHarness();
+	it("records lineage at the provider boundary", async () => {
+		const pi = createPiHarness();
 			registerCursorSessionScope(pi);
 			registerCursorSessionAgentLineage(pi);
 			await pi.runSessionStart({
@@ -141,9 +138,5 @@ describe("cursor provider lineage", () => {
 				CURSOR_SESSION_AGENT_LINEAGE_ENTRY_TYPE,
 				expect.objectContaining({ agentId: "agent-no-resume", sessionId: "session-1" }),
 			);
-		} finally {
-			if (previous === undefined) delete process.env.PI_CURSOR_LOCAL_RESUME;
-			else process.env.PI_CURSOR_LOCAL_RESUME = previous;
-		}
 	});
 });

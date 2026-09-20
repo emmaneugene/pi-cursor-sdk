@@ -1,5 +1,5 @@
 import { asRecord, getBoolean, getNumber, getString } from "./cursor-record-utils.js";
-import { isCursorReplayActivitySourceName, type CursorReplayActivitySourceName } from "./cursor-replay-source-names.js";
+import { isCursorReplayActivitySourceName, type CursorReplayActivitySourceName } from "./cursor-tool-presentation-registry.js";
 
 /** Replay detail variants keyed by replay card disposition, not SDK source tool alone. */
 export type CursorReplayToolDetailsVariant =

@@ -45,7 +45,6 @@ describe("streamCursor native replay text and usage", () => {
 	beforeEach(resetCursorProviderTestState);
 
 it("replays Cursor createPlan as a neutral cursor card before final plan text", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -123,7 +122,6 @@ it("replays Cursor createPlan as a neutral cursor card before final plan text", 
 	});
 
 	it("prefers distinct Cursor final result text after pre-plan native replay text", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -201,7 +199,6 @@ it("replays Cursor createPlan as a neutral cursor card before final plan text", 
 	});
 
 	it("emits distinct final result text even after post-replay text deltas", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -293,7 +290,6 @@ it("replays Cursor createPlan as a neutral cursor card before final plan text", 
 	});
 
 	it("suppresses incomplete Cursor tool starts during native replay when the run ends with text", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -374,7 +370,6 @@ it("replays Cursor createPlan as a neutral cursor card before final plan text", 
 	});
 
 	it("suppresses started-only Cursor tool calls when the native replay run ends with text", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -418,7 +413,6 @@ it("replays Cursor createPlan as a neutral cursor card before final plan text", 
 	});
 
 	it("counts thinking plus tool-call replay turns as nonzero assistant activity", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 
@@ -491,7 +485,6 @@ it("replays Cursor createPlan as a neutral cursor card before final plan text", 
 	});
 
 	it("gives empty final replay turns turn-local input without recounting the original prompt", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 

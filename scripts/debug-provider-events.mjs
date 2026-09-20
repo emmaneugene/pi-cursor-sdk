@@ -2,10 +2,10 @@
 /**
  * Maintainer probe: run one prompt through pi's Cursor provider and capture raw SDK callbacks.
  */
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	apiKeySecretsFromProcess,
@@ -24,15 +24,14 @@ import {
 import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
 import { createScriptFail } from "./lib/cursor-script-fail.mjs";
 import { ensureBuilt } from "./lib/ensure-built.mjs";
+import {
+	ensureArtifactDir,
+	isProbeMainModule,
+	readInstalledPackageVersion,
+	writeJsonArtifact,
+} from "./lib/cursor-probe-capture.mjs";
 import { clearCursorSdkEventDebugEnv, writeCursorSdkUserConfig } from "./lib/cursor-smoke-env.mjs";
 import { CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV } from "../shared/cursor-sdk-event-debug-env.mjs";
-
-function isMainModule() {
-	if (!process.argv[1]) return false;
-	const current = fileURLToPath(import.meta.url);
-	const invoked = resolve(process.argv[1]);
-	return process.platform === "win32" ? current.toLowerCase() === invoked.toLowerCase() : current === invoked;
-}
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -45,13 +44,7 @@ const SESSION_PI_SESSION_SNAPSHOT = "pi-session.jsonl";
 const SUMMARY_ARTIFACT = "summary.json";
 
 function readSdkVersion() {
-	try {
-		const sdkEntry = require.resolve("@cursor/sdk");
-		const sdkPackagePath = join(dirname(sdkEntry), "../../package.json");
-		return JSON.parse(readFileSync(sdkPackagePath, "utf8")).version;
-	} catch {
-		return "unknown";
-	}
+	return readInstalledPackageVersion(require, "@cursor/sdk");
 }
 
 function printHelp() {
@@ -191,7 +184,7 @@ export function backfillPiSessionSnapshot(captureSummary, artifactDir, sessionDi
 				recoveredAfterChildExit: true,
 			},
 		};
-		writeFileSync(join(artifactDir, SUMMARY_ARTIFACT), `${JSON.stringify(updated, null, 2)}\n`);
+		writeJsonArtifact(join(artifactDir, SUMMARY_ARTIFACT), updated);
 		return updated;
 	} catch {
 		return captureSummary;
@@ -208,8 +201,8 @@ export async function runDebugProviderEvents(args, envInput = process.env) {
 	const artifactDir = args.out ?? defaultOutDir(args.cwd);
 	const sessionDir = args.sessionDir ?? join(artifactDir, "session");
 	const agentDir = join(artifactDir, "pi-agent");
-	mkdirSync(artifactDir, { recursive: true });
-	mkdirSync(sessionDir, { recursive: true });
+	ensureArtifactDir(artifactDir);
+	ensureArtifactDir(sessionDir);
 	writeCursorSdkUserConfig(agentDir, {
 		local: { settingSources: args.settingSources ?? ["all"] },
 		debug: { sdkEvents: { enabled: true } },
@@ -313,7 +306,7 @@ async function main(argv = process.argv.slice(2), env = process.env) {
 	console.log(JSON.stringify(await runDebugProviderEvents(args, env)));
 }
 
-if (isMainModule()) {
+if (isProbeMainModule(import.meta.url)) {
 	main().catch((error) => {
 		fail(error instanceof Error ? error.message : String(error), apiKeySecretsFromProcess());
 	});

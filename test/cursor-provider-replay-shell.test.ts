@@ -45,7 +45,6 @@ describe("streamCursor native replay shell output", () => {
 	beforeEach(resetCursorProviderTestState);
 
 it("uses Cursor shell-output-delta as display-only fallback when completed shell output is empty", async () => {
-		process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 		const registeredTools: RegisteredTool[] = [];
 		await registerNativeToolDisplayForTest(registeredTools);
 

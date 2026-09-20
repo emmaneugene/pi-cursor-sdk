@@ -43,6 +43,9 @@ describe("cursor tool presentation registry", () => {
 	it("lists every known normalized tool exactly once", () => {
 		expect(CURSOR_KNOWN_NORMALIZED_TOOL_NAMES).toHaveLength(CURSOR_TOOL_PRESENTATION_SPECS.length);
 		expect(new Set(CURSOR_KNOWN_NORMALIZED_TOOL_NAMES).size).toBe(CURSOR_TOOL_PRESENTATION_SPECS.length);
+		expect(CURSOR_TOOL_PRESENTATION_SPECS.map((spec) => spec.normalizedName)).toEqual([
+			...CURSOR_KNOWN_NORMALIZED_TOOL_NAMES,
+		]);
 	});
 
 	it("matches transcript display spec keys exactly to registry entries", () => {

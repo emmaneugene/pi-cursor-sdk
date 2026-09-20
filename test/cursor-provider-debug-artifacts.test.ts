@@ -109,8 +109,6 @@ describe("streamCursor debug artifacts", () => {
 		});
 
 		it("records continuation drain artifacts on the next turn debug sink", async () => {
-			const previousNativeDisplay = process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
-			process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 			const registeredTools: RegisteredTool[] = [];
 			await registerNativeToolDisplayForTest(registeredTools);
 
@@ -191,15 +189,11 @@ describe("streamCursor debug artifacts", () => {
 				sdkEventDebugTestUtils.resetSessionDebugState();
 				scopeTestUtils.reset();
 				restore();
-				if (previousNativeDisplay === undefined) delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
-				else process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = previousNativeDisplay;
 				rmSync(baseDir, { recursive: true, force: true });
 			}
 		});
 
 		it("records turn_end and pre_send_end when aborting during live-run progress wait", async () => {
-			const previousNativeDisplay = process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
-			process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = "1";
 			const registeredTools: RegisteredTool[] = [];
 			await registerNativeToolDisplayForTest(registeredTools);
 
@@ -280,8 +274,6 @@ describe("streamCursor debug artifacts", () => {
 				sdkEventDebugTestUtils.resetSessionDebugState();
 				scopeTestUtils.reset();
 				restore();
-				if (previousNativeDisplay === undefined) delete process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY;
-				else process.env.PI_CURSOR_NATIVE_TOOL_DISPLAY = previousNativeDisplay;
 				rmSync(baseDir, { recursive: true, force: true });
 			}
 		});

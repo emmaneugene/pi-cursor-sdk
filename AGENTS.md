@@ -87,7 +87,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/cursor-display-text.ts` owns shared single-line sanitization and 240-char truncation for replay/trace display.
 - `src/cursor-native-tool-display-replay.ts` owns replay card rendering and diff/preview formatting.
 - `src/cursor-replay-tool-details.ts` owns parsed replay-detail variants (`nativeEdit` / `nativeWrite` / `activity` / `generateImage` / `genericFallback`).
-- `src/cursor-replay-activity-builders.ts`, `src/cursor-replay-summary-args.ts`, and `src/cursor-replay-source-names.ts` own activity-card construction, summary args, and source-name classification.
+- `src/cursor-replay-activity-builders.ts` and `src/cursor-replay-summary-args.ts` own activity-card construction and summary args; the normalized tool-name catalog lives in `src/cursor-tool-presentation-registry.ts`.
 - `src/cursor-native-tool-names.ts` owns native and replay tool-name sets.
 - `src/cursor-native-tool-display-tools.ts` owns native/replay tool definition factories and replay execute wrappers.
 - `src/cursor-native-tool-display-state.ts` owns native replay display state, `tools.display.native` gating, and record/consume helpers.

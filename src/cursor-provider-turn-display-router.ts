@@ -11,9 +11,9 @@ import {
 } from "./cursor-incomplete-tool-visibility.js";
 import { scrubPiToolDisplay, scrubSensitiveText } from "./cursor-sensitive-text.js";
 import {
-	buildCursorPiToolDisplay,
 	formatCursorToolTranscript,
 	getCursorCreatePlanText,
+	type CursorPiToolDisplay,
 } from "./cursor-tool-transcript.js";
 import { getToolName } from "./cursor-transcript-utils.js";
 import type { CursorPartialContentEmitter } from "./cursor-partial-content-emitter.js";
@@ -63,13 +63,18 @@ export class CursorTurnDisplayRouter {
 
 	routeCompletedToolCall(
 		toolCall: unknown,
+		display: CursorPiToolDisplay,
 		options: { identity?: string; source?: CursorToolDisplaySource } = {},
 	): CursorTurnDisplayAction | undefined {
 		const planText = getCursorCreatePlanText(toolCall);
 		if (planText) this.planTextCandidate = scrubSensitiveText(planText, this.resolvedApiKey);
 
-		const transcript = scrubSensitiveText(formatCursorToolTranscript(toolCall, { cwd: this.cwd }), this.resolvedApiKey);
-		const display = buildCursorPiToolDisplay(toolCall, { cwd: this.cwd });
+		// The caller builds the display once for fingerprinting; reuse it here.
+		// Format the transcript lazily: the replay path only needs it for debug
+		// records, and the inactive-trace path never needs it at all.
+		let transcript: string | undefined;
+		const getTranscript = (): string =>
+			(transcript ??= scrubSensitiveText(formatCursorToolTranscript(toolCall, { cwd: this.cwd }), this.resolvedApiKey));
 		const disposition = resolveNativeReplayDisposition({
 			toolName: display.toolName,
 			useNativeToolReplay: this.useNativeToolReplay,
@@ -86,7 +91,7 @@ export class CursorTurnDisplayRouter {
 				toolName: display.toolName,
 				identity: options.identity,
 				source: options.source,
-				transcript,
+				transcript: this.debugRecorder ? getTranscript() : undefined,
 				replayToolId: id,
 			});
 			return { kind: "queue_replay", tool: scrubbedDisplay, replayToolId: id, disposition };
@@ -95,14 +100,14 @@ export class CursorTurnDisplayRouter {
 		const traceText =
 			disposition === "inactive_trace"
 				? formatInactiveCursorReplayTrace(scrubPiToolDisplay(display, this.resolvedApiKey))
-				: transcript || `Cursor tool: ${formatCursorToolName(toolCall)} completed`;
+				: getTranscript() || `Cursor tool: ${formatCursorToolName(toolCall)} completed`;
 		this.recordDisplayDecision({
 			action: "emit_trace",
 			disposition,
 			toolName: display.toolName,
 			identity: options.identity,
 			source: options.source,
-			transcript,
+			transcript: this.debugRecorder ? getTranscript() : undefined,
 			traceText,
 		});
 		return { kind: "emit_trace", traceText, disposition };
