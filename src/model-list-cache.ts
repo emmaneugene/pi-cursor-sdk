@@ -3,9 +3,9 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ModelListItem } from "@cursor/sdk";
-import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./cursor-config.js";
-import { asRecord } from "./cursor-record-utils.js";
-import { projectCursorModelCatalog } from "../shared/cursor-model-selection-identities.mjs";
+import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./config.js";
+import { asRecord } from "./record-utils.js";
+import { projectCursorModelCatalog } from "../shared/model-selection-identities.mjs";
 
 const MODEL_LIST_CACHE_FILE = "cursor-sdk-model-list.json";
 const MODEL_LIST_CACHE_VERSION = 1;

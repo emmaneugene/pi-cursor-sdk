@@ -14,24 +14,24 @@ import {
 	defaultSettingSourcesFromEnv,
 	parseArgv,
 	requireApiKey,
-} from "./lib/cursor-cli-args.mjs";
+} from "./lib/cli-args.mjs";
 import {
 	CHILD_PROCESS_TREE_SPAWN_OPTIONS,
 	parseJsonLines,
 	terminateChild,
 	waitForChildClose,
-} from "./lib/cursor-child-process.mjs";
-import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
-import { createScriptFail } from "./lib/cursor-script-fail.mjs";
+} from "./lib/child-process.mjs";
+import { scrubSensitiveText } from "../shared/sensitive-text.mjs";
+import { createScriptFail } from "./lib/script-fail.mjs";
 import { ensureBuilt } from "./lib/ensure-built.mjs";
 import {
 	ensureArtifactDir,
 	isProbeMainModule,
 	readInstalledPackageVersion,
 	writeJsonArtifact,
-} from "./lib/cursor-probe-capture.mjs";
-import { clearCursorSdkEventDebugEnv, writeCursorSdkUserConfig } from "./lib/cursor-smoke-env.mjs";
-import { CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV } from "../shared/cursor-sdk-event-debug-env.mjs";
+} from "./lib/probe-capture.mjs";
+import { clearCursorSdkEventDebugEnv, writeCursorSdkUserConfig } from "./lib/smoke-env.mjs";
+import { CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV } from "../shared/sdk-event-debug-env.mjs";
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("..", import.meta.url));

@@ -2,21 +2,21 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
-import type { CursorSdkConfig } from "../../src/cursor-config.js";
+import type { CursorSdkConfig } from "../../src/config.js";
 import {
 	createExtensionRegistrationPi,
 	type CursorExtensionRegistrationPi,
 	type PiHarness,
 	type PiHarnessOptions,
 } from "./pi-harness.js";
-import { __testUtils as nativeToolDisplayTestUtils } from "../../src/cursor-native-tool-display-state.js";
-import { __testUtils as cursorPiToolBridgeTestUtils } from "../../src/cursor-pi-tool-bridge.js";
-import { __testUtils as cursorSessionScopeTestUtils } from "../../src/cursor-session-scope.js";
-import { __testUtils as cursorSessionResumeTestUtils } from "../../src/cursor-session-agent-resume.js";
-import { __testUtils as cursorSessionLineageTestUtils } from "../../src/cursor-session-agent-lineage.js";
-import { __testUtils as cursorSdkProcessErrorGuardTestUtils } from "../../src/cursor-sdk-process-error-guard.js";
-import { __testUtils as cursorExtensionFactoryGuardTestUtils } from "../../src/cursor-extension-factory-guard.js";
-import { installCursorSessionStoreMock } from "./cursor-session-store.js";
+import { __testUtils as nativeToolDisplayTestUtils } from "../../src/native-tool-display-state.js";
+import { __testUtils as cursorPiToolBridgeTestUtils } from "../../src/pi-tool-bridge.js";
+import { __testUtils as cursorSessionScopeTestUtils } from "../../src/session-scope.js";
+import { __testUtils as cursorSessionResumeTestUtils } from "../../src/session-agent-resume.js";
+import { __testUtils as cursorSessionLineageTestUtils } from "../../src/session-agent-lineage.js";
+import { __testUtils as cursorSdkProcessErrorGuardTestUtils } from "../../src/sdk-process-error-guard.js";
+import { __testUtils as cursorExtensionFactoryGuardTestUtils } from "../../src/extension-factory-guard.js";
+import { installCursorSessionStoreMock } from "./session-store.js";
 
 export {
 	nativeToolDisplayTestUtils,

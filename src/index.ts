@@ -1,29 +1,29 @@
 import { randomUUID } from "node:crypto";
 import type { ExtensionAPI, ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { discoverModels, type CursorModelFallbackIssue } from "./model-discovery.js";
-import { registerCursorRuntimeControls } from "./cursor-state.js";
-import { registerCursorNativeToolDisplay } from "./cursor-native-tool-display-registration.js";
-import { registerCursorPiToolBridge, registerNestedCursorPiToolBridge } from "./cursor-pi-tool-bridge.js";
-import { registerCursorSkillTool } from "./cursor-skill-tool.js";
-import { registerCursorSessionScope } from "./cursor-session-scope.js";
-import { registerCursorSessionAgentLifecycle } from "./cursor-session-agent-lifecycle.js";
-import { registerCursorSessionAgentLineage } from "./cursor-session-agent-lineage.js";
-import { registerCursorSessionAgentResume } from "./cursor-session-agent-resume.js";
-import { streamCursorLazy } from "./cursor-provider-lazy.js";
-import { CURSOR_API_KEY_CONFIG_VALUE, resolveCursorApiKey } from "./cursor-api-key.js";
-import { registerCursorFallbackIssueWarning } from "./cursor-fallback-warning.js";
-import { registerCursorAgentsContextDedup } from "./cursor-agents-context-registration.js";
-import { registerCursorOverflowNormalization } from "./cursor-provider-overflow.js";
-import { registerCursorSdkSessionProcessErrorGuard } from "./cursor-sdk-process-error-guard.js";
-import { prepareCursorSessionForCompaction } from "./cursor-session-compaction-prep.js";
-import { disposeSessionCursorAgent } from "./cursor-session-agent.js";
-import { getCursorSessionCwd } from "./cursor-session-scope.js";
-import type { CursorProviderRuntimeContext } from "./cursor-provider-runtime-context.js";
+import { registerCursorRuntimeControls } from "./state.js";
+import { registerCursorNativeToolDisplay } from "./native-tool-display-registration.js";
+import { registerCursorPiToolBridge, registerNestedCursorPiToolBridge } from "./pi-tool-bridge.js";
+import { registerCursorSkillTool } from "./skill-tool.js";
+import { registerCursorSessionScope } from "./session-scope.js";
+import { registerCursorSessionAgentLifecycle } from "./session-agent-lifecycle.js";
+import { registerCursorSessionAgentLineage } from "./session-agent-lineage.js";
+import { registerCursorSessionAgentResume } from "./session-agent-resume.js";
+import { streamCursorLazy } from "./provider-lazy.js";
+import { CURSOR_API_KEY_CONFIG_VALUE, resolveCursorApiKey } from "./api-key.js";
+import { registerCursorFallbackIssueWarning } from "./fallback-warning.js";
+import { registerCursorAgentsContextDedup } from "./agents-context-registration.js";
+import { registerCursorOverflowNormalization } from "./provider-overflow.js";
+import { registerCursorSdkSessionProcessErrorGuard } from "./sdk-process-error-guard.js";
+import { prepareCursorSessionForCompaction } from "./session-compaction-prep.js";
+import { disposeSessionCursorAgent } from "./session-agent.js";
+import { getCursorSessionCwd } from "./session-scope.js";
+import type { CursorProviderRuntimeContext } from "./provider-runtime-context.js";
 import {
 	claimCursorExtensionFactory,
 	registerCursorExtensionFactoryRelease,
 	releaseCursorExtensionFactory,
-} from "./cursor-extension-factory-guard.js";
+} from "./extension-factory-guard.js";
 
 type CursorExtensionApi =
 	& Pick<ExtensionAPI, "registerProvider" | "registerCommand" | "on">

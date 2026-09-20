@@ -25,7 +25,7 @@ vi.mock("../src/model-discovery.js", () => ({
 	getCursorModelMetadata: vi.fn(),
 }));
 
-vi.mock("../src/cursor-provider.js", () => ({
+vi.mock("../src/provider.js", () => ({
 	streamCursor: vi.fn(),
 }));
 
@@ -36,8 +36,8 @@ const mockedDiscover = vi.mocked(discoverModels);
 import {
 	canRenderCursorToolNatively,
 	recordCursorNativeToolDisplay,
-} from "../src/cursor-native-tool-display-state.js";
-import { CURSOR_ACTIVATE_SKILL_TOOL_NAME } from "../src/cursor-skill-tool.js";
+} from "../src/native-tool-display-state.js";
+import { CURSOR_ACTIVATE_SKILL_TOOL_NAME } from "../src/skill-tool.js";
 
 const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
 let agentDir: string;

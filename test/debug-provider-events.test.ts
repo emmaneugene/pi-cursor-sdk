@@ -3,7 +3,7 @@ import {
 	buildDebugProviderEventsChildEnv,
 	parseDebugProviderEventsArgs,
 } from "../scripts/debug-provider-events.mjs";
-import { CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV } from "../shared/cursor-sdk-event-debug-env.mjs";
+import { CURSOR_SDK_EVENT_DEBUG_INTERNAL_RUN_DIR_ENV } from "../shared/sdk-event-debug-env.mjs";
 
 describe("debug-provider-events maintainer probe", () => {
 	it("parses args with api key from env", () => {

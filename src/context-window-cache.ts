@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { BUNDLED_CONTEXT_WINDOWS } from "./bundled-context-windows.js";
-import { asRecord } from "./cursor-record-utils.js";
+import { asRecord } from "./record-utils.js";
 
 const CONTEXT_WINDOW_CACHE_FILE = "cursor-sdk-context-windows.json";
 let userContextWindowOverrideLoadCount = 0;

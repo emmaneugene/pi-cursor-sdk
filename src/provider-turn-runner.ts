@@ -1,0 +1,167 @@
+import { CursorLiveRunAbortError } from "./live-run-coordinator.js";
+import { drainExistingCursorLiveRunBeforeSend } from "./provider-live-run-drain.js";
+import { invalidateSessionAgent } from "./session-agent.js";
+import { getCursorSessionCwd, getCursorSessionScopeKey } from "./session-scope.js";
+import { installCursorSdkProcessErrorGuard } from "./sdk-process-error-guard.js";
+import { CursorSdkEventDebugSink } from "./sdk-event-debug.js";
+import { awaitFinalizeCursorRunOutcome } from "./provider-turn-finalize.js";
+import {
+	discardIncompleteToolsFromPrepared,
+	emitCursorLiveTurn,
+} from "./provider-turn-emit.js";
+import { CursorRunFinalizer, type CursorLiveRunCompletion } from "./provider-run-finalizer.js";
+import {
+	prepareCursorProviderTurn,
+	requireCursorApiKey,
+	resolveCursorProviderTurnConfig,
+} from "./provider-turn-prepare.js";
+import { sendCursorProviderTurn } from "./provider-turn-send.js";
+import type {
+	CursorProviderTurnPrepareResult,
+	CursorProviderTurnRunnerParams,
+	CursorProviderTurnSendResult,
+	LiveCursorProviderTurnRuntime,
+} from "./provider-turn-types.js";
+
+export type { CursorProviderTurnRunnerParams } from "./provider-turn-types.js";
+
+type LivePreparedTurn = CursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime };
+
+function requireLivePreparedTurn(prepared: CursorProviderTurnPrepareResult): LivePreparedTurn {
+	if (prepared.runtime.kind !== "live") {
+		throw new Error("Cursor live run requires a live prepared turn");
+	}
+	return prepared as LivePreparedTurn;
+}
+
+export class CursorProviderTurnRunner {
+	private sdkEventDebug: CursorSdkEventDebugSink | undefined;
+	private resolvedApiKey: string | undefined;
+
+	constructor(private readonly params: CursorProviderTurnRunnerParams) {}
+
+	private get options() {
+		return this.params.options;
+	}
+
+	private throwIfAborted(): void {
+		if (this.options?.signal?.aborted) throw new CursorLiveRunAbortError();
+	}
+
+	async run(sdkProcessErrorGuard: ReturnType<typeof installCursorSdkProcessErrorGuard>): Promise<void> {
+		const { stream, partial, model, context, options, sdkEventDebugRef } = this.params;
+		let prepared: CursorProviderTurnPrepareResult | undefined;
+		let sendResult: CursorProviderTurnSendResult | undefined;
+		let liveCompletion: CursorLiveRunCompletion | undefined;
+		const runFinalizer = new CursorRunFinalizer({
+			runnerParams: this.params,
+			sdkEventDebug: () => this.sdkEventDebug,
+			sdkProcessErrorGuard,
+			resolvedApiKey: () => this.resolvedApiKey,
+		});
+
+		try {
+			this.throwIfAborted();
+			const runtimeContext = this.params.runtimeContext;
+			const cwd = runtimeContext?.cwd ?? getCursorSessionCwd();
+			this.sdkEventDebug = CursorSdkEventDebugSink.maybeCreate({
+				cwd,
+				modelId: model.id,
+				provider: model.provider,
+			});
+			sdkEventDebugRef.current = this.sdkEventDebug;
+			this.sdkEventDebug?.recordContextSnapshot(context);
+			const resolvedConfig = resolveCursorProviderTurnConfig();
+			const localScopeKey = runtimeContext?.scopeKey ?? getCursorSessionScopeKey();
+			sdkProcessErrorGuard.containLocalTransportClosedPipe(() =>
+				invalidateSessionAgent(localScopeKey, { deadTransport: true }),
+			);
+			if (
+				(await drainExistingCursorLiveRunBeforeSend(
+					stream,
+					partial,
+					model,
+					context,
+					options?.signal,
+					this.sdkEventDebug,
+					localScopeKey,
+				)) ===
+				"stream_ended"
+			) {
+				return;
+			}
+			this.throwIfAborted();
+
+			this.resolvedApiKey = requireCursorApiKey(options);
+			prepared = await prepareCursorProviderTurn({
+				params: this.params,
+				cwd,
+				resolvedApiKey: this.resolvedApiKey,
+				sdkEventDebug: this.sdkEventDebug,
+				throwIfAborted: () => this.throwIfAborted(),
+				resolvedConfig,
+			});
+
+			sendResult = await sendCursorProviderTurn({
+				params: this.params,
+				prepared,
+				sdkEventDebug: this.sdkEventDebug,
+				sdkProcessErrorGuard,
+				throwIfAborted: () => this.throwIfAborted(),
+			});
+			const { send } = sendResult;
+
+			if (prepared.runtime.kind === "live") {
+				const livePrepared = requireLivePreparedTurn(prepared);
+				liveCompletion = runFinalizer.startLiveRunCompletion({
+					send,
+					prepared: livePrepared,
+					modelId: model.id,
+					discardIncompleteTools: (outcome) => discardIncompleteToolsFromPrepared(livePrepared, outcome),
+				});
+				await emitCursorLiveTurn({
+					params: this.params,
+					prepared: livePrepared,
+					sdkEventDebug: this.sdkEventDebug,
+					discardIncompleteTools: (outcome) => discardIncompleteToolsFromPrepared(livePrepared, outcome),
+				});
+				return;
+			}
+
+			const outcomePromise = awaitFinalizeCursorRunOutcome({
+				run: send.run,
+				prepared,
+				cursorAgentMessageOffset: send.cursorAgentMessageOffset,
+				modelId: model.id,
+				signal: options?.signal,
+				runResultFallback: send.run.result,
+				runErrorFallback: send.run.error,
+				resolvedApiKey: this.resolvedApiKey,
+				optionsApiKey: options?.apiKey,
+				sdkEventDebug: this.sdkEventDebug,
+			});
+			prepared.lifecycle.trackRunCompletion(outcomePromise);
+			const finalized = await outcomePromise;
+			await runFinalizer.applyTerminalEvent({
+				kind: "direct",
+				prepared,
+				outcome: finalized.outcome,
+			});
+		} catch (error) {
+			await runFinalizer.applyTerminalEvent({ kind: "error", prepared, error });
+		} finally {
+			await runFinalizer.cleanup(prepared, sendResult, liveCompletion);
+		}
+	}
+
+	async handleOuterCatch(error: unknown): Promise<void> {
+		const runFinalizer = new CursorRunFinalizer({
+			runnerParams: this.params,
+			sdkEventDebug: () => this.sdkEventDebug,
+			sdkProcessErrorGuard: installCursorSdkProcessErrorGuard(),
+			resolvedApiKey: () => this.resolvedApiKey,
+		});
+		await runFinalizer.applyTerminalEvent({ kind: "error", prepared: undefined, error });
+		await runFinalizer.cleanup(undefined, undefined, undefined);
+	}
+}

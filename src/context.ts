@@ -10,8 +10,8 @@ import {
 } from "@earendil-works/pi-ai";
 import { convertToLlm } from "@earendil-works/pi-coding-agent";
 import type { AgentModeOption, SDKImage } from "@cursor/sdk";
-import { CURSOR_PI_BRIDGE_PREFERENCE_TEXT } from "./cursor-bridge-contract.js";
-import { getCursorReplayPromptLabel } from "./cursor-tool-presentation-registry.js";
+import { CURSOR_PI_BRIDGE_PREFERENCE_TEXT } from "./bridge-contract.js";
+import { getCursorReplayPromptLabel } from "./tool-presentation-registry.js";
 
 export interface CursorPrompt {
 	text: string;
@@ -166,7 +166,7 @@ function sanitizeSystemPromptForCursor(systemPrompt: string): string {
 		"Guidelines:\n- Be concise in your responses.\n- Show file paths clearly when working with files.\n\nPi documentation ",
 	);
 	// Keep the Agent Skills catalog. Cursor-specific skill activation wording is normalized
-	// by cursor-skill-tool.ts before this prompt reaches the Cursor SDK provider.
+	// by skill-tool.ts before this prompt reaches the Cursor SDK provider.
 	sanitized = sanitized.replace(/\n+Semantic code intelligence priority:[\s\S]*$/g, "");
 	return sanitized.trim();
 }

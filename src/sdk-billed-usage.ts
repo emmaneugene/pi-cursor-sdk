@@ -1,0 +1,86 @@
+import type { SDKAgent } from "@cursor/sdk";
+import { asRecord, getArray, getString } from "./record-utils.js";
+import { readCursorSdkTurnUsage, type CursorSdkTurnUsage } from "./usage-accounting.js";
+
+const BILLED_USAGE_TIMEOUT_MS = 5000;
+
+// ponytail: process-lifetime watermark of billed usage UUIDs per agentId; reset on process exit.
+// Upgrade to session-scoped storage if multi-day processes retain enough agent IDs to matter.
+const seenBilledRunIdsByAgent = new Map<string, Set<string>>();
+
+export function sumCursorSdkTurnUsage(usages: readonly CursorSdkTurnUsage[]): CursorSdkTurnUsage | undefined {
+	if (usages.length === 0) return undefined;
+	return usages.reduce(
+		(total, usage) => ({
+			inputTokens: total.inputTokens + usage.inputTokens,
+			outputTokens: total.outputTokens + usage.outputTokens,
+			cacheReadTokens: total.cacheReadTokens + usage.cacheReadTokens,
+			cacheWriteTokens: total.cacheWriteTokens + usage.cacheWriteTokens,
+		}),
+	);
+}
+
+function peekCursorBilledUsageRunIds(agentId: string): ReadonlySet<string> {
+	return seenBilledRunIdsByAgent.get(agentId) ?? new Set();
+}
+
+function rememberCursorBilledUsageRunIds(agentId: string, runIds: readonly string[]): void {
+	if (runIds.length === 0) return;
+	let seen = seenBilledRunIdsByAgent.get(agentId);
+	if (!seen) {
+		seen = new Set();
+		seenBilledRunIdsByAgent.set(agentId, seen);
+	}
+	for (const runId of runIds) seen.add(runId);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = BILLED_USAGE_TIMEOUT_MS): Promise<T | undefined> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<undefined>((resolve) => {
+		timer = setTimeout(() => resolve(undefined), timeoutMs);
+		timer.unref?.();
+	});
+	return Promise.race([promise.catch(() => undefined), timeout]).finally(() => {
+		if (timer) clearTimeout(timer);
+	});
+}
+
+export function selectCursorBilledTurnUsage(
+	agentUsage: unknown,
+	options: { seenRunIds?: ReadonlySet<string> },
+): { turn?: CursorSdkTurnUsage; runIds: string[] } {
+	const runs = (getArray(asRecord(agentUsage), "runs") ?? []).flatMap((item) => {
+		const record = asRecord(item);
+		const runId = getString(record, "runId");
+		const usage = readCursorSdkTurnUsage(record?.usage);
+		return runId && usage ? [{ runId, usage }] : [];
+	});
+	const unseen = runs.filter((run) => !options.seenRunIds?.has(run.runId));
+	return { turn: sumCursorSdkTurnUsage(unseen.map((run) => run.usage)), runIds: unseen.map((run) => run.runId) };
+}
+
+export async function fetchCursorSdkAgentUsage(
+	agent: SDKAgent,
+): Promise<unknown | undefined> {
+	if (typeof agent.getUsage !== "function") return undefined;
+	return withTimeout(Promise.resolve(agent.getUsage()));
+}
+
+export async function attachCursorSdkBilledTurnUsage(options: {
+	agent: SDKAgent;
+	agentId: string;
+}): Promise<{ agentUsage?: unknown; turn?: CursorSdkTurnUsage }> {
+	const agentUsage = await fetchCursorSdkAgentUsage(options.agent);
+	if (!agentUsage) return {};
+	const selected = selectCursorBilledTurnUsage(agentUsage, {
+		seenRunIds: peekCursorBilledUsageRunIds(options.agentId),
+	});
+	rememberCursorBilledUsageRunIds(options.agentId, selected.runIds);
+	return { agentUsage, turn: selected.turn };
+}
+
+export const __testUtils = {
+	reset(): void {
+		seenBilledRunIdsByAgent.clear();
+	},
+};

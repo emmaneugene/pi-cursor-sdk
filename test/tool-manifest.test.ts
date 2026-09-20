@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest";
+import { buildCursorPrompt } from "../src/context.js";
+import {
+	buildCursorToolManifestText,
+	resolveCursorToolManifestEnabled,
+} from "../src/tool-manifest.js";
+
+describe("cursor-tool-manifest", () => {
+	it("builds manifest with bridge tools and host summary", () => {
+		const text = buildCursorToolManifestText({
+			piBridgeEnabled: true,
+			bridgeSnapshot: {
+				tools: [
+					{
+						piToolName: "sem_reindex",
+						mcpToolName: "pi__sem_reindex",
+						description: "ask",
+						inputSchema: { type: "object" },
+						sourceInfo: { source: "extension", path: "test", scope: "temporary", origin: "top-level" },
+					},
+				],
+				mcpToolNameToPiToolName: new Map([["pi__sem_reindex", "sem_reindex"]]),
+			},
+		});
+
+		expect(text).toContain("Callable tool surfaces this run:");
+		expect(text).toContain("Cursor host/MCP");
+		expect(text).toContain("Pi tool toggles affect pi tools/bridge exposure only");
+		expect(text).toContain("pi__sem_reindex");
+		expect(text).toContain("cursor-replay-*");
+	});
+
+	it("omits bridge lines when pi bridge guidance is disabled", () => {
+		const text = buildCursorToolManifestText({
+			includePiBridgeGuidance: false,
+			piBridgeEnabled: true,
+			bridgeSnapshot: {
+				tools: [
+					{
+						piToolName: "sem_reindex",
+						mcpToolName: "pi__sem_reindex",
+						description: "ask",
+						inputSchema: { type: "object" },
+						sourceInfo: { source: "extension", path: "test", scope: "temporary", origin: "top-level" },
+					},
+				],
+				mcpToolNameToPiToolName: new Map(),
+			},
+		});
+
+		expect(text).toContain("Callable tool surfaces this run:");
+		expect(text).toContain("Cursor host/MCP");
+		expect(text).toContain("configured MCP depends on Cursor settings");
+		expect(text).not.toContain("Pi bridge");
+		expect(text).not.toContain("pi__sem_reindex");
+	});
+
+	it("notes disabled bridge", () => {
+		const text = buildCursorToolManifestText({ piBridgeEnabled: false });
+		expect(text).toContain("Pi bridge: disabled");
+		expect(text).not.toContain("SwitchMode");
+	});
+
+	it("distinguishes disabled bridge from empty exposure", () => {
+		const disabled = buildCursorToolManifestText({ piBridgeEnabled: false });
+		const empty = buildCursorToolManifestText({ piBridgeEnabled: true, bridgeSnapshot: { tools: [], mcpToolNameToPiToolName: new Map() } });
+		expect(disabled).toContain("disabled");
+		expect(empty).toContain("no pi__* tools exposed");
+	});
+
+	it("defaults the manifest to enabled and reads user config", () => {
+		expect(resolveCursorToolManifestEnabled({})).toBe(true);
+		expect(resolveCursorToolManifestEnabled({ tools: { manifest: false } })).toBe(false);
+	});
+
+	it("includes manifest in bootstrap prompts when provided", () => {
+		const manifest = buildCursorToolManifestText();
+		const prompt = buildCursorPrompt(
+			{ messages: [{ role: "user", content: "hi", timestamp: 1 }] },
+			{ toolManifest: manifest },
+		);
+		expect(prompt.text).toContain("Callable tool surfaces this run:");
+		expect(prompt.text).toContain("Cursor SDK tool boundary:");
+		expect(prompt.text).toContain("See callable surfaces below.");
+	});
+});

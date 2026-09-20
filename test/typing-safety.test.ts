@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const PRODUCTION_DIRS = ["src", "scripts", "shared"] as const;
 const SOURCE_FILE_EXTENSIONS = new Set([".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
-const IGNORED_FILES = new Set(["src/cursor-fallback-models.generated.ts"]);
+const IGNORED_FILES = new Set(["src/fallback-models.generated.ts"]);
 
 const FORBIDDEN_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
 	{ label: "double assertion through unknown", pattern: /\bas\s+unknown\s+as\b/ },

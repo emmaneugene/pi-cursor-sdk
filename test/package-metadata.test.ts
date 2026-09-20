@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { OPENAI_CODEX_MODELS } from "@earendil-works/pi-ai/providers/openai-codex.models";
 import { describe, expect, it } from "vitest";
-import { FALLBACK_MODEL_ITEMS } from "../src/cursor-fallback-models.generated.js";
+import { FALLBACK_MODEL_ITEMS } from "../src/fallback-models.generated.js";
 
 const require = createRequire(import.meta.url);
 const packageJson = require("../package.json") as {
@@ -213,7 +213,7 @@ describe("package metadata cutover baselines", () => {
 	});
 
 	it("keeps Grok UX examples aligned with the generated Cursor catalog", () => {
-		const spec = readFileSync(join(process.cwd(), "docs/cursor-model-ux-spec.md"), "utf8");
+		const spec = readFileSync(join(process.cwd(), "docs/model-ux-spec.md"), "utf8");
 		const grok45 = FALLBACK_MODEL_ITEMS.find((item) => item.id === "grok-4.5");
 		const grok46 = FALLBACK_MODEL_ITEMS.find((item) => item.id === "grok-4.6");
 

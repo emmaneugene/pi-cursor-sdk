@@ -13,7 +13,7 @@ import {
 import {
 	buildCursorSessionSendPrompt,
 	planCursorSessionSend,
-} from "../src/cursor-session-send-policy.js";
+} from "../src/session-send-policy.js";
 import {
 	normalizeContext,
 	type AssistantMessage,
@@ -21,7 +21,7 @@ import {
 	type ToolResultMessage,
 	type UserMessage,
 } from "@earendil-works/pi-ai";
-import { getActiveContextToolNames } from "../src/cursor-context-tools.js";
+import { getActiveContextToolNames } from "../src/context-tools.js";
 import { buildInstalledPiSystemPrompt } from "./helpers/pi-system-prompt.js";
 
 describe("buildCursorPrompt", () => {

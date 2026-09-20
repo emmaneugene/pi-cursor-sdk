@@ -14,9 +14,9 @@ import {
 	defaultTimestampedDir,
 	parseArgv,
 	requireApiKey,
-} from "./lib/cursor-cli-args.mjs";
-import { createScriptFail } from "./lib/cursor-script-fail.mjs";
-import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "./lib/cursor-sdk-output-filter.mjs";
+} from "./lib/cli-args.mjs";
+import { createScriptFail } from "./lib/script-fail.mjs";
+import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "./lib/sdk-output-filter.mjs";
 import {
 	ensureArtifactDir,
 	isProbeMainModule,
@@ -24,7 +24,7 @@ import {
 	RAW_PROBE_ARTIFACT_WARNING,
 	readInstalledPackageVersion,
 	writeJsonArtifact,
-} from "./lib/cursor-probe-capture.mjs";
+} from "./lib/probe-capture.mjs";
 
 const require = createRequire(import.meta.url);
 const packageJson = require("../package.json");

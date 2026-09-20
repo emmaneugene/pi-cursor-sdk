@@ -21,19 +21,19 @@ vi.mock("../src/model-discovery.js", () => ({
 	getCursorModelMetadata: vi.fn(),
 }));
 
-vi.mock("../src/cursor-provider.js", () => ({
+vi.mock("../src/provider.js", () => ({
 	streamCursor: vi.fn(),
 }));
 
 import extensionFactory from "../src/index.js";
 import { discoverModels } from "../src/model-discovery.js";
-import { acquireSessionCursorAgent, __testUtils as sessionAgentTestUtils } from "../src/cursor-session-agent.js";
-import { __testUtils as cursorSessionScopeTestUtils } from "../src/cursor-session-scope.js";
-import { streamCursor } from "../src/cursor-provider.js";
-import { streamCursorLazy } from "../src/cursor-provider-lazy.js";
-import { buildCursorPiToolBridgeSnapshot } from "../src/cursor-pi-tool-bridge.js";
-import { CURSOR_ACTIVATE_SKILL_TOOL_NAME } from "../src/cursor-skill-tool.js";
-import { __testUtils as cursorSdkProcessErrorGuardTestUtils } from "../src/cursor-sdk-process-error-guard.js";
+import { acquireSessionCursorAgent, __testUtils as sessionAgentTestUtils } from "../src/session-agent.js";
+import { __testUtils as cursorSessionScopeTestUtils } from "../src/session-scope.js";
+import { streamCursor } from "../src/provider.js";
+import { streamCursorLazy } from "../src/provider-lazy.js";
+import { buildCursorPiToolBridgeSnapshot } from "../src/pi-tool-bridge.js";
+import { CURSOR_ACTIVATE_SKILL_TOOL_NAME } from "../src/skill-tool.js";
+import { __testUtils as cursorSdkProcessErrorGuardTestUtils } from "../src/sdk-process-error-guard.js";
 
 const mockedDiscover = vi.mocked(discoverModels);
 const mockedStreamCursor = vi.mocked(streamCursor);

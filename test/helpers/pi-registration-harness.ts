@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { Provider } from "@earendil-works/pi-ai";
 import { createEventBus, type ExtensionAPI, type ProviderConfig, type ToolInfo } from "@earendil-works/pi-coding-agent";
-import type { CursorNativeToolDisplayExtensionApi } from "../../src/cursor-native-tool-display-registration.js";
+import type { CursorNativeToolDisplayExtensionApi } from "../../src/native-tool-display-registration.js";
 import type cursorExtensionFactory from "../../src/index.js";
 import { createExtensionCommandContext } from "./context-fixtures.js";
 import { createHarnessEventApi } from "./event-harness.js";

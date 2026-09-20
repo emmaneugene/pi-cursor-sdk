@@ -3,5 +3,5 @@
 	"compilerOptions": {
 		"rootDir": ".."
 	},
-	"include": ["cursor-replay-tool-details.compile.test.ts"]
+	"include": ["replay-tool-details.compile.test.ts"]
 }

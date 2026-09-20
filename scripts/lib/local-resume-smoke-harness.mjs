@@ -16,9 +16,9 @@ import { fileURLToPath } from "node:url";
 import {
 	CHILD_PROCESS_TREE_SPAWN_OPTIONS,
 	terminateChild,
-} from "./cursor-child-process.mjs";
-import { buildCursorSmokeEnv } from "./cursor-smoke-env.mjs";
-import { scrubSensitiveText } from "../../shared/cursor-sensitive-text.mjs";
+} from "./child-process.mjs";
+import { buildCursorSmokeEnv } from "./smoke-env.mjs";
+import { scrubSensitiveText } from "../../shared/sensitive-text.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 

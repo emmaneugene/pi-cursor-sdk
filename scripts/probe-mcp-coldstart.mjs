@@ -10,11 +10,11 @@ import { resolve } from "node:path";
 import {
 	installCursorMcpToolTimeoutOverride,
 	restoreCursorMcpToolTimeoutOverride,
-} from "../src/cursor-mcp-timeout-override.ts";
-import { apiKeySecretsFromProcess, defaultApiKeyFromEnv, parseArgv } from "./lib/cursor-cli-args.mjs";
-import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
-import { createScriptFail } from "./lib/cursor-script-fail.mjs";
-import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "./lib/cursor-sdk-output-filter.mjs";
+} from "../src/mcp-timeout-override.ts";
+import { apiKeySecretsFromProcess, defaultApiKeyFromEnv, parseArgv } from "./lib/cli-args.mjs";
+import { scrubSensitiveText } from "../shared/sensitive-text.mjs";
+import { createScriptFail } from "./lib/script-fail.mjs";
+import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "./lib/sdk-output-filter.mjs";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 

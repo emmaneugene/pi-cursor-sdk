@@ -6,7 +6,7 @@ import type {
 	NormalizedBuildSystemPromptOptions,
 } from "@earendil-works/pi-coding-agent";
 import { createDefaultSystemPromptOptions } from "./context-fixtures.js";
-import type { PiAgentsContextFile } from "../../src/cursor-agents-context.js";
+import type { PiAgentsContextFile } from "../../src/agents-context.js";
 
 type PiBuildSystemPrompt = (options: BuildSystemPromptOptions) => string;
 let cachedBuildSystemPrompt: PiBuildSystemPrompt | undefined;

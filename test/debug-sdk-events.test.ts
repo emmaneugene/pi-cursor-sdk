@@ -3,21 +3,21 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CURSOR_SDK_STARTUP_NOISE_PATTERNS as providerNoisePatterns } from "../src/cursor-sdk-output-filter.js";
-import { resolveCursorSettingSources as resolveProviderSettingSources } from "../src/cursor-setting-sources.js";
-import { scrubSensitiveText as scrubProviderSensitiveText } from "../src/cursor-sensitive-text.js";
-import { CURSOR_SDK_STARTUP_NOISE_PATTERNS as scriptNoisePatterns } from "../scripts/lib/cursor-sdk-output-filter.mjs";
+import { CURSOR_SDK_STARTUP_NOISE_PATTERNS as providerNoisePatterns } from "../src/sdk-output-filter.js";
+import { resolveCursorSettingSources as resolveProviderSettingSources } from "../src/setting-sources.js";
+import { scrubSensitiveText as scrubProviderSensitiveText } from "../src/sensitive-text.js";
+import { CURSOR_SDK_STARTUP_NOISE_PATTERNS as scriptNoisePatterns } from "../scripts/lib/sdk-output-filter.mjs";
 import {
 	CURSOR_SETTING_SOURCES_ENV,
 	resolveCursorSettingSources as resolveScriptSettingSources,
-} from "../shared/cursor-setting-sources.mjs";
-import { scrubSensitiveText as scrubScriptSensitiveText } from "../shared/cursor-sensitive-text.mjs";
+} from "../shared/setting-sources.mjs";
+import { scrubSensitiveText as scrubScriptSensitiveText } from "../shared/sensitive-text.mjs";
 import {
 	buildSummary,
 	createEventJsonlSink,
 	parseDebugSdkEventsArgs,
 } from "../scripts/debug-sdk-events.mjs";
-import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "../scripts/lib/cursor-sdk-output-filter.mjs";
+import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "../scripts/lib/sdk-output-filter.mjs";
 
 const scriptPath = "scripts/debug-sdk-events.mjs";
 
@@ -187,14 +187,14 @@ describe("debug-sdk-events maintainer probe", () => {
 			mkdirSync(join(packageRoot, "src"), { recursive: true });
 			cpSync("package.json", join(packageRoot, "package.json"));
 			cpSync(scriptPath, join(packageRoot, scriptPath));
-			for (const sharedFile of ["cursor-setting-sources.mjs", "cursor-sensitive-text.mjs", "cursor-sdk-output-filter.mjs"]) {
+			for (const sharedFile of ["setting-sources.mjs", "sensitive-text.mjs", "sdk-output-filter.mjs"]) {
 				cpSync(`shared/${sharedFile}`, join(packageRoot, "shared", sharedFile));
 			}
 			for (const libFile of [
-				"cursor-cli-args.mjs",
-				"cursor-probe-capture.mjs",
-				"cursor-script-fail.mjs",
-				"cursor-sdk-output-filter.mjs",
+				"cli-args.mjs",
+				"probe-capture.mjs",
+				"script-fail.mjs",
+				"sdk-output-filter.mjs",
 			]) {
 				cpSync(`scripts/lib/${libFile}`, join(packageRoot, "scripts/lib", libFile));
 			}

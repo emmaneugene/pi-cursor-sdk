@@ -692,7 +692,7 @@ First release of the maintained fork published as `@emmaneugene/pi-cursor-sdk`.
 ### Added
 
 - Add Cursor SDK **`agent` / `plan` mode** controls: `--cursor-mode agent|plan` for one run, `/cursor-mode agent|plan` (persisted in the session), and `/cursor-mode` to show current mode. Default is `agent`. Plan-mode `createPlan` / `updateTodos` activity stays display-only in pi replay.
-- Add a bootstrap **callable tool surfaces** block on the first Cursor send (default on). It summarizes Cursor host tools, exposed `pi__*` bridge tools for the run, and that configured Cursor MCP servers are discovered at runtime. Disable with `PI_CURSOR_TOOL_MANIFEST=0`. See [cursor-tool-surfaces.md](docs/cursor-tool-surfaces.md).
+- Add a bootstrap **callable tool surfaces** block on the first Cursor send (default on). It summarizes Cursor host tools, exposed `pi__*` bridge tools for the run, and that configured Cursor MCP servers are discovered at runtime. Disable with `PI_CURSOR_TOOL_MANIFEST=0`. See [tool-surfaces.md](docs/tool-surfaces.md).
 - Add maintainer `/cursor-tools` to print the effective callable-surface manifest for the current session.
 
 ### Changed
@@ -714,7 +714,7 @@ First release of the maintained fork published as `@emmaneugene/pi-cursor-sdk`.
 ### Maintainer
 
 - Add `npm run smoke:visual` for offscreen TUI visual smoke (ANSI/text/HTML/PNG/JSONL).
-- Add [Cursor dogfood checklist](docs/cursor-dogfood-checklist.md) and tighten live/visual smoke env isolation for pi 0.76 `--session-id`, plan mode, and native-replay card proof.
+- Add [Cursor dogfood checklist](docs/dogfood-checklist.md) and tighten live/visual smoke env isolation for pi 0.76 `--session-id`, plan mode, and native-replay card proof.
 - Add package metadata regression tests for the SDK/pi cutover baselines.
 
 ## 0.1.20 - 2026-05-26
@@ -777,10 +777,10 @@ First release of the maintained fork published as `@emmaneugene/pi-cursor-sdk`.
 
 ### Added
 
-- Add `scripts/isolated-cursor-smoke.sh` and `npm run smoke:isolated` for packed `/tmp` install smoke with seeded `auth.json`, plan-strip shim, and JSONL replay-error scans.
+- Add `scripts/isolated-smoke.sh` and `npm run smoke:isolated` for packed `/tmp` install smoke with seeded `auth.json`, plan-strip shim, and JSONL replay-error scans.
 - Add `scripts/fixtures/plan-strip-shim/` to simulate plan-mode execute stripping active tools to `read`, `bash`, `edit`, and `write`.
 - Extend `scripts/validate-smoke-jsonl.mjs` with `--replay-errors` and `--replay-errors-only` to fail on persisted `Tool grep/cursor/find/ls not found` entries.
-- Add [Cursor testing lessons](docs/cursor-testing-lessons.md) documenting auth.json seeding, isolated harness layout, JSONL replay scans, and the plan-mode replay regression chain.
+- Add [Cursor testing lessons](docs/testing-lessons.md) documenting auth.json seeding, isolated harness layout, JSONL replay scans, and the plan-mode replay regression chain.
 - Add regression coverage in `test/cursor-native-replay-stress.test.ts`, `test/cursor-native-replay-trace.test.ts`, `test/cursor-native-replay-routing.test.ts`, and expanded live-run / extension lifecycle tests.
 
 ### Changed
@@ -833,7 +833,7 @@ First release of the maintained fork published as `@emmaneugene/pi-cursor-sdk`.
 
 - Reuse Cursor SDK agents within the same pi session when model, API key, cwd, bridge surface, and pi context remain compatible, sending incremental follow-up prompts instead of re-bootstrapping full history on every turn.
 - Add context fingerprinting to choose bootstrap vs incremental `Agent.send()` prompts, including branch and compaction summary detection after `/tree` navigation and session compaction.
-- Add a manual [Cursor live smoke checklist](docs/cursor-live-smoke-checklist.md) for release validation with real `pi -e . --cursor-no-fast --model cursor/composer-2.5` runs, diagnostics safety scans, TUI observation, bridge/replay checks, abort/cancel coverage, and an assume-everything-is-in-scope no-optional/no-deferred release rule.
+- Add a manual [Cursor live smoke checklist](docs/live-smoke-checklist.md) for release validation with real `pi -e . --cursor-no-fast --model cursor/composer-2.5` runs, diagnostics safety scans, TUI observation, bridge/replay checks, abort/cancel coverage, and an assume-everything-is-in-scope no-optional/no-deferred release rule.
 - Share the Cursor pi bridge contract through provider prompts and bridged MCP tool descriptions via `src/cursor-bridge-contract.ts`.
 - Isolate Cursor usage and live-run accounting in `src/cursor-usage-accounting.ts` and `src/cursor-live-run-accounting.ts`.
 

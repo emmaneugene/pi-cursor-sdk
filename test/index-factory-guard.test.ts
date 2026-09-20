@@ -15,7 +15,7 @@ import {
 	resetIndexExtensionTestState,
 	writeIndexTestUserConfig,
 } from "./helpers/index-extension-test-kit.js";
-import { getCursorSessionScopeKey } from "../src/cursor-session-scope.js";
+import { getCursorSessionScopeKey } from "../src/session-scope.js";
 
 vi.mock("../src/model-discovery.js", () => ({
 	discoverModels: vi.fn(),

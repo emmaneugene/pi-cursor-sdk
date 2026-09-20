@@ -11,7 +11,7 @@ import {
 	type CursorModelFallbackIssue,
 } from "../src/model-discovery.js";
 import { saveCachedContextWindow, __testUtils as contextWindowCacheTestUtils } from "../src/context-window-cache.js";
-import { FALLBACK_MODEL_ITEMS } from "../src/cursor-fallback-models.generated.js";
+import { FALLBACK_MODEL_ITEMS } from "../src/fallback-models.generated.js";
 
 vi.mock("@cursor/sdk", () => ({
 	Cursor: {

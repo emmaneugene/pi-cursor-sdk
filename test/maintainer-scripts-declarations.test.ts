@@ -40,13 +40,13 @@ import {
 	parseArgv,
 	readArgvValue,
 	requireApiKey,
-} from "../scripts/lib/cursor-cli-args.mjs";
+} from "../scripts/lib/cli-args.mjs";
 import {
 	buildCursorSmokeEnv,
 	buildCursorSmokeEnvPlan,
 	CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as SCRIPT_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES,
 	sealedNodePath,
-} from "../scripts/lib/cursor-smoke-env.mjs";
+} from "../scripts/lib/smoke-env.mjs";
 import {
 	CHILD_PROCESS_TREE_SPAWN_OPTIONS,
 	DEFAULT_CHILD_SHUTDOWN_GRACE_MS,
@@ -54,36 +54,36 @@ import {
 	signalChild,
 	terminateChild,
 	waitForChildClose,
-} from "../scripts/lib/cursor-child-process.mjs";
-import { createScriptFail } from "../scripts/lib/cursor-script-fail.mjs";
+} from "../scripts/lib/child-process.mjs";
+import { createScriptFail } from "../scripts/lib/script-fail.mjs";
 import {
 	CURSOR_SDK_STARTUP_NOISE_PATTERNS,
 	installCursorSdkOutputFilter,
 	isCursorSdkOutputSuppressed,
 	isCursorSdkStartupNoise,
 	suppressCursorSdkOutput,
-} from "../scripts/lib/cursor-sdk-output-filter.mjs";
-import { buildTerminalHtml, writeTerminalScreenshot } from "../scripts/lib/cursor-visual-render.mjs";
-import { scrubSensitiveText as scrubSensitiveTextFromScriptLib } from "../shared/cursor-sensitive-text.mjs";
+} from "../scripts/lib/sdk-output-filter.mjs";
+import { buildTerminalHtml, writeTerminalScreenshot } from "../scripts/lib/visual-render.mjs";
+import { scrubSensitiveText as scrubSensitiveTextFromScriptLib } from "../shared/sensitive-text.mjs";
 import {
 	CURSOR_SETTING_SOURCES_ENV as SCRIPT_CURSOR_SETTING_SOURCES_ENV,
 	resolveCursorSettingSources as resolveCursorSettingSourcesFromScriptLib,
 	serializeCursorSettingSources as serializeCursorSettingSourcesFromScriptLib,
-} from "../shared/cursor-setting-sources.mjs";
-import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
+} from "../shared/setting-sources.mjs";
+import { scrubSensitiveText } from "../shared/sensitive-text.mjs";
 import {
 	CURSOR_SETTING_SOURCES_ENV,
 	resolveCursorSettingSources,
 	serializeCursorSettingSources,
-} from "../shared/cursor-setting-sources.mjs";
-import { CURSOR_SDK_EVENT_DEBUG_ENV_NAMES } from "../shared/cursor-sdk-event-debug-env.mjs";
+} from "../shared/setting-sources.mjs";
+import { CURSOR_SDK_EVENT_DEBUG_ENV_NAMES } from "../shared/sdk-event-debug-env.mjs";
 
 const require = createRequire(import.meta.url);
 const packageJson = require("../package.json") as { files: string[] };
 
 /** Type-only exports that intentionally have no runtime .mjs value. */
 const DECLARATION_TYPE_ONLY_EXPORTS: Record<string, readonly string[]> = {
-	"shared/cursor-model-selection-identities.d.mts": ["CursorModelSelectionIdentity"],
+	"shared/model-selection-identities.d.mts": ["CursorModelSelectionIdentity"],
 	"scripts/debug-provider-events.d.mts": [
 		"CursorDebugCaptureCounts",
 		"CursorDebugCaptureSummary",
@@ -98,10 +98,10 @@ const DECLARATION_TYPE_ONLY_EXPORTS: Record<string, readonly string[]> = {
 		"CursorSdkEventTimingSnapshot",
 		"CursorSdkEventJsonlSink",
 	],
-	"scripts/lib/cursor-smoke-env.d.mts": [
+	"scripts/lib/smoke-env.d.mts": [
 		"CursorSmokeUserConfigOptions",
 	],
-	"scripts/lib/cursor-cli-args.d.mts": [
+	"scripts/lib/cli-args.d.mts": [
 		"CursorCliBooleanFlagSpec",
 		"CursorCliFlagSpec",
 		"CursorCliFlagSpecMap",

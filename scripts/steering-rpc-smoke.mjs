@@ -13,11 +13,11 @@ import {
 	parseJsonLines,
 	terminateChild,
 	waitForChildClose,
-} from "./lib/cursor-child-process.mjs";
-import { apiKeySecretsFromProcess } from "./lib/cursor-cli-args.mjs";
-import { buildCursorSmokeEnv, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES } from "./lib/cursor-smoke-env.mjs";
+} from "./lib/child-process.mjs";
+import { apiKeySecretsFromProcess } from "./lib/cli-args.mjs";
+import { buildCursorSmokeEnv, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES } from "./lib/smoke-env.mjs";
 import { ensureBuilt } from "./lib/ensure-built.mjs";
-import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
+import { scrubSensitiveText } from "../shared/sensitive-text.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const DEBUG_ENV_NAMES = CURSOR_SDK_EVENT_DEBUG_ENV_NAMES;

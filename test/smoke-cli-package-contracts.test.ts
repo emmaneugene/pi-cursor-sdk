@@ -10,13 +10,13 @@ function run(command: string, args: string[], env = process.env, cwd = process.c
 
 describe("smoke CLI and package contracts", () => {
 	it("keeps smoke helper syntax and help paths working without live Cursor auth", () => {
-		expect(run("bash", ["-n", "scripts/lib/cursor-smoke-shell.sh"]).status).toBe(0);
+		expect(run("bash", ["-n", "scripts/lib/smoke-shell.sh"]).status).toBe(0);
 		expect(run("bash", ["-n", "scripts/tmux-live-smoke.sh"]).status).toBe(0);
-		expect(run("bash", ["-n", "scripts/isolated-cursor-smoke.sh"]).status).toBe(0);
+		expect(run("bash", ["-n", "scripts/isolated-smoke.sh"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/steering-rpc-smoke.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/visual-tui-smoke.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/visual-tui-smoke-self-test.mjs"]).status).toBe(0);
-		expect(run(process.execPath, ["--check", "scripts/lib/cursor-visual-manifest.mjs"]).status).toBe(0);
+		expect(run(process.execPath, ["--check", "scripts/lib/visual-manifest.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/validate-smoke-jsonl.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/debug-sdk-events.mjs"]).status).toBe(0);
 		expect(run(process.execPath, ["--check", "scripts/debug-provider-events.mjs"]).status).toBe(0);
@@ -26,7 +26,7 @@ describe("smoke CLI and package contracts", () => {
 		expect(run(process.execPath, ["--check", "scripts/lib/local-resume-suites.mjs"]).status).toBe(0);
 
 		const liveHelp = process.platform === "win32" ? undefined : run("scripts/tmux-live-smoke.sh", ["--help"]);
-		const isolatedHelp = process.platform === "win32" ? undefined : run("scripts/isolated-cursor-smoke.sh", ["--help"]);
+		const isolatedHelp = process.platform === "win32" ? undefined : run("scripts/isolated-smoke.sh", ["--help"]);
 		const steeringHelp = run(process.execPath, ["scripts/steering-rpc-smoke.mjs", "--help"]);
 		const visualHelp = run(process.execPath, ["scripts/visual-tui-smoke.mjs", "--help"]);
 		const jsonlHelp = run(process.execPath, ["scripts/validate-smoke-jsonl.mjs", "--help"]);
@@ -71,7 +71,7 @@ describe("smoke CLI and package contracts", () => {
 		if (process.platform !== "win32") {
 			const failedCommand = run("bash", [
 				"-c",
-				"set -e; . scripts/lib/cursor-smoke-shell.sh; smoke_run_with_timeout_or_fail repro 1 bash -c 'exit 42'",
+				"set -e; . scripts/lib/smoke-shell.sh; smoke_run_with_timeout_or_fail repro 1 bash -c 'exit 42'",
 			]);
 			expect(failedCommand.status).toBe(1);
 			expect(failedCommand.stderr).toContain("repro exited 42");
@@ -91,7 +91,7 @@ describe("smoke CLI and package contracts", () => {
 			const liveSelfTest = run("scripts/tmux-live-smoke.sh", ["--self-test"]);
 			expect(liveSelfTest.status).toBe(0);
 			expect(liveSelfTest.stdout).toContain("self-test PASS");
-			const isolatedSelfTest = run("scripts/isolated-cursor-smoke.sh", ["--self-test"]);
+			const isolatedSelfTest = run("scripts/isolated-smoke.sh", ["--self-test"]);
 			expect(isolatedSelfTest.status).toBe(0);
 			expect(isolatedSelfTest.stdout).toContain("self-test PASS");
 		}
@@ -179,7 +179,7 @@ describe("smoke CLI and package contracts", () => {
 
 		expect(pack.name).toBe("@emmaneugene/pi-cursor-sdk");
 		expect(paths.has("scripts/tmux-live-smoke.sh")).toBe(true);
-		expect(paths.has("scripts/isolated-cursor-smoke.sh")).toBe(true);
+		expect(paths.has("scripts/isolated-smoke.sh")).toBe(true);
 		expect(paths.has("scripts/fixtures/plan-strip-shim/index.ts")).toBe(true);
 		expect(paths.has("scripts/steering-rpc-smoke.mjs")).toBe(true);
 		expect(paths.has("scripts/visual-tui-smoke.mjs")).toBe(true);
@@ -191,23 +191,23 @@ describe("smoke CLI and package contracts", () => {
 			const declarationPath = path.replace(/\.mjs$/, ".d.mts");
 			if (existsSync(declarationPath)) expect(paths.has(declarationPath)).toBe(true);
 		}
-		expect(paths.has("shared/cursor-setting-sources.mjs")).toBe(true);
-		expect(paths.has("shared/cursor-setting-sources.d.mts")).toBe(true);
-		expect(paths.has("shared/cursor-sensitive-text.mjs")).toBe(true);
-		expect(paths.has("shared/cursor-sensitive-text.d.mts")).toBe(true);
+		expect(paths.has("shared/setting-sources.mjs")).toBe(true);
+		expect(paths.has("shared/setting-sources.d.mts")).toBe(true);
+		expect(paths.has("shared/sensitive-text.mjs")).toBe(true);
+		expect(paths.has("shared/sensitive-text.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/local-resume-smoke-harness.mjs")).toBe(true);
 		expect(paths.has("scripts/lib/local-resume-suites.mjs")).toBe(true);
 		expect(paths.has("scripts/lib/local-resume-suites.d.mts")).toBe(true);
-		expect(paths.has("scripts/lib/cursor-smoke-env.mjs")).toBe(true);
-		expect(paths.has("scripts/lib/cursor-smoke-env.d.mts")).toBe(true);
-		expect(paths.has("scripts/lib/cursor-smoke-shell.sh")).toBe(true);
-		expect(paths.has("scripts/lib/cursor-visual-render.mjs")).toBe(true);
-		expect(paths.has("scripts/lib/cursor-visual-render.d.mts")).toBe(true);
-		expect(paths.has("shared/cursor-sdk-event-debug-env.mjs")).toBe(true);
-		expect(paths.has("shared/cursor-sdk-event-debug-env.d.mts")).toBe(true);
+		expect(paths.has("scripts/lib/smoke-env.mjs")).toBe(true);
+		expect(paths.has("scripts/lib/smoke-env.d.mts")).toBe(true);
+		expect(paths.has("scripts/lib/smoke-shell.sh")).toBe(true);
+		expect(paths.has("scripts/lib/visual-render.mjs")).toBe(true);
+		expect(paths.has("scripts/lib/visual-render.d.mts")).toBe(true);
+		expect(paths.has("shared/sdk-event-debug-env.mjs")).toBe(true);
+		expect(paths.has("shared/sdk-event-debug-env.d.mts")).toBe(true);
 		expect(paths.has("scripts/lib/cursor-setting-sources.mjs")).toBe(false);
 		expect(paths.has("scripts/lib/cursor-sensitive-text.mjs")).toBe(false);
-		expect(paths.has("scripts/lib/cursor-cli-args.mjs")).toBe(true);
+		expect(paths.has("scripts/lib/cli-args.mjs")).toBe(true);
 		expect(paths.has("CHANGELOG.md")).toBe(true);
 		expect(paths.has("README.md")).toBe(true);
 		expect(paths.has("dist/index.js")).toBe(true);

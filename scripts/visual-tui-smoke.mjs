@@ -4,11 +4,11 @@ import { accessSync, chmodSync, constants, copyFileSync, mkdirSync, readdirSync,
 import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { commonBooleanFlag, commonRepeatStringFlag, parseArgv } from "./lib/cursor-cli-args.mjs";
-import { buildCursorSmokeEnvPlan, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES, sealedNodePath, writeCursorSdkEventDebugUserConfig } from "./lib/cursor-smoke-env.mjs";
-import { writeVisualManifest } from "./lib/cursor-visual-manifest.mjs";
+import { commonBooleanFlag, commonRepeatStringFlag, parseArgv } from "./lib/cli-args.mjs";
+import { buildCursorSmokeEnvPlan, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES, sealedNodePath, writeCursorSdkEventDebugUserConfig } from "./lib/smoke-env.mjs";
+import { writeVisualManifest } from "./lib/visual-manifest.mjs";
 import { runVisualSmokeSelfTest } from "./visual-tui-smoke-self-test.mjs";
-import { buildTerminalHtml, writeTerminalScreenshot } from "./lib/cursor-visual-render.mjs";
+import { buildTerminalHtml, writeTerminalScreenshot } from "./lib/visual-render.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_WIDTH = 150;

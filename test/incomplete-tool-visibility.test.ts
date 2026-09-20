@@ -1,0 +1,112 @@
+import { describe, expect, it } from "vitest";
+import {
+	buildIncompleteCursorToolDisplay,
+	buildIncompleteCursorToolRunOutcome,
+	formatIncompleteCursorToolReasonText,
+	formatIncompleteCursorToolTrace,
+	getIncompleteCursorToolActivityTitle,
+	resolveIncompleteCursorToolVisibility,
+} from "../src/incomplete-tool-visibility.js";
+import { DISCARDED_INCOMPLETE_TOOL_CALL_REASON } from "../src/sdk-event-debug.js";
+import { CURSOR_REPLAY_UNREGISTERED_ACTIVITY_TOOL_NAME } from "../src/replay-tool-details.js";
+
+describe("cursor incomplete tool visibility", () => {
+	it("labels ordinary native Cursor tools", () => {
+		expect(getIncompleteCursorToolActivityTitle({ name: "read", args: { path: "README.md" } })).toBe("Cursor read");
+		const display = buildIncompleteCursorToolDisplay(
+			{ name: "read", args: { path: "README.md" } },
+			DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
+		);
+		expect(formatIncompleteCursorToolTrace(display)).toContain("Cursor read did not complete: missing completion");
+	});
+
+	it("labels web search MCP activity distinctly from generic MCP", () => {
+		const webSearchDisplay = buildIncompleteCursorToolDisplay(
+			{ name: "mcp", args: { toolName: "WebSearch", args: { search_term: "pi extension" } } },
+			DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
+		);
+		expect(webSearchDisplay.args.activityTitle).toBe("Cursor web search");
+		expect(formatIncompleteCursorToolTrace(webSearchDisplay)).toContain("Cursor web search did not complete");
+
+		const mcpDisplay = buildIncompleteCursorToolDisplay(
+			{ name: "mcp", args: { toolName: "git" } },
+			DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
+		);
+		expect(mcpDisplay.args.activityTitle).toBe("Cursor MCP");
+		expect(formatIncompleteCursorToolTrace(mcpDisplay)).toContain("Cursor MCP did not complete");
+	});
+
+	it("maps SDK run status and abort state into incomplete run outcome", () => {
+		expect(buildIncompleteCursorToolRunOutcome({ status: "finished", assistantTextProduced: true })).toEqual({
+			reason: DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
+			assistantTextProduced: true,
+		});
+		expect(buildIncompleteCursorToolRunOutcome({ status: "cancelled" })).toEqual({
+			reason: "abort",
+			assistantTextProduced: false,
+		});
+		expect(buildIncompleteCursorToolRunOutcome({ status: "finished", signalAborted: true })).toEqual({
+			reason: "abort",
+			assistantTextProduced: false,
+		});
+		expect(buildIncompleteCursorToolRunOutcome({ status: "error" })).toEqual({
+			reason: "sdk-failure",
+			assistantTextProduced: false,
+		});
+	});
+
+	it("suppresses missing-completion starts after successful text-producing runs and keeps failure paths visible", () => {
+		// @cursor/sdk 1.0.30 (beforeShellExecution deny-hook repro): a denied shell
+		// call emits tool-call-started with no completion delta, step, or
+		// conversation entry; denials are indistinguishable from lost completions,
+		// so successful runs suppress for all tools by policy.
+		expect(
+			resolveIncompleteCursorToolVisibility(
+				buildIncompleteCursorToolRunOutcome({
+					assistantTextProduced: true,
+					reason: DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
+				}),
+			),
+		).toBe("debugOnly");
+		expect(
+			resolveIncompleteCursorToolVisibility(
+				buildIncompleteCursorToolRunOutcome({
+					assistantTextProduced: false,
+					reason: DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
+				}),
+			),
+		).toBe("emit");
+		expect(
+			resolveIncompleteCursorToolVisibility(
+				buildIncompleteCursorToolRunOutcome({ assistantTextProduced: true, reason: "abort" }),
+			),
+		).toBe("emit");
+		expect(
+			resolveIncompleteCursorToolVisibility(
+				buildIncompleteCursorToolRunOutcome({ assistantTextProduced: true, reason: "sdk-failure" }),
+			),
+		).toBe("emit");
+	});
+
+	it("labels incomplete generateImage as activity instead of a generateImage result card", () => {
+		const display = buildIncompleteCursorToolDisplay(
+			{ name: "generateImage", args: { prompt: "a red circle" } },
+			DISCARDED_INCOMPLETE_TOOL_CALL_REASON,
+		);
+		expect(display.result.details).toMatchObject({
+			variant: "activity",
+			sourceToolName: CURSOR_REPLAY_UNREGISTERED_ACTIVITY_TOOL_NAME,
+			title: "Cursor image generation did not complete",
+			summary: "missing completion",
+		});
+		expect(formatIncompleteCursorToolTrace(display)).toContain(
+			"Cursor image generation did not complete: missing completion",
+		);
+	});
+
+	it("maps discard reasons to bounded user-facing text", () => {
+		expect(formatIncompleteCursorToolReasonText("abort")).toBe("aborted");
+		expect(formatIncompleteCursorToolReasonText("sdk-failure")).toBe("SDK run failed");
+		expect(formatIncompleteCursorToolReasonText("run-drain")).toBe("run ended during drain");
+	});
+});

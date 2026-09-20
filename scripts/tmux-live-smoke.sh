@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# shellcheck source=scripts/lib/cursor-smoke-shell.sh
-. "$ROOT/scripts/lib/cursor-smoke-shell.sh"
+# shellcheck source=scripts/lib/smoke-shell.sh
+. "$ROOT/scripts/lib/smoke-shell.sh"
 
 SMOKE_DIR="${SMOKE_DIR:-/tmp/pi-cursor-sdk-live-smoke-$(date +%Y%m%dT%H%M%S)}"
 SHELL_BIN="${SHELL:-/bin/bash}"
@@ -35,7 +35,7 @@ cleanup() {
 trap cleanup EXIT
 
 print_help() {
-	printf '%s\n' 'Partial live smoke runner for pi-cursor-sdk (subset of docs/cursor-live-smoke-checklist.md).
+	printf '%s\n' 'Partial live smoke runner for pi-cursor-sdk (subset of docs/live-smoke-checklist.md).
 
 Usage:
   ./scripts/tmux-live-smoke.sh
@@ -62,7 +62,7 @@ Coverage:
   - JSONL assistant usage validation
 
 Not covered here:
-  - canonical rendered-PNG visual smoke; collect separately with docs/cursor-native-tool-visual-audit.md
+  - canonical rendered-PNG visual smoke; collect separately with docs/native-tool-visual-audit.md
   - bridge MCP
   - standalone native replay
   - abort/cancel cleanup
@@ -363,8 +363,8 @@ EOF_SELFTEST_NODE
 
 	ENV_BIN="$(smoke_resolve_cmd env)"
 	NODE_BIN="$(smoke_resolve_node_cmd)"
-	smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/cursor-sdk-event-debug-env.mjs"
-	smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs"
+	smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/sdk-event-debug-env.mjs"
+	smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/smoke-env.mjs"
 	hostile_path="$bin_dir:$PATH"
 	[[ "$(smoke_build_sealed_node_path "$NODE_BIN" "")" != *: ]] || fail "self-test failed: empty inherited PATH left a trailing PATH separator"
 	SEALED_PATH="$(smoke_build_sealed_node_path "$NODE_BIN" "$hostile_path")"
@@ -389,7 +389,7 @@ EOF_SELFTEST_NODE
 			fail "self-test failed: $name was not cleared"
 		fi
 	done
-	smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs" "$temp_dir/agent-none" '{"local":{"settingSources":[]}}'
+	smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/smoke-env.mjs" "$temp_dir/agent-none" '{"local":{"settingSources":[]}}'
 	grep -q '"settingSources": \[\]' "$temp_dir/agent-none/cursor-sdk.json" || fail "self-test failed: isolated config did not write local.settingSources=[]"
 
 	PI_CURSOR_SETTING_SOURCES=all "${DEFAULT_ENV[@]}" "$fake_pi" --version
@@ -432,8 +432,8 @@ NPM_BIN="$(smoke_resolve_cmd npm)"
 RG_BIN="$(smoke_resolve_cmd rg)"
 TMUX_BIN="$(smoke_resolve_cmd tmux)"
 ENV_BIN="$(smoke_resolve_cmd env)"
-smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/cursor-sdk-event-debug-env.mjs"
-smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs"
+smoke_load_cursor_sdk_event_debug_env_names "$NODE_BIN" "$ROOT/shared/sdk-event-debug-env.mjs"
+smoke_load_cursor_sdk_stale_public_env_names "$NODE_BIN" "$ROOT/scripts/lib/smoke-env.mjs"
 SEALED_PATH="$(smoke_build_sealed_node_path "$NODE_BIN" "$PATH")"
 if [[ "$SHELL_BIN" != /* ]]; then
 	SHELL_BIN="$(smoke_resolve_cmd "$SHELL_BIN")"
@@ -453,7 +453,7 @@ NONE_AGENT_DIR="$SMOKE_DIR/agent-none"
 DEFAULT_AGENT_DIR="$SMOKE_DIR/agent-default"
 smoke_seed_pi_agent_dir "$NONE_AGENT_DIR"
 smoke_seed_pi_agent_dir "$DEFAULT_AGENT_DIR"
-smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/cursor-smoke-env.mjs" "$NONE_AGENT_DIR" '{"local":{"settingSources":[]}}'
+smoke_write_cursor_sdk_user_config "$NODE_BIN" "$ROOT/scripts/lib/smoke-env.mjs" "$NONE_AGENT_DIR" '{"local":{"settingSources":[]}}'
 build_smoke_env_arrays
 printf '%s\n' "$SMOKE_DIR" >"$SMOKE_DIR/smoke-dir.txt"
 

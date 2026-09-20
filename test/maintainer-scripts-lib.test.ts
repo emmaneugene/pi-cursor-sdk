@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { resolveCursorSettingSources as resolveProviderSettingSources } from "../src/cursor-setting-sources.js";
+import { resolveCursorSettingSources as resolveProviderSettingSources } from "../src/setting-sources.js";
 import {
 	commonBooleanFlag,
 	commonProbeFlags,
@@ -15,28 +15,28 @@ import {
 	parseArgv,
 	readArgvApiKey,
 	requireApiKey,
-} from "../scripts/lib/cursor-cli-args.mjs";
+} from "../scripts/lib/cli-args.mjs";
 import {
 	CHILD_PROCESS_TREE_SPAWN_OPTIONS,
 	parseJsonLines,
 	terminateChild,
 	waitForChildClose,
-} from "../scripts/lib/cursor-child-process.mjs";
+} from "../scripts/lib/child-process.mjs";
 import {
 	buildCursorSmokeEnv,
 	buildCursorSmokeEnvPlan,
 	CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as scriptSdkEventDebugEnvNames,
 	sealedNodePath,
 	writeCursorSdkEventDebugUserConfig,
-} from "../scripts/lib/cursor-smoke-env.mjs";
-import { CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as sharedSdkEventDebugEnvNames } from "../shared/cursor-sdk-event-debug-env.mjs";
+} from "../scripts/lib/smoke-env.mjs";
+import { CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as sharedSdkEventDebugEnvNames } from "../shared/sdk-event-debug-env.mjs";
 import {
 	CURSOR_SETTING_SOURCES_ENV,
 	resolveCursorSettingSources,
 	serializeCursorSettingSources,
-} from "../shared/cursor-setting-sources.mjs";
-import { scrubSensitiveText } from "../shared/cursor-sensitive-text.mjs";
-import { createScriptFail } from "../scripts/lib/cursor-script-fail.mjs";
+} from "../shared/setting-sources.mjs";
+import { scrubSensitiveText } from "../shared/sensitive-text.mjs";
+import { createScriptFail } from "../scripts/lib/script-fail.mjs";
 import { buildLocalResumeSmokeEnv } from "../scripts/local-resume-smoke.mjs";
 
 function processExists(pid: number): boolean {
