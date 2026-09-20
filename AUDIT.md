@@ -33,15 +33,6 @@ The remaining runtime work has no single large structural simplification. The re
 - **Validation:** `test/cursor-native-tool-display-replay.test.ts`, `test/cursor-replay-tool-details.test.ts`, `test/cursor-replay-tool-details.compile.test.ts`.
 - **Confidence:** high
 
-### 12. `package.json` `files` (S16)
-
-- **Verdict:** recommend
-- **Evidence:** `package.json` lists 37 `scripts/...` entries, one for every current file under `scripts/`. `dist`, `shared`, and `src` already use directory entries.
-- **Proposed representation:** one `"scripts"` entry. ≈ −36 lines, identical pack set.
-- **Risks:** untracked stray files under `scripts/` would ship; none today.
-- **Validation:** `test/maintainer-scripts-declarations.test.ts` (expands directory entries), `test/smoke-cli-package-contracts.test.ts`; diff `npm pack --dry-run --json` before/after.
-- **Confidence:** high
-
 ### 13. Docs and `AGENTS.md` map drift (S17)
 
 - 23 `src/` files are absent from the map: `cursor-active-tools`, `cursor-agent-message-web-tools`, `cursor-api-key`, `cursor-compact-tool-summary`, `cursor-display-only-trace`, `cursor-fallback-models.generated`, `cursor-live-run-accounting`, `cursor-native-tool-names`, `cursor-pi-tool-bridge-constants`, `cursor-provider-overflow`, `cursor-replay-activity-builders`, `cursor-replay-source-names`, `cursor-replay-summary-args`, `cursor-replay-tool-details`, `cursor-sdk-process-error-guard`, `cursor-sdk-runtime`, `cursor-session-agent-resume`, `cursor-session-turn-queue`, `cursor-skill-tool`, `cursor-task-presentation`, `cursor-web-tool-activity`, `cursor-web-tool-args`, `model-list-cache`.
@@ -76,7 +67,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S12 | Usage accounting | `cursor-usage-accounting.ts`, `cursor-sdk-billed-usage.ts` | guard merge demoted |
 | S13 | Debug artifacts, output filter, scrubbing | `cursor-sdk-event-debug*.ts`, `shared/cursor-sdk-event-debug-env.*`, `cursor-sdk-output-filter.ts`, `shared/cursor-sdk-output-filter.*`, `cursor-sensitive-text.ts`, `shared/cursor-sensitive-text.*` | recommend (#10); allocation union rejected; output filter and scrubbing clean |
 | S14 | Maintainer smoke scripts | `scripts/*.mjs`, `scripts/*.sh`, `scripts/lib/*` (except `ensure-built.mjs`), `scripts/fixtures/*`, `.d.mts` siblings | smoke env options consolidated; no unused entrypoints |
-| S16 | Build, packaging, test helpers | `scripts/build.mjs`, `scripts/prepare.mjs`, `scripts/lib/ensure-built.mjs`, `package.json`, `tsconfig*.json`, `vitest.config.ts`, `test/helpers/*`, `test/fixtures/*` | recommend (#12); build race-safety removal rejected; harnesses compose, no unused fixtures |
+| S16 | Build, packaging, test helpers | `scripts/build.mjs`, `scripts/prepare.mjs`, `scripts/lib/ensure-built.mjs`, `package.json`, `tsconfig*.json`, `vitest.config.ts`, `test/helpers/*`, `test/fixtures/*` | `files` ships the `scripts` directory; build race-safety removal rejected; harnesses compose, no unused fixtures |
 | S17 | Docs and `AGENTS.md` map | `AGENTS.md`, `README.md`, `docs/**` | recommend (#13) |
 
 ## Rejected, merged, or demoted
@@ -91,6 +82,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
 - **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.
 - **Merged:** S03 session preference restore/persist helpers in `cursor-state.ts`.
+- **Merged:** S16 `package.json` `files` now ships `scripts/` as one directory entry.
 
 ## Limitations
 

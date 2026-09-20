@@ -169,6 +169,9 @@ describe("smoke CLI and package contracts", () => {
 	});
 
 	it("packages maintainer smoke scripts", () => {
+		const published = JSON.parse(readFileSync("package.json", "utf8")) as { files: string[] };
+		expect(published.files).toContain("scripts");
+		expect(published.files.some((entry) => entry.startsWith("scripts/"))).toBe(false);
 		const result = run("npm", ["pack", "--dry-run", "--json"]);
 		expect(result.status).toBe(0);
 		const [pack] = JSON.parse(result.stdout) as Array<{ name: string; version: string; files: Array<{ path: string }> }>;
