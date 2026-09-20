@@ -2,16 +2,21 @@
 
 ## Unreleased
 
+## 0.5.2 - 2026-09-20
+
+### Fixed
+
+- Keep the owner catalog used by nested factories in sync after `/cursor-refresh-models`.
+- Resolve read fallback content once per transcript or display build, including consistent empty-file previews.
+
 ### Changed
 
 - Remove the deferred Crabbox platform-smoke matrix and retain the host-local live, visual, and local-resume smoke checks.
 - Remove unused internal exports, bridge indexes, native-replay state, and test-only compatibility surfaces.
-- Resolve read fallback content once per transcript or display build, including consistent empty-file previews.
 - Replace duplicate smoke native-display flags and the ambiguous boolean resume alias with explicit string modes.
 - Drop turn-result aliases and the second emission vocabulary; checkpoint context windows from the leased session agent.
 - Normalize legacy resume cleanup IDs and unphased delete logs at parse time.
 - Load the Cursor model catalog cache once per discovery and classify it as fresh or stale.
-- Keep the owner catalog used by nested factories in sync after `/cursor-refresh-models`.
 - Share session preference restore and persist helpers in Cursor runtime controls.
 - Keep one pending record per deferred Cursor tool-lifecycle call.
 - Ship the maintainer `scripts/` tree as one package `files` entry.
