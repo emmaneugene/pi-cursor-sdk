@@ -13,16 +13,6 @@ The remaining runtime work has no single large structural simplification. The re
 - **Verdict:** recommend (7b)
 - **7b Snapshot projection.** `scripts/refresh-cursor-model-snapshots.mjs:88-115` copies the full SDK DTO; `model-list-cache.ts:45-92` re-validates it; `model-discovery.ts` consumes only IDs, model display name, parameter IDs/values, variant params/default marker, variant display name. The generated file has 589 `displayName` fields and 30 alias blocks for 37 models. One shared parser/projector for live, cached, and snapshot input, dropping aliases, descriptions, and parameter/value display names. ≈ −300 to −600 generated lines, −10 to −30 handwritten. Risk: existing version-1 cache files must stay readable or need a version bump. Validation: `test/model-list-cache.test.ts`, `test/model-discovery*.test.ts`, `test/cursor-model-snapshot-context.test.ts`. Confidence medium.
 
-### 11. Replay expandable details typed by variant (S10)
-
-- **Verdict:** recommend
-- **Evidence:** `src/cursor-native-tool-display-replay.ts:405-420` `CursorReplayExpandableResultDetails` is a flat optional bag (image + edit diff + write content on one object); `src/cursor-replay-tool-details.ts:89-94` already defines the variant union; `cursor-native-tool-display-replay.ts:228-282` duplicates edit vs write preview (`details.diffString ?? details.diff`, then write adds `fileContentAfterWrite`); `:504-533` routes generateImage and activity through the same renderer.
-- **Proposed representation:** type the expandable renderer as `CursorReplayActivityDetails | CursorReplayGenerateImageDetails`, narrow on `variant`, merge the two preview helpers, delete the bag type. ≈ −25 to −40 lines.
-- **Scope:** `src/cursor-native-tool-display-replay.ts` only.
-- **Risks:** activity edit/write cards must still color from `diffString`/`diff` and fall back to `expandedText`; nativeEdit/nativeWrite keep their own renderers.
-- **Validation:** `test/cursor-native-tool-display-replay.test.ts`, `test/cursor-replay-tool-details.test.ts`, `test/cursor-replay-tool-details.compile.test.ts`.
-- **Confidence:** high
-
 ### 13. Docs and `AGENTS.md` map drift (S17)
 
 - 23 `src/` files are absent from the map: `cursor-active-tools`, `cursor-agent-message-web-tools`, `cursor-api-key`, `cursor-compact-tool-summary`, `cursor-display-only-trace`, `cursor-fallback-models.generated`, `cursor-live-run-accounting`, `cursor-native-tool-names`, `cursor-pi-tool-bridge-constants`, `cursor-provider-overflow`, `cursor-replay-activity-builders`, `cursor-replay-source-names`, `cursor-replay-summary-args`, `cursor-replay-tool-details`, `cursor-sdk-process-error-guard`, `cursor-sdk-runtime`, `cursor-session-agent-resume`, `cursor-session-turn-queue`, `cursor-skill-tool`, `cursor-task-presentation`, `cursor-web-tool-activity`, `cursor-web-tool-args`, `model-list-cache`.
@@ -52,7 +42,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S07 | Session agents, resume, store, scope | `cursor-session-agent*.ts`, `cursor-session-store.ts`, `cursor-session-scope.ts`, `cursor-session-compaction-prep.ts`, `cursor-session-send-policy.ts`, `cursor-session-turn-queue.ts`, `cursor-durable-fs.ts`, `cursor-sdk-platform-package.ts` | cleanup candidates normalized; pool slot-map demoted |
 | S08 | Live run coordinator, drain, routing | `cursor-live-run-coordinator.ts`, `cursor-provider-live-run-drain.ts`, `cursor-live-run-accounting.ts`, `cursor-native-replay-routing.ts` | **skip** — a `running/finished/cancelled/error` union would add 40–80 lines and touch out-of-boundary mutators |
 | S09 | Tool registry, transcript formatting | `cursor-tool-presentation-registry.ts`, `cursor-transcript-*.ts`, `cursor-tool-transcript.ts`, `cursor-tool-result-display-readers.ts`, `cursor-tool-visibility.ts`, `cursor-native-tool-names.ts`, `cursor-display-text.ts`, `cursor-record-utils.ts`, `cursor-edit-diff.ts`, `cursor-compact-tool-summary.ts`, `cursor-web-tool-*.ts`, `cursor-agent-message-web-tools.ts`, `cursor-replay-source-names.ts` | read preview consolidated |
-| S10 | Native replay cards | `cursor-native-tool-display-*.ts`, `cursor-native-replay-trace.ts`, `cursor-replay-{activity-builders,summary-args,tool-details}.ts` | recommend (#11) |
+| S10 | Native replay cards | `cursor-native-tool-display-*.ts`, `cursor-native-replay-trace.ts`, `cursor-replay-{activity-builders,summary-args,tool-details}.ts` | expandable replay details typed by variant |
 | S11 | Pi tool bridge | `cursor-pi-tool-bridge*.ts` | dead surface removed |
 | S12 | Usage accounting | `cursor-usage-accounting.ts`, `cursor-sdk-billed-usage.ts` | guard merge demoted |
 | S13 | Debug artifacts, output filter, scrubbing | `cursor-sdk-event-debug*.ts`, `shared/cursor-sdk-event-debug-env.*`, `cursor-sdk-output-filter.ts`, `shared/cursor-sdk-output-filter.*`, `cursor-sensitive-text.ts`, `shared/cursor-sensitive-text.*` | debug sink buckets unified; allocation union rejected; output filter and scrubbing clean |
@@ -72,6 +62,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
 - **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.
 - **Merged:** S03 session preference restore/persist helpers in `cursor-state.ts`.
+- **Merged:** S10 expandable replay cards now take activity or generateImage details.
 - **Merged:** S13 debug sink counters now use named buckets plus a numeric error count.
 - **Merged:** S16 `package.json` `files` now ships `scripts/` as one directory entry.
 

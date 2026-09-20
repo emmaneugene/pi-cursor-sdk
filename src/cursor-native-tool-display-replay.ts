@@ -225,59 +225,29 @@ function formatCursorReplayActivityDiffPreview(
 	return formatCursorReplayDiff(diffSection, theme, maxLines);
 }
 
-function formatCursorReplayActivityEditPreview(
-	details: CursorReplayExpandableResultDetails,
-	text: string,
-	theme: CursorReplayRenderTheme,
-	maxLines: number,
-	stripHeader: boolean,
-): string | undefined {
-	const structuredDiff = details.diffString ?? details.diff;
-	if (structuredDiff) {
-		return formatCursorReplayDiff(structuredDiff, theme, maxLines);
-	}
-	const diffPreview = formatCursorReplayActivityDiffPreview(text, theme, maxLines, stripHeader);
-	if (diffPreview) return diffPreview;
-	return stripHeader ? formatCursorReplayPreview(text, theme, maxLines, true) : formatMutedBlock(text, theme);
-}
-
-function formatCursorReplayActivityWritePreview(
-	details: CursorReplayExpandableResultDetails,
-	text: string,
-	theme: CursorReplayRenderTheme,
-	maxLines: number,
-	stripHeader: boolean,
-): string | undefined {
-	const structuredDiff = details.diffString ?? details.diff;
-	if (structuredDiff) {
-		return formatCursorReplayDiff(structuredDiff, theme, maxLines);
-	}
-	if (details.fileContentAfterWrite) {
-		return formatCursorReplayFilePreview(
-			details.fileContentAfterWrite,
-			details.path,
-			theme,
-			maxLines,
-			false,
-		);
-	}
-	const diffPreview = formatCursorReplayActivityDiffPreview(text, theme, maxLines, stripHeader);
-	if (diffPreview) return diffPreview;
-	return stripHeader ? formatCursorReplayPreview(text, theme, maxLines, true) : formatMutedBlock(text, theme);
-}
-
 function formatCursorReplayActivityPreview(
-	details: CursorReplayExpandableResultDetails,
+	details: CursorReplayActivityDetails | CursorReplayGenerateImageDetails,
 	text: string,
 	theme: CursorReplayRenderTheme,
 	maxLines: number,
 	stripHeader: boolean,
 ): string | undefined {
-	if (details.sourceToolName === "edit") {
-		return formatCursorReplayActivityEditPreview(details, text, theme, maxLines, stripHeader);
-	}
-	if (details.sourceToolName === "write") {
-		return formatCursorReplayActivityWritePreview(details, text, theme, maxLines, stripHeader);
+	if (details.variant === "activity" && (details.sourceToolName === "edit" || details.sourceToolName === "write")) {
+		const structuredDiff = details.diffString ?? details.diff;
+		if (structuredDiff) {
+			return formatCursorReplayDiff(structuredDiff, theme, maxLines);
+		}
+		if (details.sourceToolName === "write" && details.fileContentAfterWrite) {
+			return formatCursorReplayFilePreview(
+				details.fileContentAfterWrite,
+				details.path,
+				theme,
+				maxLines,
+				false,
+			);
+		}
+		const diffPreview = formatCursorReplayActivityDiffPreview(text, theme, maxLines, stripHeader);
+		if (diffPreview) return diffPreview;
 	}
 	return stripHeader ? formatCursorReplayPreview(text, theme, maxLines, true) : formatMutedBlock(text, theme);
 }
@@ -402,23 +372,6 @@ function firstContentText(result: Parameters<CursorReplayRenderResult>[0]): stri
 	return content?.type === "text" ? content.text : "";
 }
 
-type CursorReplayExpandableResultDetails = {
-	summary?: string;
-	expandedText?: string;
-	collapseDetailsByDefault?: boolean;
-	imagePath?: string;
-	imageMimeType?: string;
-	sourceToolName?: CursorReplayActivityDetails["sourceToolName"];
-	path?: string;
-	/** Structured diff fields populated on activity edit/write details for canonical coloring (primary over text parse). */
-	diffString?: string;
-	diff?: string;
-	linesAdded?: number;
-	linesRemoved?: number;
-	/** Structured post-write content for activity write fallbacks; drives canonical file preview (mirrors nativeWrite). */
-	fileContentAfterWrite?: string;
-};
-
 function hasCursorReplayDisplayTitle(details: CursorReplayToolDetails | undefined): boolean {
 	if (!details) return false;
 	return isCursorReplayActivityDetails(details) || isCursorReplayGenerateImageDetails(details);
@@ -434,7 +387,7 @@ function formatCursorReplayExpandHint(): string {
 
 function renderExpandableCursorReplayResult(
 	title: string,
-	details: CursorReplayExpandableResultDetails,
+	details: CursorReplayActivityDetails | CursorReplayGenerateImageDetails,
 	result: Parameters<CursorReplayRenderResult>[0],
 	options: Parameters<CursorReplayRenderResult>[1],
 	theme: Parameters<CursorReplayRenderResult>[2],
@@ -444,7 +397,8 @@ function renderExpandableCursorReplayResult(
 	const text = firstContentText(result);
 	const summary = details.summary ?? text.split("\n").find((line) => line.trim()) ?? "completed";
 	const expandedText = details.expandedText ?? (text.includes("\n") ? text : undefined);
-	const showExpandHint = expandedText && !options.expanded && shouldShowCursorReplayCollapsedExpandHint(details.sourceToolName);
+	const sourceToolName = details.variant === "activity" ? details.sourceToolName : undefined;
+	const showExpandHint = expandedText && !options.expanded && shouldShowCursorReplayCollapsedExpandHint(sourceToolName);
 	const expandHint = showExpandHint ? theme.fg("dim", ` (${formatCursorReplayExpandHint()})`) : "";
 	let rendered = `${theme.fg("toolTitle", theme.bold(title))} ${theme.fg(isError ? "error" : "success", summary)}${expandHint}`;
 	if (expandedText && (options.expanded || !details.collapseDetailsByDefault)) {
@@ -457,7 +411,7 @@ function renderExpandableCursorReplayResult(
 		);
 		if (preview) rendered += `\n${preview}`;
 	}
-	if (details.imagePath && !isError && context.showImages) {
+	if (details.variant === "generateImage" && details.imagePath && !isError && context.showImages) {
 		const imageData = readImageFileForReplay(details.imagePath);
 		const mimeType = details.imageMimeType ?? inferImageMimeType(details.imagePath);
 		if (imageData && mimeType) return buildImageReplayComponent(rendered, imageData, mimeType, basename(details.imagePath ?? "generated-image"), theme);
