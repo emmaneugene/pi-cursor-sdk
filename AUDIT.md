@@ -13,17 +13,6 @@ The remaining runtime work has no single large structural simplification. The re
 - **Verdict:** recommend (7b)
 - **7b Snapshot projection.** `scripts/refresh-cursor-model-snapshots.mjs:88-115` copies the full SDK DTO; `model-list-cache.ts:45-92` re-validates it; `model-discovery.ts` consumes only IDs, model display name, parameter IDs/values, variant params/default marker, variant display name. The generated file has 589 `displayName` fields and 30 alias blocks for 37 models. One shared parser/projector for live, cached, and snapshot input, dropping aliases, descriptions, and parameter/value display names. ≈ −300 to −600 generated lines, −10 to −30 handwritten. Risk: existing version-1 cache files must stay readable or need a version bump. Validation: `test/model-list-cache.test.ts`, `test/model-discovery*.test.ts`, `test/cursor-model-snapshot-context.test.ts`. Confidence medium.
 
-### 8. `cursor-state.ts` triple duplication (S03)
-
-- **Verdict:** recommend
-- **Evidence:** restore loops `restoreSessionFastPreferences` (:113-125), `restoreSessionCursorMode` (:127-136), `restoreSessionCursorHttp1` (:146-155); persist-with-rollback `persistFastPreference` (:216-241) and `persistCursorHttp1Preference` (:261-284); command epilogues `cursor-fast` (:398-419) and `cursor-http` (:447-477).
-- **Current complexity:** ~95 lines of parallel copies of one concept (session-scoped preference log); the `authoritativeGlobalFastPreferenceIds` set vs `cursor-http1.ts` single authoritative flag is easy to mis-copy.
-- **Proposed representation:** two private helpers in the same file: `lastBranchEntryData(branch, customType, guard)` and `persistSessionGlobalPreference({ apply, revert, save, appendEntry, onAppendFailure })`. ≈ −40 to −55 lines, no new module.
-- **Scope:** `src/cursor-state.ts` only.
-- **Risks:** helpers must stay trivial to remain net-negative. Preserve rollback ordering and the "invalid mode keeps `cliCursorModeState`" exception.
-- **Validation:** `test/cursor-fast-persistence.test.ts`, `test/cursor-http1-state.test.ts`, `test/cursor-state.test.ts`, `test/cursor-http1.test.ts`, `test/cursor-local-force.test.ts`.
-- **Confidence:** medium
-
 ### 9. Lifecycle emitter per-call record (S06)
 
 - **Verdict:** recommend
@@ -86,7 +75,7 @@ The remaining runtime work has no single large structural simplification. The re
 |---|---|---|---|
 | S01 | Entry, factory guard, lifecycle hooks | `index.ts`, `cursor-extension-factory-guard.ts`, `cursor-provider-runtime-context.ts`, `cursor-provider-lazy.ts`, `cursor-model-lifecycle.ts`, `cursor-fallback-warning.ts`, `cursor-agents-context*.ts`, `cursor-model.ts`, `cursor-sdk-runtime.ts`, `cursor-active-tools.ts` | refresh catalog now updates the nested-factory owner catalog |
 | S02 | Model discovery, caches, snapshot | `model-discovery.ts`, `model-list-cache.ts`, `cursor-fallback-models.generated.ts`, `bundled-context-windows.ts`, `context-window-cache.ts`, `shared/cursor-model-selection-identities.*`, `scripts/refresh-cursor-model-snapshots.mjs` | cache read consolidated; recommend (#7b) |
-| S03 | Config, state controls, HTTP/1.1 | `cursor-config.ts`, `cursor-state.ts`, `cursor-runtime-state.ts`, `cursor-http1.ts`, `cursor-setting-sources.ts`, `shared/cursor-setting-sources.*`, `cursor-api-key.ts`, `cursor-task-presentation.ts` | recommend (#8) |
+| S03 | Config, state controls, HTTP/1.1 | `cursor-config.ts`, `cursor-state.ts`, `cursor-runtime-state.ts`, `cursor-http1.ts`, `cursor-setting-sources.ts`, `shared/cursor-setting-sources.*`, `cursor-api-key.ts`, `cursor-task-presentation.ts` | session preference persist/restore helpers shared |
 | S04 | Prompt/context, bootstrap surfaces | `context.ts`, `cursor-context-tools.ts`, `cursor-tool-manifest.ts`, `cursor-bridge-contract.ts`, `cursor-skill-tool.ts`, `cursor-provider-overflow.ts` | plan-flag finding rejected |
 | S05 | Turn pipeline, outcomes, errors | `cursor-provider.ts`, `cursor-provider-turn-{runner,prepare,send,finalize,emit,types}.ts`, `cursor-provider-run-{outcome,finalizer}.ts`, `cursor-run-final-text.ts`, `cursor-provider-errors.ts`, `cursor-mcp-timeout-override.ts`, `cursor-sdk-process-error-guard.ts` | turn plumbing removed |
 | S06 | Turn coordinator, normalization | `cursor-provider-turn-{coordinator,shell-output,tool-ledger,sdk-normalizer,display-router,lifecycle-emitter}.ts`, `cursor-tool-lifecycle.ts`, `cursor-partial-content-emitter.ts`, `cursor-incomplete-tool-visibility.ts`, `cursor-display-only-trace.ts` | recommend (#9) |
@@ -112,6 +101,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records remain #9.
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
 - **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.
+- **Merged:** S03 session preference restore/persist helpers in `cursor-state.ts`.
 
 ## Limitations
 

@@ -150,6 +150,19 @@ function saveGlobalCursorHttp1Enabled(enabled: boolean): void {
 	);
 }
 
+function lastBranchCustomData<T>(
+	branch: readonly SessionEntry[],
+	customType: string,
+	guard: (value: unknown) => value is T,
+): T | undefined {
+	let last: T | undefined;
+	for (const entry of branch) {
+		if (entry.type !== "custom" || entry.customType !== customType) continue;
+		if (guard(entry.data)) last = entry.data;
+	}
+	return last;
+}
+
 function restoreSessionFastPreferences(branch: readonly SessionEntry[]): void {
 	sessionFastPreferences.clear();
 	for (const entry of branch) {
@@ -162,13 +175,7 @@ function restoreSessionFastPreferences(branch: readonly SessionEntry[]): void {
 }
 
 function restoreSessionCursorMode(branch: readonly SessionEntry[]): void {
-	sessionCursorAgentMode = undefined;
-	for (const entry of branch) {
-		if (entry.type !== "custom" || entry.customType !== MODE_ENTRY_TYPE) continue;
-		if (isCursorModeEntryData(entry.data)) {
-			sessionCursorAgentMode = entry.data.mode;
-		}
-	}
+	sessionCursorAgentMode = lastBranchCustomData(branch, MODE_ENTRY_TYPE, isCursorModeEntryData)?.mode;
 }
 
 function restoreSessionCursorPreferences(ctx: { sessionManager: Pick<ExtensionContext["sessionManager"], "getBranch"> }): void {
@@ -179,13 +186,7 @@ function restoreSessionCursorPreferences(ctx: { sessionManager: Pick<ExtensionCo
 }
 
 function restoreSessionCursorHttp1(branch: readonly SessionEntry[]): void {
-	setStoredCursorHttp1Enabled(undefined);
-	for (const entry of branch) {
-		if (entry.type !== "custom" || entry.customType !== CURSOR_HTTP1_ENTRY_TYPE) continue;
-		if (isCursorHttp1EntryData(entry.data)) {
-			setStoredCursorHttp1Enabled(entry.data.enabled);
-		}
-	}
+	setStoredCursorHttp1Enabled(lastBranchCustomData(branch, CURSOR_HTTP1_ENTRY_TYPE, isCursorHttp1EntryData)?.enabled);
 }
 
 function getMapFastPreference(
@@ -274,6 +275,29 @@ function restoreMapValue(map: Map<string, boolean>, key: string, previous: boole
 	}
 }
 
+function persistSessionGlobalPreference(params: {
+	apply: () => void;
+	revert: () => void;
+	save: () => void;
+	append: () => void;
+	markAppendFailed: () => void;
+}): unknown | undefined {
+	params.apply();
+	try {
+		params.save();
+	} catch (error) {
+		params.revert();
+		throw error;
+	}
+	try {
+		params.append();
+		return undefined;
+	} catch (error) {
+		params.markAppendFailed();
+		return error;
+	}
+}
+
 function persistFastPreference(
 	pi: Pick<ExtensionAPI, "appendEntry">,
 	modelId: string,
@@ -281,23 +305,26 @@ function persistFastPreference(
 ): unknown | undefined {
 	const previousSession = sessionFastPreferences.get(modelId);
 	const previousGlobal = globalFastPreferences.get(modelId);
-	sessionFastPreferences.set(modelId, fast);
-	globalFastPreferences.set(modelId, fast);
-	try {
-		saveGlobalFastPreference(modelId, fast);
-	} catch (error) {
-		restoreMapValue(sessionFastPreferences, modelId, previousSession);
-		restoreMapValue(globalFastPreferences, modelId, previousGlobal);
-		throw error;
-	}
-	try {
-		pi.appendEntry<CursorFastEntryData>(FAST_ENTRY_TYPE, { modelId, fast });
-		authoritativeGlobalFastPreferenceIds.delete(modelId);
-		return undefined;
-	} catch (error) {
-		authoritativeGlobalFastPreferenceIds.add(modelId);
-		return error;
-	}
+	return persistSessionGlobalPreference({
+		apply: () => {
+			sessionFastPreferences.set(modelId, fast);
+			globalFastPreferences.set(modelId, fast);
+		},
+		revert: () => {
+			restoreMapValue(sessionFastPreferences, modelId, previousSession);
+			restoreMapValue(globalFastPreferences, modelId, previousGlobal);
+		},
+		save: () => {
+			saveGlobalFastPreference(modelId, fast);
+		},
+		append: () => {
+			pi.appendEntry<CursorFastEntryData>(FAST_ENTRY_TYPE, { modelId, fast });
+			authoritativeGlobalFastPreferenceIds.delete(modelId);
+		},
+		markAppendFailed: () => {
+			authoritativeGlobalFastPreferenceIds.add(modelId);
+		},
+	});
 }
 
 function persistCursorModePreference(pi: Pick<ExtensionAPI, "appendEntry">, mode: AgentModeOption): void {
@@ -316,21 +343,48 @@ function persistCursorHttp1Preference(
 	enabled: boolean,
 ): unknown | undefined {
 	const previousSession = getStoredCursorHttp1Enabled();
-	setStoredCursorHttp1Enabled(enabled);
+	return persistSessionGlobalPreference({
+		apply: () => {
+			setStoredCursorHttp1Enabled(enabled);
+		},
+		revert: () => {
+			setStoredCursorHttp1Enabled(previousSession);
+		},
+		save: () => {
+			saveGlobalCursorHttp1Enabled(enabled);
+		},
+		append: () => {
+			pi.appendEntry<CursorHttp1EntryData>(CURSOR_HTTP1_ENTRY_TYPE, { enabled });
+			setCursorHttp1GlobalPreferenceAuthoritative(false);
+		},
+		markAppendFailed: () => {
+			setCursorHttp1GlobalPreferenceAuthoritative(true);
+		},
+	});
+}
+
+function applyPersistedPreference(
+	ctx: CursorStatusContext & Pick<ExtensionContext, "model" | "ui">,
+	persist: () => unknown | undefined,
+	messages: { saveFailed: string; appendFailed: string; success: string },
+): void {
+	let appendError: unknown;
 	try {
-		saveGlobalCursorHttp1Enabled(enabled);
+		appendError = persist();
 	} catch (error) {
-		setStoredCursorHttp1Enabled(previousSession);
-		throw error;
+		updateCursorStatus(ctx);
+		ctx.ui.notify(`${messages.saveFailed}: ${error instanceof Error ? error.message : String(error)}`, "error");
+		return;
 	}
-	try {
-		pi.appendEntry<CursorHttp1EntryData>(CURSOR_HTTP1_ENTRY_TYPE, { enabled });
-		setCursorHttp1GlobalPreferenceAuthoritative(false);
-		return undefined;
-	} catch (error) {
-		setCursorHttp1GlobalPreferenceAuthoritative(true);
-		return error;
+	updateCursorStatus(ctx);
+	if (appendError !== undefined) {
+		ctx.ui.notify(
+			`${messages.appendFailed}: ${appendError instanceof Error ? appendError.message : String(appendError)}`,
+			"error",
+		);
+		return;
 	}
+	ctx.ui.notify(messages.success, "info");
 }
 
 function restoreCliCursorMode(raw: boolean | string | undefined): void {
@@ -453,23 +507,11 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 			const preferenceModelId = metadata.piModelId;
 			const current = getEffectiveFast(metadata.piModelId) ?? false;
 			const next = !current;
-			let appendError: unknown;
-			try {
-				appendError = persistFastPreference(pi, preferenceModelId, next);
-			} catch (error) {
-				updateCursorStatus(ctx);
-				ctx.ui.notify(`Failed to save Cursor fast preference: ${error instanceof Error ? error.message : String(error)}`, "error");
-				return;
-			}
-			updateCursorStatus(ctx);
-			if (appendError !== undefined) {
-				ctx.ui.notify(
-					`Cursor fast ${next ? "enabled" : "disabled"} was saved globally, but persisting the session entry failed: ${appendError instanceof Error ? appendError.message : String(appendError)}`,
-					"error",
-				);
-				return;
-			}
-			ctx.ui.notify(`Cursor fast ${next ? "enabled" : "disabled"}`, "info");
+			applyPersistedPreference(ctx, () => persistFastPreference(pi, preferenceModelId, next), {
+				saveFailed: "Failed to save Cursor fast preference",
+				appendFailed: `Cursor fast ${next ? "enabled" : "disabled"} was saved globally, but persisting the session entry failed`,
+				success: `Cursor fast ${next ? "enabled" : "disabled"}`,
+			});
 		},
 	});
 
@@ -513,29 +555,11 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 				);
 				return;
 			}
-			let appendError: unknown;
-			try {
-				appendError = persistCursorHttp1Preference(pi, next);
-			} catch (error) {
-				updateCursorStatus(ctx);
-				ctx.ui.notify(
-					`Failed to save Cursor HTTP/1.1 preference: ${error instanceof Error ? error.message : String(error)}`,
-					"error",
-				);
-				return;
-			}
-			updateCursorStatus(ctx);
-			if (appendError !== undefined) {
-				ctx.ui.notify(
-					`Cursor HTTP/1.1 preference was saved globally, but persisting the session entry failed: ${appendError instanceof Error ? appendError.message : String(appendError)}`,
-					"error",
-				);
-				return;
-			}
-			ctx.ui.notify(
-				`Cursor HTTP/1.1/SSE transport ${next ? "enabled" : "disabled"}`,
-				"info",
-			);
+			applyPersistedPreference(ctx, () => persistCursorHttp1Preference(pi, next), {
+				saveFailed: "Failed to save Cursor HTTP/1.1 preference",
+				appendFailed: "Cursor HTTP/1.1 preference was saved globally, but persisting the session entry failed",
+				success: `Cursor HTTP/1.1/SSE transport ${next ? "enabled" : "disabled"}`,
+			});
 		},
 	});
 
