@@ -36,6 +36,23 @@ export {
 
 const MAX_CURSOR_SDK_EVENT_DEBUG_JSONL_BYTES = 2 * 1024 * 1024;
 
+const COUNT_BUCKET_NAMES = [
+	"onDelta",
+	"onStep",
+	"stream",
+	"piStream",
+	"provider",
+	"liveRun",
+	"bridge",
+	"bridgeRaw",
+	"displayDecisions",
+	"coordinator",
+	"drain",
+	"timeline",
+] as const;
+
+type CountBucketName = (typeof COUNT_BUCKET_NAMES)[number];
+
 export type CursorSdkDisplayDecisionAction =
 	| "skip-duplicate"
 	| "skip-incomplete-successful-run"
@@ -234,21 +251,8 @@ export class CursorSdkEventDebugSink {
 	readonly pinnedRun: boolean;
 	private readonly config: CursorSdkConfig;
 	private readonly startedAt = Date.now();
-	private readonly counts = {
-		onDelta: {} as Record<string, number>,
-		onStep: {} as Record<string, number>,
-		stream: {} as Record<string, number>,
-		piStream: {} as Record<string, number>,
-		provider: {} as Record<string, number>,
-		liveRun: {} as Record<string, number>,
-		bridge: {} as Record<string, number>,
-		bridgeRaw: {} as Record<string, number>,
-		displayDecisions: {} as Record<string, number>,
-		coordinator: {} as Record<string, number>,
-		drain: {} as Record<string, number>,
-		timeline: {} as Record<string, number>,
-		errors: 0,
-	};
+	private readonly buckets: Record<string, Record<string, number>> = {};
+	private errorCount = 0;
 	private metadata: Record<string, unknown>;
 	private readonly jsonlBuffers = new Map<string, string[]>();
 	private readonly jsonlBufferBytes = new Map<string, number>();
@@ -330,32 +334,32 @@ export class CursorSdkEventDebugSink {
 	}
 
 	recordOnDelta(update: InteractionUpdate): void {
-		this.appendJsonl(ARTIFACTS.onDelta, "update", update, this.counts.onDelta);
+		this.appendJsonl(ARTIFACTS.onDelta, "update", update, "onDelta");
 	}
 
 	recordOnStep(step: unknown): void {
-		this.appendJsonl(ARTIFACTS.onStep, "step", step, this.counts.onStep);
+		this.appendJsonl(ARTIFACTS.onStep, "step", step, "onStep");
 	}
 
 	recordStreamEvent(event: unknown): void {
-		this.appendJsonl(ARTIFACTS.streamEvents, "event", event, this.counts.stream);
+		this.appendJsonl(ARTIFACTS.streamEvents, "event", event, "stream");
 	}
 
 	recordPiStreamEvent(event: unknown): void {
-		this.appendJsonl(ARTIFACTS.piStreamEvents, "event", event, this.counts.piStream);
+		this.appendJsonl(ARTIFACTS.piStreamEvents, "event", event, "piStream");
 	}
 
 	recordProviderEvent(phase: string, payload: unknown): void {
-		this.appendProviderJsonl(phase, payload);
+		this.appendPhased(ARTIFACTS.providerEvents, "provider", phase, payload);
 	}
 
 	recordLiveRunEvent(event: CursorLiveQueuedEvent): void {
-		this.appendJsonl(ARTIFACTS.liveRunEvents, "event", event, this.counts.liveRun);
+		this.appendJsonl(ARTIFACTS.liveRunEvents, "event", event, "liveRun");
 	}
 
 	recordBridgeDiagnostic(event: CursorPiToolBridgeDiagnosticEvent): void {
 		const serialized = serializeCursorPiToolBridgeDiagnostic(event);
-		this.appendJsonl(ARTIFACTS.bridgeEvents, "event", serialized, this.counts.bridge, String(serialized.event));
+		this.appendJsonl(ARTIFACTS.bridgeEvents, "event", serialized, "bridge", String(serialized.event));
 	}
 
 	recordBridgeRaw(payload: {
@@ -365,19 +369,19 @@ export class CursorSdkEventDebugSink {
 		error?: unknown;
 		rejectionKind?: string;
 	}): void {
-		this.appendJsonl(ARTIFACTS.bridgeRaw, "bridgeRaw", payload, this.counts.bridgeRaw, payload.kind);
+		this.appendJsonl(ARTIFACTS.bridgeRaw, "bridgeRaw", payload, "bridgeRaw", payload.kind);
 	}
 
 	recordDisplayDecision(decision: CursorSdkDisplayDecisionRecord): void {
-		this.appendJsonl(ARTIFACTS.displayDecisions, "decision", decision, this.counts.displayDecisions, decision.action);
+		this.appendJsonl(ARTIFACTS.displayDecisions, "decision", decision, "displayDecisions", decision.action);
 	}
 
 	recordCoordinatorEvent(phase: string, payload: unknown): void {
-		this.appendCoordinatorJsonl(phase, payload);
+		this.appendPhased(ARTIFACTS.coordinatorEvents, "coordinator", phase, payload);
 	}
 
 	recordDrainEvent(phase: string, payload: unknown): void {
-		this.appendDrainJsonl(phase, payload);
+		this.appendPhased(ARTIFACTS.drainEvents, "drain", phase, payload);
 	}
 
 	recordFinalPartial(partial: unknown): void {
@@ -386,14 +390,14 @@ export class CursorSdkEventDebugSink {
 	}
 
 	recordError(label: string, error: unknown): void {
-		this.counts.errors += 1;
+		this.errorCount += 1;
 		const payload = {
 			label,
 			message: error instanceof Error ? error.message : String(error),
 			stack: error instanceof Error ? error.stack : undefined,
 			value: error,
 		};
-		this.appendJsonl(ARTIFACTS.errors, "error", payload, { [label]: 1 }, label);
+		this.appendJsonl(ARTIFACTS.errors, "error", payload, undefined, label);
 	}
 
 	attachRunStream(run: unknown): void {
@@ -512,21 +516,7 @@ export class CursorSdkEventDebugSink {
 			sessionFile: getCursorSessionFile(),
 			turn: this.turn,
 			elapsedMs: Date.now() - this.startedAt,
-			counts: {
-				onDelta: { ...this.counts.onDelta },
-				onStep: { ...this.counts.onStep },
-				stream: { ...this.counts.stream },
-				piStream: { ...this.counts.piStream },
-				provider: { ...this.counts.provider },
-				liveRun: { ...this.counts.liveRun },
-				bridge: { ...this.counts.bridge },
-				bridgeRaw: { ...this.counts.bridgeRaw },
-				displayDecisions: { ...this.counts.displayDecisions },
-				coordinator: { ...this.counts.coordinator },
-				drain: { ...this.counts.drain },
-				timeline: { ...this.counts.timeline },
-				errors: this.counts.errors,
-			},
+			counts: this.snapshotCounts(),
 			piSessionSnapshot,
 			artifacts: Object.fromEntries(
 				Object.entries(ARTIFACTS).map(([key, name]) => [key, join(this.artifactDir, name)]),
@@ -547,28 +537,27 @@ export class CursorSdkEventDebugSink {
 		this.finalized = true;
 	}
 
-	private appendProviderJsonl(phase: string, payload: unknown): void {
-		const elapsedMs = Date.now() - this.startedAt;
-		const record = { ts: new Date().toISOString(), elapsedMs, turn: this.turn, phase, payload };
-		this.bufferJsonl(ARTIFACTS.providerEvents, record);
-		this.counts.provider[phase] = (this.counts.provider[phase] ?? 0) + 1;
-		this.recordTimeline("provider", phase, payload);
+	private bucket(name: CountBucketName): Record<string, number> {
+		return (this.buckets[name] ??= {});
 	}
 
-	private appendCoordinatorJsonl(phase: string, payload: unknown): void {
-		const elapsedMs = Date.now() - this.startedAt;
-		const record = { ts: new Date().toISOString(), elapsedMs, turn: this.turn, phase, payload };
-		this.bufferJsonl(ARTIFACTS.coordinatorEvents, record);
-		this.counts.coordinator[phase] = (this.counts.coordinator[phase] ?? 0) + 1;
-		this.recordTimeline("coordinator", phase, payload);
+	private increment(name: CountBucketName, key: string): void {
+		const bucket = this.bucket(name);
+		bucket[key] = (bucket[key] ?? 0) + 1;
 	}
 
-	private appendDrainJsonl(phase: string, payload: unknown): void {
+	private snapshotCounts(): Record<string, Record<string, number> | number> {
+		return {
+			...Object.fromEntries(COUNT_BUCKET_NAMES.map((name) => [name, { ...this.bucket(name) }])),
+			errors: this.errorCount,
+		};
+	}
+
+	private appendPhased(fileName: string, layer: CountBucketName, phase: string, payload: unknown): void {
 		const elapsedMs = Date.now() - this.startedAt;
-		const record = { ts: new Date().toISOString(), elapsedMs, turn: this.turn, phase, payload };
-		this.bufferJsonl(ARTIFACTS.drainEvents, record);
-		this.counts.drain[phase] = (this.counts.drain[phase] ?? 0) + 1;
-		this.recordTimeline("drain", phase, payload);
+		this.bufferJsonl(fileName, { ts: new Date().toISOString(), elapsedMs, turn: this.turn, phase, payload });
+		this.increment(layer, phase);
+		this.recordTimeline(layer, phase, payload);
 	}
 
 	private recordTimeline(layer: string, kind: string, payload: unknown): void {
@@ -582,15 +571,14 @@ export class CursorSdkEventDebugSink {
 			payload,
 		};
 		this.bufferJsonl(ARTIFACTS.timeline, record);
-		const timelineKey = `${layer}:${kind}`;
-		this.counts.timeline[timelineKey] = (this.counts.timeline[timelineKey] ?? 0) + 1;
+		this.increment("timeline", `${layer}:${kind}`);
 	}
 
 	private appendJsonl(
 		fileName: string,
 		recordKey: string,
 		value: unknown,
-		counts: Record<string, number>,
+		bucket: CountBucketName | undefined,
 		countKey?: string,
 	): void {
 		const elapsedMs = Date.now() - this.startedAt;
@@ -602,7 +590,7 @@ export class CursorSdkEventDebugSink {
 		};
 		this.bufferJsonl(fileName, record);
 		const type = countKey ?? eventType(value);
-		counts[type] = (counts[type] ?? 0) + 1;
+		if (bucket) this.increment(bucket, type);
 		const layer = fileName.replace(/\.jsonl$/, "");
 		this.recordTimeline(layer, type, value);
 	}

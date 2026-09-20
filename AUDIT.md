@@ -13,16 +13,6 @@ The remaining runtime work has no single large structural simplification. The re
 - **Verdict:** recommend (7b)
 - **7b Snapshot projection.** `scripts/refresh-cursor-model-snapshots.mjs:88-115` copies the full SDK DTO; `model-list-cache.ts:45-92` re-validates it; `model-discovery.ts` consumes only IDs, model display name, parameter IDs/values, variant params/default marker, variant display name. The generated file has 589 `displayName` fields and 30 alias blocks for 37 models. One shared parser/projector for live, cached, and snapshot input, dropping aliases, descriptions, and parameter/value display names. ≈ −300 to −600 generated lines, −10 to −30 handwritten. Risk: existing version-1 cache files must stay readable or need a version bump. Validation: `test/model-list-cache.test.ts`, `test/model-discovery*.test.ts`, `test/cursor-model-snapshot-context.test.ts`. Confidence medium.
 
-### 10. Debug sink counters (S13)
-
-- **Verdict:** recommend
-- **Evidence:** `src/cursor-sdk-event-debug.ts:237-251` declares 13 counter fields; `:515-529` copies them by hand into the summary; `:550-572` three identical `append*Jsonl` methods; `:589-605` `appendJsonl` already takes the bucket as a parameter; `:396` `recordError` passes a throwaway bucket that is discarded.
-- **Proposed representation:** `counts: Record<string, Record<string, number>>` with a `bucket(name)` accessor, one `appendPhased(bucket, layer, phase, payload)`, and `errorCount` kept numeric. `summary.counts` keys unchanged. ≈ −35 lines.
-- **Scope:** `src/cursor-sdk-event-debug.ts` private members only.
-- **Risks:** `summary.counts` is a persisted artifact contract; keys must match exactly.
-- **Validation:** `test/cursor-sdk-event-debug.test.ts`, `test/cursor-provider-debug-artifacts.test.ts`; add an assertion on `Object.keys(summary.counts)`.
-- **Confidence:** medium-high
-
 ### 11. Replay expandable details typed by variant (S10)
 
 - **Verdict:** recommend
@@ -44,7 +34,7 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Cross-cutting patterns
 
-1. One entity, several containers: five pool collections and 13 counter fields.
+1. One entity, several containers: five pool collections.
 2. Compatibility shapes stay at the resume parser, not in downstream cleanup.
 3. The generated model snapshot remains large relative to its runtime projection.
 4. `AGENTS.md` map drift (see #13).
@@ -65,7 +55,7 @@ The remaining runtime work has no single large structural simplification. The re
 | S10 | Native replay cards | `cursor-native-tool-display-*.ts`, `cursor-native-replay-trace.ts`, `cursor-replay-{activity-builders,summary-args,tool-details}.ts` | recommend (#11) |
 | S11 | Pi tool bridge | `cursor-pi-tool-bridge*.ts` | dead surface removed |
 | S12 | Usage accounting | `cursor-usage-accounting.ts`, `cursor-sdk-billed-usage.ts` | guard merge demoted |
-| S13 | Debug artifacts, output filter, scrubbing | `cursor-sdk-event-debug*.ts`, `shared/cursor-sdk-event-debug-env.*`, `cursor-sdk-output-filter.ts`, `shared/cursor-sdk-output-filter.*`, `cursor-sensitive-text.ts`, `shared/cursor-sensitive-text.*` | recommend (#10); allocation union rejected; output filter and scrubbing clean |
+| S13 | Debug artifacts, output filter, scrubbing | `cursor-sdk-event-debug*.ts`, `shared/cursor-sdk-event-debug-env.*`, `cursor-sdk-output-filter.ts`, `shared/cursor-sdk-output-filter.*`, `cursor-sensitive-text.ts`, `shared/cursor-sensitive-text.*` | debug sink buckets unified; allocation union rejected; output filter and scrubbing clean |
 | S14 | Maintainer smoke scripts | `scripts/*.mjs`, `scripts/*.sh`, `scripts/lib/*` (except `ensure-built.mjs`), `scripts/fixtures/*`, `.d.mts` siblings | smoke env options consolidated; no unused entrypoints |
 | S16 | Build, packaging, test helpers | `scripts/build.mjs`, `scripts/prepare.mjs`, `scripts/lib/ensure-built.mjs`, `package.json`, `tsconfig*.json`, `vitest.config.ts`, `test/helpers/*`, `test/fixtures/*` | `files` ships the `scripts` directory; build race-safety removal rejected; harnesses compose, no unused fixtures |
 | S17 | Docs and `AGENTS.md` map | `AGENTS.md`, `README.md`, `docs/**` | recommend (#13) |
@@ -82,6 +72,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
 - **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.
 - **Merged:** S03 session preference restore/persist helpers in `cursor-state.ts`.
+- **Merged:** S13 debug sink counters now use named buckets plus a numeric error count.
 - **Merged:** S16 `package.json` `files` now ships `scripts/` as one directory entry.
 
 ## Limitations

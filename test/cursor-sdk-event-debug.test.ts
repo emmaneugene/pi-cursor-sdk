@@ -126,7 +126,23 @@ describe("cursor sdk event debug sink", () => {
 			expect(JSON.parse(readFileSync(join(artifactDir, sdkEventDebugTestUtils.ARTIFACTS.waitResult), "utf8"))).toMatchObject({
 				status: "finished",
 			});
-			expect(JSON.parse(readFileSync(join(artifactDir, sdkEventDebugTestUtils.ARTIFACTS.summary), "utf8"))).toMatchObject({
+			const summary = JSON.parse(readFileSync(join(artifactDir, sdkEventDebugTestUtils.ARTIFACTS.summary), "utf8"));
+			expect(Object.keys(summary.counts).sort()).toEqual([
+				"bridge",
+				"bridgeRaw",
+				"coordinator",
+				"displayDecisions",
+				"drain",
+				"errors",
+				"liveRun",
+				"onDelta",
+				"onStep",
+				"piStream",
+				"provider",
+				"stream",
+				"timeline",
+			]);
+			expect(summary).toMatchObject({
 				artifactDir,
 				counts: {
 					bridge: { run_created: 1 },

@@ -15,6 +15,7 @@
 - Share session preference restore and persist helpers in Cursor runtime controls.
 - Keep one pending record per deferred Cursor tool-lifecycle call.
 - Ship the maintainer `scripts/` tree as one package `files` entry.
+- Count Cursor SDK debug artifacts with named buckets instead of 13 parallel fields.
 
 ## 0.5.1 - 2026-09-13
 
