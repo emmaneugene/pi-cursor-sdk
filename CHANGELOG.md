@@ -11,6 +11,7 @@
 - Drop turn-result aliases and the second emission vocabulary; checkpoint context windows from the leased session agent.
 - Normalize legacy resume cleanup IDs and unphased delete logs at parse time.
 - Load the Cursor model catalog cache once per discovery and classify it as fresh or stale.
+- Keep the owner catalog used by nested factories in sync after `/cursor-refresh-models`.
 
 ## 0.5.1 - 2026-09-13
 

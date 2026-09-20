@@ -3,9 +3,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Type } from "typebox";
 import {
+	createExtensionCommandContext,
 	createExtensionRegistrationPi,
 	createTestToolInfo,
 	getCursorPiBridgeMcpUrl,
+	makeProviderModelConfig,
 } from "./helpers/pi-harness.js";
 import {
 	createExtensionPi,
@@ -66,6 +68,29 @@ describe("extension factory nested-session guard", () => {
 		await childPi.runSessionShutdown({ reason: "quit" });
 		await extensionFactory(laterChildPi);
 		expect(laterChildPi.registerProvider).toHaveBeenCalledOnce();
+	});
+
+	it("gives a nested factory the catalog from the last owner refresh", async () => {
+		const startupModels = [makeProviderModelConfig("composer-2", { name: "Cursor Composer 2" })];
+		const refreshedModels = [makeProviderModelConfig("grok-4.6", { name: "Cursor Grok 4.6" })];
+		mockedDiscover.mockResolvedValueOnce(startupModels).mockResolvedValueOnce(refreshedModels);
+		const parentPi = createExtensionPi();
+		const childPi = createExtensionPi();
+		await extensionFactory(parentPi);
+		await parentPi.runCommand(
+			"cursor-refresh-models",
+			"",
+			createExtensionCommandContext({
+				hasUI: false,
+				model: undefined,
+				modelRegistry: { getApiKeyForProvider: async () => undefined } as never,
+			}),
+		);
+
+		await extensionFactory(childPi);
+
+		expect(childPi.registerProvider).toHaveBeenCalledOnce();
+		expect(childPi._registered[0]?.config.models).toEqual(refreshedModels);
 	});
 
 	it("does not let a child session_start steal the parent Cursor session scope", async () => {

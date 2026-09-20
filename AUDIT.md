@@ -10,9 +10,8 @@ The remaining runtime work has no single large structural simplification. The re
 
 ### 7. Model catalog (S02, S01)
 
-- **Verdict:** recommend (7b); correctness note (7c)
+- **Verdict:** recommend (7b)
 - **7b Snapshot projection.** `scripts/refresh-cursor-model-snapshots.mjs:88-115` copies the full SDK DTO; `model-list-cache.ts:45-92` re-validates it; `model-discovery.ts` consumes only IDs, model display name, parameter IDs/values, variant params/default marker, variant display name. The generated file has 589 `displayName` fields and 30 alias blocks for 37 models. One shared parser/projector for live, cached, and snapshot input, dropping aliases, descriptions, and parameter/value display names. ≈ −300 to −600 generated lines, −10 to −30 handwritten. Risk: existing version-1 cache files must stay readable or need a version bump. Validation: `test/model-list-cache.test.ts`, `test/model-discovery*.test.ts`, `test/cursor-model-snapshot-context.test.ts`. Confidence medium.
-- **7c Correctness backlog.** `src/index.ts:116` sets `activeCursorProviderModels` on load; `/cursor-refresh-models` (`:137-149`) re-registers the owner provider but does not update it, so a nested child factory loaded after refresh (`:99-103`) receives the startup catalog. One assignment fixes it. Not a simplification.
 
 ### 8. `cursor-state.ts` triple duplication (S03)
 
@@ -85,7 +84,7 @@ The remaining runtime work has no single large structural simplification. The re
 
 | ID | Subsystem | Boundary | Result |
 |---|---|---|---|
-| S01 | Entry, factory guard, lifecycle hooks | `index.ts`, `cursor-extension-factory-guard.ts`, `cursor-provider-runtime-context.ts`, `cursor-provider-lazy.ts`, `cursor-model-lifecycle.ts`, `cursor-fallback-warning.ts`, `cursor-agents-context*.ts`, `cursor-model.ts`, `cursor-sdk-runtime.ts`, `cursor-active-tools.ts` | correctness note only (#7c) |
+| S01 | Entry, factory guard, lifecycle hooks | `index.ts`, `cursor-extension-factory-guard.ts`, `cursor-provider-runtime-context.ts`, `cursor-provider-lazy.ts`, `cursor-model-lifecycle.ts`, `cursor-fallback-warning.ts`, `cursor-agents-context*.ts`, `cursor-model.ts`, `cursor-sdk-runtime.ts`, `cursor-active-tools.ts` | refresh catalog now updates the nested-factory owner catalog |
 | S02 | Model discovery, caches, snapshot | `model-discovery.ts`, `model-list-cache.ts`, `cursor-fallback-models.generated.ts`, `bundled-context-windows.ts`, `context-window-cache.ts`, `shared/cursor-model-selection-identities.*`, `scripts/refresh-cursor-model-snapshots.mjs` | cache read consolidated; recommend (#7b) |
 | S03 | Config, state controls, HTTP/1.1 | `cursor-config.ts`, `cursor-state.ts`, `cursor-runtime-state.ts`, `cursor-http1.ts`, `cursor-setting-sources.ts`, `shared/cursor-setting-sources.*`, `cursor-api-key.ts`, `cursor-task-presentation.ts` | recommend (#8) |
 | S04 | Prompt/context, bootstrap surfaces | `context.ts`, `cursor-context-tools.ts`, `cursor-tool-manifest.ts`, `cursor-bridge-contract.ts`, `cursor-skill-tool.ts`, `cursor-provider-overflow.ts` | plan-flag finding rejected |
@@ -109,7 +108,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Rejected — S16 `build.mjs` staging/reaper/retry removal:** added in commit `a3399e7` for reproduced concurrent-build and filesystem races, with regression tests.
 - **Demoted — S07 pool slot-map (`cursor-session-agent.ts:148-153`, five per-scope collections):** the collections have different lifetimes; a slot with many optional fields may relocate complexity and risks acquire/dispose races. Treat as a design spike.
 - **Demoted — S12 guard merge in `applyCursorUsage`:** the repeated guards mark distinct billed/local/partition/occupancy trust boundaries.
-- **Demoted — S01 refresh catalog:** bug, not simplification (#7c).
+- **Fixed — S01 refresh catalog:** `/cursor-refresh-models` now updates `activeCursorProviderModels` for nested factories.
 - **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records remain #9.
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
 - **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.

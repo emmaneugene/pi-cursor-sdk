@@ -146,6 +146,7 @@ export default async function (pi: CursorExtensionApi) {
 						refreshFallbackIssue = issue;
 					},
 				});
+				activeCursorProviderModels = refreshedModels;
 				registerCursorProvider(pi, refreshedModels);
 				if (!ctx.hasUI) return;
 				if (refreshFallbackIssue) {
