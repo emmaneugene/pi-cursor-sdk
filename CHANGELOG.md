@@ -10,6 +10,7 @@
 - Replace duplicate smoke native-display flags and the ambiguous boolean resume alias with explicit string modes.
 - Drop turn-result aliases and the second emission vocabulary; checkpoint context windows from the leased session agent.
 - Normalize legacy resume cleanup IDs and unphased delete logs at parse time.
+- Load the Cursor model catalog cache once per discovery and classify it as fresh or stale.
 
 ## 0.5.1 - 2026-09-13
 

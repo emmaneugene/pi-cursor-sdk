@@ -7,8 +7,7 @@ import {
 	fingerprintApiKey,
 	getModelCacheTtlMs,
 	isModelCacheDisabled,
-	loadAnyCachedModelCatalog,
-	loadFreshCachedModels,
+	loadCachedModelCatalog,
 	saveModelListCache,
 	__testUtils,
 } from "../src/model-list-cache.js";
@@ -39,7 +38,11 @@ describe("model-list-cache", () => {
 
 	it("round-trips a saved catalog for a matching key", () => {
 		saveModelListCache(fp, MODELS);
-		expect(loadFreshCachedModels(fp)).toEqual(MODELS);
+		expect(loadCachedModelCatalog(fp)).toEqual({
+			fetchedAt: expect.any(Number),
+			models: MODELS,
+			freshness: "fresh",
+		});
 	});
 
 	it("writes the cache file with 0600 permissions and no API key", () => {
@@ -62,20 +65,22 @@ describe("model-list-cache", () => {
 
 	it("misses when the key fingerprint differs", () => {
 		saveModelListCache(fp, MODELS);
-		expect(loadFreshCachedModels(fingerprintApiKey("other-key"))).toBeUndefined();
+		expect(loadCachedModelCatalog(fingerprintApiKey("other-key"))).toBeUndefined();
 	});
 
-	it("treats entries older than the TTL as a miss but still returns them as stale", () => {
+	it("returns entries older than the TTL as stale", () => {
 		saveModelListCache(fp, MODELS);
 		const future = Date.now() + __testUtils.DEFAULT_TTL_MS + 1000;
-		expect(loadFreshCachedModels(fp, future)).toBeUndefined();
-		expect(loadAnyCachedModelCatalog(fp)?.models).toEqual(MODELS);
+		expect(loadCachedModelCatalog(fp, future)).toEqual({
+			fetchedAt: expect.any(Number),
+			models: MODELS,
+			freshness: "stale",
+		});
 	});
 
 	it("ignores a corrupt cache file", () => {
 		writeFileSync(__testUtils.getCachePath(), "{ not json");
-		expect(loadFreshCachedModels(fp)).toBeUndefined();
-		expect(loadAnyCachedModelCatalog(fp)).toBeUndefined();
+		expect(loadCachedModelCatalog(fp)).toBeUndefined();
 	});
 
 	it.each([
@@ -89,8 +94,7 @@ describe("model-list-cache", () => {
 			`{"version":1,"fetchedAt":${fetchedAt},"keyFingerprint":${JSON.stringify(fp)},"models":${JSON.stringify(MODELS)}}`,
 		);
 
-		expect(loadFreshCachedModels(fp)).toBeUndefined();
-		expect(loadAnyCachedModelCatalog(fp)).toBeUndefined();
+		expect(loadCachedModelCatalog(fp)).toBeUndefined();
 	});
 
 	it.each([
@@ -115,22 +119,30 @@ describe("model-list-cache", () => {
 			}),
 		);
 
-		expect(loadFreshCachedModels(fp)).toBeUndefined();
-		expect(loadAnyCachedModelCatalog(fp)).toBeUndefined();
+		expect(loadCachedModelCatalog(fp)).toBeUndefined();
 	});
 
 	it("disables reads and writes through user config", () => {
 		const config = { models: { cache: { enabled: false } } };
 		expect(saveModelListCache(fp, MODELS, config)).toBe(false);
-		expect(loadFreshCachedModels(fp, Date.now(), config)).toBeUndefined();
-		expect(loadAnyCachedModelCatalog(fp, config)).toBeUndefined();
+		expect(loadCachedModelCatalog(fp, Date.now(), config)).toBeUndefined();
 	});
 
 	it("honors a custom TTL from user config", () => {
 		const config = { models: { cache: { ttlMs: 1000 } } };
 		expect(getModelCacheTtlMs(config)).toBe(1000);
 		saveModelListCache(fp, MODELS, config);
-		expect(loadFreshCachedModels(fp, Date.now() + 2000, config)).toBeUndefined();
+		expect(loadCachedModelCatalog(fp, Date.now() + 2000, config)?.freshness).toBe("stale");
+	});
+
+	it("treats a zero TTL as stale while still returning the catalog", () => {
+		const config = { models: { cache: { ttlMs: 0 } } };
+		saveModelListCache(fp, MODELS, config);
+		expect(loadCachedModelCatalog(fp, Date.now(), config)).toEqual({
+			fetchedAt: expect.any(Number),
+			models: MODELS,
+			freshness: "stale",
+		});
 	});
 
 	it("falls back to the default TTL for invalid config values", () => {

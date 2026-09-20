@@ -4,14 +4,13 @@ Read-only audit of `pi-cursor-sdk` at `main`. 16 subsystem reviews (Grok 4.6, GP
 
 ## Summary
 
-The remaining runtime work has no single large structural simplification. The recommendations focus on duplicate reads, parallel state, compatibility shapes, and generated model metadata. Folding the many <50-line modules into their callers would move lines, not delete them; no worker recommended it.
+The remaining runtime work has no single large structural simplification. The recommendations focus on parallel state, compatibility shapes, and generated model metadata. Folding the many <50-line modules into their callers would move lines, not delete them; no worker recommended it.
 
 ## Ranked recommendations
 
 ### 7. Model catalog (S02, S01)
 
-- **Verdict:** recommend (7a, 7b); correctness note (7c)
-- **7a Single cache read.** `src/model-list-cache.ts:131` `loadFreshCachedModels` and `:143` `loadAnyCachedModelCatalog` each call `readCacheFile()`; `src/model-discovery.ts:337` loads fresh, then `:359` reloads after a failed request. Replace with one `loadCachedModelCatalog()` returning `{ fetchedAt, models, freshness: "fresh" | "stale" } | undefined`, loaded once per discovery. ≈ −10 to −20 lines. Scope: `model-list-cache.ts`, `model-discovery.ts`, `test/model-list-cache.test.ts`, `test/model-discovery-cache.test.ts`. Preserve `forceRefresh`, disabled cache, zero TTL, key mismatch, clock skew, stale fallback. Confidence high.
+- **Verdict:** recommend (7b); correctness note (7c)
 - **7b Snapshot projection.** `scripts/refresh-cursor-model-snapshots.mjs:88-115` copies the full SDK DTO; `model-list-cache.ts:45-92` re-validates it; `model-discovery.ts` consumes only IDs, model display name, parameter IDs/values, variant params/default marker, variant display name. The generated file has 589 `displayName` fields and 30 alias blocks for 37 models. One shared parser/projector for live, cached, and snapshot input, dropping aliases, descriptions, and parameter/value display names. ≈ −300 to −600 generated lines, −10 to −30 handwritten. Risk: existing version-1 cache files must stay readable or need a version bump. Validation: `test/model-list-cache.test.ts`, `test/model-discovery*.test.ts`, `test/cursor-model-snapshot-context.test.ts`. Confidence medium.
 - **7c Correctness backlog.** `src/index.ts:116` sets `activeCursorProviderModels` on load; `/cursor-refresh-models` (`:137-149`) re-registers the owner provider but does not update it, so a nested child factory loaded after refresh (`:99-103`) receives the startup catalog. One assignment fixes it. Not a simplification.
 
@@ -73,7 +72,7 @@ The remaining runtime work has no single large structural simplification. The re
 
 ## Best next slices (one small PR each)
 
-1. #7a single model-cache read.
+1. #7b snapshot projection.
 
 ## Cross-cutting patterns
 
@@ -87,7 +86,7 @@ The remaining runtime work has no single large structural simplification. The re
 | ID | Subsystem | Boundary | Result |
 |---|---|---|---|
 | S01 | Entry, factory guard, lifecycle hooks | `index.ts`, `cursor-extension-factory-guard.ts`, `cursor-provider-runtime-context.ts`, `cursor-provider-lazy.ts`, `cursor-model-lifecycle.ts`, `cursor-fallback-warning.ts`, `cursor-agents-context*.ts`, `cursor-model.ts`, `cursor-sdk-runtime.ts`, `cursor-active-tools.ts` | correctness note only (#7c) |
-| S02 | Model discovery, caches, snapshot | `model-discovery.ts`, `model-list-cache.ts`, `cursor-fallback-models.generated.ts`, `bundled-context-windows.ts`, `context-window-cache.ts`, `shared/cursor-model-selection-identities.*`, `scripts/refresh-cursor-model-snapshots.mjs` | recommend ×2 (#7a, #7b) |
+| S02 | Model discovery, caches, snapshot | `model-discovery.ts`, `model-list-cache.ts`, `cursor-fallback-models.generated.ts`, `bundled-context-windows.ts`, `context-window-cache.ts`, `shared/cursor-model-selection-identities.*`, `scripts/refresh-cursor-model-snapshots.mjs` | cache read consolidated; recommend (#7b) |
 | S03 | Config, state controls, HTTP/1.1 | `cursor-config.ts`, `cursor-state.ts`, `cursor-runtime-state.ts`, `cursor-http1.ts`, `cursor-setting-sources.ts`, `shared/cursor-setting-sources.*`, `cursor-api-key.ts`, `cursor-task-presentation.ts` | recommend (#8) |
 | S04 | Prompt/context, bootstrap surfaces | `context.ts`, `cursor-context-tools.ts`, `cursor-tool-manifest.ts`, `cursor-bridge-contract.ts`, `cursor-skill-tool.ts`, `cursor-provider-overflow.ts` | plan-flag finding rejected |
 | S05 | Turn pipeline, outcomes, errors | `cursor-provider.ts`, `cursor-provider-turn-{runner,prepare,send,finalize,emit,types}.ts`, `cursor-provider-run-{outcome,finalizer}.ts`, `cursor-run-final-text.ts`, `cursor-provider-errors.ts`, `cursor-mcp-timeout-override.ts`, `cursor-sdk-process-error-guard.ts` | turn plumbing removed |
@@ -113,6 +112,7 @@ The remaining runtime work has no single large structural simplification. The re
 - **Demoted — S01 refresh catalog:** bug, not simplification (#7c).
 - **Merged:** S05 + S06 turn plumbing completed; S06 lifecycle-emitter records remain #9.
 - **Merged:** S07 resume cleanup candidates and cleanup-entry phases now normalize at parse.
+- **Merged:** S02 single model-cache read (`loadCachedModelCatalog`); snapshot projection remains #7b.
 
 ## Limitations
 

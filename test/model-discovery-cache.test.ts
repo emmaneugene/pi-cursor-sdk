@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,7 @@ import {
 	getCursorModelMetadata,
 	type CursorModelFallbackIssue,
 } from "../src/model-discovery.js";
+import { fingerprintApiKey, __testUtils as cacheTestUtils } from "../src/model-list-cache.js";
 
 vi.mock("@cursor/sdk", () => ({
 	Cursor: { models: { list: vi.fn() } },
@@ -156,6 +157,62 @@ describe("discoverModels model-list cache", () => {
 		expect(issues[0].reason).toBe("cached-after-error");
 		expect(issues[0].message).toContain("using cached Cursor model catalog");
 		expect(issues[0].errorMessage).toContain("network down");
+	});
+
+	it("reuses the first cache read after a live request fails even if the file changes", async () => {
+		writeStoredCursorApiKey("cache-key");
+		writeFileSync(cacheTestUtils.getCachePath(), JSON.stringify({
+			version: 1,
+			fetchedAt: Date.now() - cacheTestUtils.DEFAULT_TTL_MS - 1000,
+			keyFingerprint: fingerprintApiKey("cache-key"),
+			models: [MODEL],
+		}));
+		mockedList.mockImplementationOnce(() => {
+			unlinkSync(cacheTestUtils.getCachePath());
+			return Promise.reject(new Error("network down"));
+		});
+		const issues: CursorModelFallbackIssue[] = [];
+
+		const models = await discoverModels({ onFallback: (issue) => issues.push(issue) });
+
+		expect(models.map((model) => model.id)).toEqual(["composer-2"]);
+		expect(issues[0]?.reason).toBe("cached-after-error");
+	});
+
+	it("uses a stale catalog after a live request fails", async () => {
+		writeStoredCursorApiKey("cache-key");
+		writeFileSync(cacheTestUtils.getCachePath(), JSON.stringify({
+			version: 1,
+			fetchedAt: Date.now() - cacheTestUtils.DEFAULT_TTL_MS - 1000,
+			keyFingerprint: fingerprintApiKey("cache-key"),
+			models: [MODEL],
+		}));
+		mockedList.mockRejectedValueOnce(new Error("network down"));
+		const issues: CursorModelFallbackIssue[] = [];
+
+		const models = await discoverModels({ onFallback: (issue) => issues.push(issue) });
+
+		expect(mockedList).toHaveBeenCalledTimes(1);
+		expect(models.map((model) => model.id)).toEqual(["composer-2"]);
+		expect(issues[0]?.reason).toBe("cached-after-error");
+	});
+
+	it("does not treat a zero-TTL catalog as fresh but still uses it after a live failure", async () => {
+		writeFileSync(join(tmpAgentDir, "cursor-sdk.json"), JSON.stringify({
+			models: { cache: { ttlMs: 0 } },
+		}));
+		writeStoredCursorApiKey("cache-key");
+		mockedList.mockResolvedValueOnce([MODEL]);
+		await discoverModels();
+		expect(mockedList).toHaveBeenCalledTimes(1);
+
+		mockedList.mockRejectedValueOnce(new Error("network down"));
+		const issues: CursorModelFallbackIssue[] = [];
+		const models = await discoverModels({ onFallback: (issue) => issues.push(issue) });
+
+		expect(mockedList).toHaveBeenCalledTimes(2);
+		expect(models.map((model) => model.id)).toEqual(["composer-2"]);
+		expect(issues[0]?.reason).toBe("cached-after-error");
 	});
 
 	it("omits an empty cached-catalog error detail", async () => {

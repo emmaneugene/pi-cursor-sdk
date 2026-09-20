@@ -18,9 +18,10 @@ interface ModelListCacheFile {
 	models: ModelListItem[];
 }
 
-export interface CachedModelList {
+export interface CachedModelCatalog {
 	fetchedAt: number;
 	models: ModelListItem[];
+	freshness: "fresh" | "stale";
 }
 
 function getCachePath(): string {
@@ -126,25 +127,22 @@ function readCacheFile(): ModelListCacheFile | undefined {
 	}
 }
 
-// Return cached models only when caching is enabled, the key matches, and the
-// entry is within the TTL. Used on the hot startup path to skip the network.
-export function loadFreshCachedModels(keyFingerprint: string, now: number = Date.now(), config?: CursorSdkConfig): ModelListItem[] | undefined {
+// One read of the on-disk catalog. Freshness is "stale" when the entry is older
+// than the TTL, or when TTL is zero. Callers skip the network only for "fresh".
+export function loadCachedModelCatalog(
+	keyFingerprint: string,
+	now: number = Date.now(),
+	config?: CursorSdkConfig,
+): CachedModelCatalog | undefined {
 	if (isModelCacheDisabled(config)) return undefined;
+	const cache = readCacheFile();
+	if (!cache || cache.keyFingerprint !== keyFingerprint) return undefined;
 	const ttlMs = getModelCacheTtlMs(config);
-	if (ttlMs <= 0) return undefined;
-	const cache = readCacheFile();
-	if (!cache || cache.keyFingerprint !== keyFingerprint) return undefined;
-	if (now - cache.fetchedAt > ttlMs) return undefined;
-	return cache.models;
-}
-
-// Return cached models regardless of age, as long as the key matches. Used as a
-// resilience fallback when a live discovery request fails.
-export function loadAnyCachedModelCatalog(keyFingerprint: string, config?: CursorSdkConfig): CachedModelList | undefined {
-	if (isModelCacheDisabled(config)) return undefined;
-	const cache = readCacheFile();
-	if (!cache || cache.keyFingerprint !== keyFingerprint) return undefined;
-	return { fetchedAt: cache.fetchedAt, models: cache.models };
+	return {
+		fetchedAt: cache.fetchedAt,
+		models: cache.models,
+		freshness: ttlMs > 0 && now - cache.fetchedAt <= ttlMs ? "fresh" : "stale",
+	};
 }
 
 export function saveModelListCache(keyFingerprint: string, models: ModelListItem[], config?: CursorSdkConfig): boolean {

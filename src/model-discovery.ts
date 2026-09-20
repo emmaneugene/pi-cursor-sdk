@@ -13,8 +13,7 @@ import { resolveCursorApiKey, resolveCursorRuntimeApiKey } from "./cursor-api-ke
 import { scrubSensitiveText } from "./cursor-sensitive-text.js";
 import {
 	fingerprintApiKey,
-	loadAnyCachedModelCatalog,
-	loadFreshCachedModels,
+	loadCachedModelCatalog,
 	saveModelListCache,
 } from "./model-list-cache.js";
 
@@ -332,12 +331,10 @@ export async function discoverModels(options: DiscoverModelsOptions = {}): Promi
 	}
 
 	const keyFingerprint = fingerprintApiKey(apiKey);
+	const cachedCatalog = loadCachedModelCatalog(keyFingerprint);
 
-	if (!options.forceRefresh) {
-		const cachedModels = loadFreshCachedModels(keyFingerprint);
-		if (cachedModels && cachedModels.length > 0) {
-			return registerModelItems(cachedModels);
-		}
+	if (!options.forceRefresh && cachedCatalog?.freshness === "fresh" && cachedCatalog.models.length > 0) {
+		return registerModelItems(cachedCatalog.models);
 	}
 
 	try {
@@ -356,7 +353,6 @@ export async function discoverModels(options: DiscoverModelsOptions = {}): Promi
 		// Prefer a previously cached catalog over the generic bundled fallback when
 		// a live refresh fails (e.g. transient network/auth errors), but keep the
 		// provenance visible so refresh commands do not claim a live refresh worked.
-		const cachedCatalog = loadAnyCachedModelCatalog(keyFingerprint);
 		if (cachedCatalog && cachedCatalog.models.length > 0) {
 			options.onFallback?.({
 				reason: "cached-after-error",
