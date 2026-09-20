@@ -9,7 +9,6 @@ import {
 	getStoredCursorAgentMode,
 	resolveCursorAgentMode,
 	formatCursorToolsDebugReport,
-	getCursorCliConfig,
 	__testUtils,
 } from "../src/state.js";
 import { __testUtils as modelDiscoveryTestUtils } from "../src/model-discovery.js";
@@ -85,8 +84,6 @@ function createCursorRuntimeHarness(options: {
 	cursorFastFlag?: boolean;
 	cursorNoFastFlag?: boolean;
 	cursorModeFlag?: boolean | string;
-	cursorLocalResumeFlag?: boolean;
-	cursorNoLocalResumeFlag?: boolean;
 	mode?: ExtensionContext["mode"];
 	hasUI?: boolean;
 	cwd?: string;
@@ -96,8 +93,6 @@ function createCursorRuntimeHarness(options: {
 			"cursor-fast": options.cursorFastFlag ?? false,
 			"cursor-no-fast": options.cursorNoFastFlag ?? false,
 			"cursor-mode": options.cursorModeFlag ?? "",
-			"cursor-local-resume": options.cursorLocalResumeFlag ?? false,
-			"cursor-no-local-resume": options.cursorNoLocalResumeFlag ?? false,
 		},
 	});
 	const ctx = createExtensionTestContext({
@@ -486,16 +481,6 @@ describe("Cursor runtime state", () => {
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("cursor", "cursor · fast:off");
 		expect(getEffectiveFastForModelId("composer-2")).toBe(false);
 		expect(pi.appendEntry).not.toHaveBeenCalled();
-	});
-
-	it("maps local resume CLI flags and lets --cursor-no-local-resume win", async () => {
-		let harness = createCursorRuntimeHarness({ cursorLocalResumeFlag: true });
-		await harness.pi.runSessionStart({ model: makeModel("composer-2.5") });
-		expect(getCursorCliConfig().local?.resume).toBe(true);
-
-		harness = createCursorRuntimeHarness({ cursorLocalResumeFlag: true, cursorNoLocalResumeFlag: true });
-		await harness.pi.runSessionStart({ model: makeModel("composer-2.5") });
-		expect(getCursorCliConfig().local?.resume).toBe(false);
 	});
 
 	it("lets --cursor-no-fast win when both one-run force flags are set", async () => {

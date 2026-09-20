@@ -1,9 +1,15 @@
 import type { ExtensionAPI, SessionEntry } from "@earendil-works/pi-coding-agent";
-import { isCursorLocalAgentId } from "./session-agent-resume.js";
 import { getCursorSessionScopeKey } from "./session-scope.js";
 import { asRecord } from "./record-utils.js";
 
 export const CURSOR_SESSION_AGENT_LINEAGE_ENTRY_TYPE = "cursor-sdk-agent-lineage";
+
+const MAX_LOCAL_AGENT_ID_LENGTH = 256;
+
+/** @cursor/sdk AgentOptions.agentId is a public custom string; lineage records local ids only. */
+export function isCursorLocalAgentId(value: unknown): value is string {
+	return typeof value === "string" && value.length <= MAX_LOCAL_AGENT_ID_LENGTH && /^agent-[A-Za-z0-9_-]+$/.test(value);
+}
 
 const LINEAGE_ENTRY_VERSION = 1;
 
@@ -76,7 +82,7 @@ function readRecordedAgentIds(entries: readonly SessionEntry[], sessionId: strin
 	);
 }
 
-/** Best-effort forensic lineage at the local Agent.send() boundary. Independent of resume. */
+/** Best-effort forensic lineage at the local Agent.send() boundary. Independent of same-process pooling. */
 export function recordCursorSessionAgentLineage(agentId: string): void {
 	const { appendEntry, sessionId, sessionFile, scopeKey, cwd } = state;
 	if (!appendEntry || !sessionId || !scopeKey || !cwd) return;

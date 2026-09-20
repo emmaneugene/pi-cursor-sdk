@@ -3,7 +3,7 @@ import type { AgentModeOption, ModelSelection } from "@cursor/sdk";
 import { configureCursorSdkHttp1 } from "./http1.js";
 import { installCursorMcpToolTimeoutOverride } from "./mcp-timeout-override.js";
 import { ensureCursorRipgrepPath, ensureCursorTreeSitterVendorDir } from "./sdk-platform-package.js";
-import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "./sdk-output-filter.js";
+import { installCursorSdkOutputFilter, suppressCursorSdkOutput } from "../shared/sdk-output-filter.mjs";
 import {
 	acquireSessionCursorAgent,
 	buildCursorSessionSendPrompt,
@@ -114,7 +114,6 @@ async function prepareCursorLocalProviderTurn(
 		const queuedBridgeRequestsBeforeLiveRun: CursorPiBridgeToolRequest[] = [];
 		let liveRunForBridgeQueue: CursorLiveRun | undefined;
 		const bridgeExcludeToolNames = buildCursorBridgeExcludeToolNames(resolvedConfig);
-		const localResumeEnabled = runtimeContext?.localResume ?? resolvedConfig.local.resume.value;
 
 		const sessionAgentAcquireParams = {
 			apiKey: resolvedApiKey,
@@ -123,7 +122,6 @@ async function prepareCursorLocalProviderTurn(
 			modelSelection: selection,
 			settingSources,
 			localSafety,
-			localResume: localResumeEnabled,
 			useHttp1ForAgent,
 			runtimeScope: runtimeContext
 				? { scopeKey: runtimeContext.scopeKey, sessionFile: runtimeContext.sessionFile }
@@ -166,14 +164,11 @@ async function prepareCursorLocalProviderTurn(
 			};
 		};
 		let sendPlan = planCursorSessionSend(sessionAgentLease.sendState, context);
-		if (sessionAgentLease.created && sessionAgentLease.resumed && sendPlan.mode === "incremental") {
-			sendPlan = { mode: "bootstrap", resetAgent: false, reason: "process_resume" };
-		}
 		let promptOptions = buildPromptOptions(sendPlan);
 		let prompt = buildCursorSessionSendPrompt(context, promptOptions, sendPlan);
 		if (sendPlan.resetAgent) {
 			await resetSessionCursorAgent(sessionAgentScopeKey);
-			sessionAgentLease = await acquireSessionCursorAgent({ ...sessionAgentAcquireParams, forceCreate: true });
+			sessionAgentLease = await acquireSessionCursorAgent(sessionAgentAcquireParams);
 			sessionAgentScopeKey = sessionAgentLease.scopeKey;
 			bridgeToolNames = new Set(sessionAgentLease.bridgeRun?.snapshot.tools.map((tool) => tool.mcpToolName) ?? []);
 			includePiBridgeGuidance = bridgeToolNames.size > 0;
@@ -208,8 +203,6 @@ async function prepareCursorLocalProviderTurn(
 			toolManifestEnabled: resolveCursorToolManifestEnabled(),
 			agentMode,
 			localForce: resolvedConfig.local.force.value,
-			localResume: localResumeEnabled,
-			resumedAgent: sessionAgentLease.resumed,
 			activeToolNames: activeToolNames ? [...activeToolNames] : [],
 			sessionAgentScopeKey,
 			bridgeRunId: bridgeRun?.id,
@@ -262,7 +255,6 @@ async function prepareCursorLocalProviderTurn(
 				nativeReplayId,
 				agentMode,
 				modelSelection: selection,
-				...(sessionAgentLease.resumeNotice ? { resumeNotice: sessionAgentLease.resumeNotice } : {}),
 			},
 			sessionAgentLease,
 			localForce: resolvedConfig.local.force,

@@ -8,11 +8,10 @@ import { registerCursorSkillTool } from "./skill-tool.js";
 import { registerCursorSessionScope } from "./session-scope.js";
 import { registerCursorSessionAgentLifecycle } from "./session-agent-lifecycle.js";
 import { registerCursorSessionAgentLineage } from "./session-agent-lineage.js";
-import { registerCursorSessionAgentResume } from "./session-agent-resume.js";
 import { streamCursorLazy } from "./provider-lazy.js";
 import { CURSOR_API_KEY_CONFIG_VALUE, resolveCursorApiKey } from "./api-key.js";
-import { registerCursorFallbackIssueWarning } from "./fallback-warning.js";
-import { registerCursorAgentsContextDedup } from "./agents-context-registration.js";
+import { registerCursorFallbackIssueWarning } from "./model.js";
+import { registerCursorAgentsContextDedup } from "./agents-context.js";
 import { registerCursorOverflowNormalization } from "./provider-overflow.js";
 import { registerCursorSdkSessionProcessErrorGuard } from "./sdk-process-error-guard.js";
 import { prepareCursorSessionForCompaction } from "./session-compaction-prep.js";
@@ -30,7 +29,6 @@ type CursorExtensionApi =
 	& Parameters<typeof registerCursorSessionScope>[0]
 	& Parameters<typeof registerCursorSessionAgentLifecycle>[0]
 	& Parameters<typeof registerCursorSessionAgentLineage>[0]
-	& Parameters<typeof registerCursorSessionAgentResume>[0]
 	& Parameters<typeof registerCursorRuntimeControls>[0]
 	& Parameters<typeof registerCursorNativeToolDisplay>[0]
 	& Parameters<typeof registerCursorSkillTool>[0]
@@ -73,7 +71,6 @@ function registerNestedCursorProvider(pi: CursorExtensionApi, models: ProviderMo
 		cwd: getCursorSessionCwd(),
 		sessionFile: undefined,
 		bridge,
-		localResume: false,
 		nativeToolReplay: false,
 		disposeAgentAfterTurn: true,
 	};
@@ -119,7 +116,6 @@ export default async function (pi: CursorExtensionApi) {
 		registerCursorSessionScope(pi);
 		registerCursorSessionAgentLineage(pi);
 		registerCursorSessionAgentLifecycle(pi);
-		registerCursorSessionAgentResume(pi);
 		pi.on("session_before_compact", async () => {
 			await prepareCursorSessionForCompaction();
 		});

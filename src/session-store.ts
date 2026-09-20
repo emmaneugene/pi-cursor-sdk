@@ -18,12 +18,6 @@ export interface OpenCursorSessionStore {
 
 export interface CursorSessionStoreSelection {
 	sessionStore: OpenCursorSessionStore;
-	identities: {
-		defaultStore: CursorSessionStoreIdentity;
-		sessionStore: CursorSessionStoreIdentity;
-	};
-	resumeAttemptAllowed: boolean;
-	resumeFallback: boolean;
 }
 
 interface CursorSessionStoreSdkOperations {
@@ -73,13 +67,6 @@ export async function getCursorSessionStoreIdentities(
 	};
 }
 
-export function cursorSessionStoreIdentitiesEqual(
-	left: CursorSessionStoreIdentity,
-	right: CursorSessionStoreIdentity,
-): boolean {
-	return left.version === right.version && left.stateRoot === right.stateRoot;
-}
-
 async function openOwnedCursorSessionStore(
 	cwd: string,
 	identity: CursorSessionStoreIdentity,
@@ -120,32 +107,12 @@ export async function openCursorSessionStoreForScope(options: {
 	cwd: string;
 	scopeKey: string;
 	persistent: boolean;
-	hasResumeHandle: boolean;
-	resumeIdentity?: CursorSessionStoreIdentity;
 }): Promise<CursorSessionStoreSelection> {
 	const identities = await getCursorSessionStoreIdentities(options.cwd, options.scopeKey, options.persistent);
-	const requestedResumeIdentity = options.hasResumeHandle
-		? options.resumeIdentity ?? (options.persistent ? identities.defaultStore : undefined)
-		: undefined;
-	const resumableIdentities = options.persistent
-		? [identities.defaultStore, identities.sessionStore]
-		: [identities.sessionStore];
-	const resumeIdentity = requestedResumeIdentity && resumableIdentities
-		.find((identity) => cursorSessionStoreIdentitiesEqual(identity, requestedResumeIdentity));
-	let resumeAttemptAllowed = options.hasResumeHandle && resumeIdentity !== undefined;
-	let resumeFallback = options.persistent && options.hasResumeHandle && !resumeIdentity;
-	const selectedIdentity = resumeIdentity ?? identities.sessionStore;
 	const removalRoot = options.persistent ? undefined : dirname(dirname(identities.sessionStore.stateRoot));
-	let sessionStore: OpenCursorSessionStore;
-	try {
-		sessionStore = await openOwnedCursorSessionStore(options.cwd, selectedIdentity, removalRoot);
-	} catch (error) {
-		if (!resumeIdentity || cursorSessionStoreIdentitiesEqual(resumeIdentity, identities.sessionStore)) throw error;
-		resumeAttemptAllowed = false;
-		resumeFallback = true;
-		sessionStore = await openOwnedCursorSessionStore(options.cwd, identities.sessionStore);
-	}
-	return { sessionStore, identities, resumeAttemptAllowed, resumeFallback };
+	return {
+		sessionStore: await openOwnedCursorSessionStore(options.cwd, identities.sessionStore, removalRoot),
+	};
 }
 
 export const __testUtils = {

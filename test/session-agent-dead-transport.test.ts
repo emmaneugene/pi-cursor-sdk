@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installCursorSdkProcessErrorGuard } from "../src/sdk-process-error-guard.js";
-import { __testUtils as resumeTestUtils } from "../src/session-agent-resume.js";
 import {
 	acquireSessionCursorAgent,
 	__testUtils as sessionAgentTestUtils,
@@ -13,7 +12,6 @@ describe("cursor-session-agent dead transport", () => {
 	beforeEach(async () => {
 		installCursorSessionStoreMock();
 		cursorSessionScopeTestUtils.reset();
-		resumeTestUtils.reset();
 		await sessionAgentTestUtils.disposeAllSessionCursorAgents();
 		vi.clearAllMocks();
 	});

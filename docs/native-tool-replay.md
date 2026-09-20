@@ -77,7 +77,7 @@ Edit and write activity replays through pi-facing `edit` and `write` cards only 
 
 Source of truth for SDK tool names: `@cursor/sdk@1.0.30` conversation `ToolType` values and https://cursor.com/docs/sdk/typescript
 
-Implementation owners: `src/tool-presentation-registry.ts` (canonical names, labels, visibility, replay policy, bridge exclusions for internal replay wrappers, alias normalization, and display-spec key completeness), `src/transcript-tool-specs.ts` (registry-keyed display implementations for transcript formatting and pi display builders), `src/native-tool-display-replay.ts` (replay card rendering derived from registry replay metadata), and `src/web-tool-activity.ts` (MCP/web alias remapping before display lookup).
+Implementation owners: `src/tool-presentation-registry.ts` (canonical names, labels, visibility, replay policy, bridge exclusions for internal replay wrappers, alias normalization, and display-spec key completeness), `src/transcript-tool-specs.ts` (registry-keyed display implementations for transcript formatting and pi display builders), `src/native-tool-display-replay.ts` (replay card rendering derived from registry replay metadata), and `src/tool-visibility.ts` (MCP/web alias remapping before display lookup).
 
 **Maintainer invariants — edit/write replay previews:** All colored diff rendering (native `edit` cards and `Cursor edit` activity fallbacks) flows through the single `formatCursorReplayDiff()` in `src/native-tool-display-replay.ts`. Activity write fallbacks with structured `fileContentAfterWrite` use the same `formatCursorReplayFilePreview()` path as native `write` cards. Structured `diffString` (and `diff`/`lines*`) or `fileContentAfterWrite` on `CursorReplay*Details` (including activity variants) is the source of truth for TUI preview coloring/highlighting. `expandedText` on activity details is for summary/expansion and as a fallback when the current SDK reports a unified diff only in text; it is never the primary preview source when structured fields are present. No parallel +/- coloring loops exist.
 
@@ -113,7 +113,7 @@ Neutral activity rows use pi tool name `cursor` with `activityTitle` / `activity
 
 ## Runtime alias normalization
 
-Before display lookup, completed SDK tool names pass through `normalizeCursorToolName()` in `src/tool-presentation-registry.ts`; MCP web tool names are additionally remapped by `resolveTranscriptToolName()` in `src/web-tool-activity.ts`. Documented aliases:
+Before display lookup, completed SDK tool names pass through `normalizeCursorToolName()` in `src/tool-presentation-registry.ts`; MCP web tool names are additionally remapped by `resolveTranscriptToolName()` in `src/tool-visibility.ts`. Documented aliases:
 
 | Runtime alias | Canonical SDK name |
 | --- | --- |

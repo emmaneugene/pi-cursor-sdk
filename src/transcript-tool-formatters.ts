@@ -1,4 +1,4 @@
-import { resolveCursorEditDiff } from "./edit-diff.js";
+import { resolveCursorEditDiff } from "./display-text.js";
 import { extractWebFetchTarget, extractWebSearchQuery } from "./web-tool-args.js";
 import {
 	asRecord,

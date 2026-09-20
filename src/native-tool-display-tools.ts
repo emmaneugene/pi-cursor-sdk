@@ -11,11 +11,11 @@ import {
 import { Text } from "@earendil-works/pi-tui";
 import type { TSchema } from "typebox";
 import { getCursorSessionCwd } from "./session-scope.js";
-import type {
-	BuiltinNativeCursorToolName,
-	NativeCursorToolName,
-} from "./native-tool-names.js";
-import { isCursorReplayToolName } from "./tool-presentation-registry.js";
+import {
+	isCursorReplayToolName,
+	type BuiltinNativeCursorToolName,
+	type NativeCursorToolName,
+} from "./tool-presentation-registry.js";
 import {
 	createCursorReplayOnlyToolDefinition,
 	isCursorReplayNativeEditDetails,

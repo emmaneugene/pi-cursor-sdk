@@ -4,7 +4,6 @@ import { computeCursorContextFingerprint, shouldBootstrapCursorContext } from ".
 import { createEventHarness, createExtensionTestContext, makeContext } from "./helpers/pi-harness.js";
 import { createTestToolInfo, registerBridgeForProviderTest } from "./helpers/provider-harness.js";
 import { __testUtils as cursorSessionScopeTestUtils, registerCursorSessionScope } from "../src/session-scope.js";
-import { __testUtils as resumeTestUtils } from "../src/session-agent-resume.js";
 import {
 	acquireSessionCursorAgent,
 	__testUtils as sessionAgentTestUtils,
@@ -18,7 +17,6 @@ describe("cursor-session-agent", () => {
 	beforeEach(async () => {
 		installCursorSessionStoreMock();
 		cursorSessionScopeTestUtils.reset();
-		resumeTestUtils.reset();
 		await sessionAgentTestUtils.disposeAllSessionCursorAgents();
 		vi.clearAllMocks();
 	});

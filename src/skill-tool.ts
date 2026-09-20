@@ -8,9 +8,12 @@ import type {
 	Skill,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { arePiToolsDisabled } from "./active-tools.js";
-import { isCursorModel } from "./model.js";
-import { registerCursorModelLifecycle, type CursorModelLifecycleExtensionApi } from "./model-lifecycle.js";
+import {
+	arePiToolsDisabled,
+	isCursorModel,
+	registerCursorModelLifecycle,
+	type CursorModelLifecycleExtensionApi,
+} from "./model.js";
 import { resolveCursorPiToolBridgeConfig } from "./pi-tool-bridge-config.js";
 
 export const CURSOR_ACTIVATE_SKILL_TOOL_NAME = "cursor_activate_skill";

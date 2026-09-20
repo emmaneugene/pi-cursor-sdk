@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { getLanguageFromPath, highlightCode, keyHint, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Image, Text, type Component } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { resolveCursorEditDiff } from "./edit-diff.js";
+import { resolveCursorEditDiff } from "./display-text.js";
 import { inferImageMimeType } from "./tool-result-display-readers.js";
 import { LOCAL_READ_PREVIEW_NOTICE, isLocalReadPreviewContent } from "./transcript-utils.js";
 import {

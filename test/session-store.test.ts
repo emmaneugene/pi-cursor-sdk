@@ -31,7 +31,7 @@ describe("cursor session store identity", () => {
 		expect(anonymous).toContain("pi-sessions");
 	});
 
-	it("never resumes a fileless acquisition from the shared default store", async () => {
+	it("never opens a fileless acquisition from the shared default store", async () => {
 		const workspaceRoot = mkdtempSync(join(tmpdir(), "pi-cursor-fileless-shared-store-"));
 		storeTestUtils.setSdkOperations({
 			getDefaultStateRoot: () => workspaceRoot,
@@ -44,10 +44,7 @@ describe("cursor session store identity", () => {
 				cwd: workspaceRoot,
 				scopeKey: "ephemeral",
 				persistent: false,
-				hasResumeHandle: true,
-				resumeIdentity: { version: 1, stateRoot: workspaceRoot },
 			});
-			expect(selection.resumeAttemptAllowed).toBe(false);
 			expect(selection.sessionStore.identity.stateRoot).not.toBe(workspaceRoot);
 			await selection.sessionStore.dispose();
 		} finally {
@@ -63,7 +60,6 @@ describe("cursor session store identity", () => {
 			cwd: root,
 			scopeKey: "ephemeral",
 			persistent: false,
-			hasResumeHandle: false,
 		});
 		const removalRoot = dirname(dirname(selection.sessionStore.identity.stateRoot));
 		expect(existsSync(selection.sessionStore.identity.stateRoot)).toBe(true);
@@ -74,7 +70,7 @@ describe("cursor session store identity", () => {
 		rmSync(root, { recursive: true, force: true });
 	});
 
-	it("never grants temporary-removal ownership to a caller-supplied store", async () => {
+	it("never grants temporary-removal ownership to the persisted session store", async () => {
 		const workspaceRoot = mkdtempSync(join(tmpdir(), "pi-cursor-shared-store-"));
 		const sharedRoot = join(workspaceRoot, "shared");
 		const marker = join(sharedRoot, "keep.txt");
@@ -84,12 +80,8 @@ describe("cursor session store identity", () => {
 			cwd: workspaceRoot,
 			scopeKey: "persisted-session",
 			persistent: true,
-			hasResumeHandle: true,
-			resumeIdentity: { version: 1, stateRoot: sharedRoot },
 		});
 		try {
-			expect(selection.resumeAttemptAllowed).toBe(false);
-			expect(selection.resumeFallback).toBe(true);
 			expect(selection.sessionStore.identity.stateRoot).not.toBe(sharedRoot);
 		} finally {
 			await selection.sessionStore.dispose();
@@ -116,7 +108,6 @@ describe("cursor session store identity", () => {
 				cwd: workspaceRoot,
 				scopeKey: "ephemeral",
 				persistent: false,
-				hasResumeHandle: false,
 			});
 			const removalRoot = dirname(dirname(stateRoot));
 			await expect(selection.sessionStore.dispose()).rejects.toThrow("dispose failed");

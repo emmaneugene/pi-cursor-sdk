@@ -99,16 +99,12 @@ export function buildCursorSmokeUserConfig({
 	exposeBuiltinTools,
 	bridgeDebug,
 	bridgeDebugFile,
-	localResume,
 	transport,
 	eventDebugDir,
 } = {}) {
 	const config = {};
 	if (settingSources !== undefined && settingSources !== null) {
 		config.local = { ...config.local, settingSources: resolveCursorSettingSources(settingSources) };
-	}
-	if (localResume !== undefined) {
-		config.local = { ...config.local, resume: localResume };
 	}
 	if (transport !== undefined) {
 		config.local = { ...config.local, transport };
@@ -148,7 +144,6 @@ export function buildCursorSmokeEnv({
 	exposeBuiltinTools,
 	bridgeDebug,
 	bridgeDebugFile,
-	localResume,
 	transport,
 	term,
 	eventDebugDir,
@@ -165,7 +160,6 @@ export function buildCursorSmokeEnv({
 			exposeBuiltinTools,
 			bridgeDebug,
 			bridgeDebugFile,
-			localResume,
 			transport,
 			eventDebugDir,
 		}));

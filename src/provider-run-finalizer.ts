@@ -23,7 +23,6 @@ import type {
 } from "./provider-turn-types.js";
 import { applyCursorUsage } from "./usage-accounting.js";
 import { hasUsableText } from "./record-utils.js";
-import { emitDisplayOnlyTraceBlock } from "./display-only-trace.js";
 export type CursorTurnTerminalEvent =
 	| {
 			kind: "direct";
@@ -42,7 +41,6 @@ function applyLiveRunOutcome(
 	switch (outcome.kind) {
 		case "finished":
 			prepared.lifecycle.commitSend(context, prepared.meta.bootstrap);
-			if (prepared.meta.resumeNotice) liveRun.resumeNotice = prepared.meta.resumeNotice;
 			cursorLiveRuns.markFinished(liveRun, outcome.finalText);
 			break;
 		case "cancelled":
@@ -177,7 +175,6 @@ export class CursorRunFinalizer {
 					turn: prepared.runtime.turnCoordinator.lastSdkTurnUsage,
 					billed: prepared.runtime.billedTurnUsage,
 				});
-				if (prepared.meta.resumeNotice) emitDisplayOnlyTraceBlock(stream, partial, prepared.meta.resumeNotice);
 				stream.push({ type: "done", reason: "stop", message: partial });
 				break;
 		}

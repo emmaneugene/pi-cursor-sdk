@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- Drop cross-process Cursor SDK local resume and `/cursor-local-resume-cleanup`. After a pi restart the next turn always `Agent.create()`s and bootstraps from the pi transcript. Same-process pooling stays. Silent `cursor-sdk-agent-lineage` JSONL logging stays.
+- Ignore leftover `local.resume` keys and old `cursor-sdk-agent-resume` / `cursor-sdk-agent-cleanup` session entries.
+
 ## 0.5.2 - 2026-09-20
 
 ### Fixed

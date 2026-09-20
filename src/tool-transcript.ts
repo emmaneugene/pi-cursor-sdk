@@ -13,7 +13,7 @@ import {
 	type CursorPiToolDisplay,
 	type TranscriptOptions,
 } from "./transcript-utils.js";
-import { resolveTranscriptToolName } from "./web-tool-activity.js";
+import { resolveTranscriptToolName } from "./tool-visibility.js";
 
 export type { CursorPiToolDisplay } from "./transcript-utils.js";
 export type { ToolDisplayContext } from "./transcript-tool-specs.js";

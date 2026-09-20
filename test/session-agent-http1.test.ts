@@ -5,7 +5,6 @@ import {
 	__testUtils as sessionAgentTestUtils,
 } from "../src/session-agent.js";
 import { __testUtils as cursorSessionScopeTestUtils } from "../src/session-scope.js";
-import { __testUtils as resumeTestUtils } from "../src/session-agent-resume.js";
 import {
 	__testUtils as cursorHttp1TestUtils,
 	configureCursorSdkHttp1,
@@ -18,7 +17,6 @@ describe("Cursor session agent HTTP/1.1 pooling", () => {
 	beforeEach(async () => {
 		installCursorSessionStoreMock();
 		cursorSessionScopeTestUtils.reset();
-		resumeTestUtils.reset();
 		await sessionAgentTestUtils.disposeAllSessionCursorAgents();
 		cursorHttp1TestUtils.reset();
 		vi.clearAllMocks();

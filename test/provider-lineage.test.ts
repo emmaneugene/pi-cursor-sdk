@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
 	asMockCursorRun,
 	asMockSdkAgent,
@@ -7,6 +8,7 @@ import {
 	makeContext,
 	makeModel,
 	mockedCreate,
+	mockedResume,
 	resetCursorProviderTestState,
 } from "./helpers/provider-harness.js";
 import {
@@ -138,5 +140,64 @@ describe("cursor provider lineage", () => {
 				CURSOR_SESSION_AGENT_LINEAGE_ENTRY_TYPE,
 				expect.objectContaining({ agentId: "agent-no-resume", sessionId: "session-1" }),
 			);
+	});
+
+	it("bootstraps a new agent when retired resume/cleanup JSONL is present and still records lineage", async () => {
+		const pi = createPiHarness();
+		registerCursorSessionScope(pi);
+		registerCursorSessionAgentLineage(pi);
+		const existingEntries: SessionEntry[] = [
+			{
+				type: "custom",
+				id: "resume-old",
+				parentId: null,
+				timestamp: "2026-07-23T00:00:00.000Z",
+				customType: "cursor-sdk-agent-resume",
+				data: { version: 2, runtime: "local", agentId: "agent-old" },
+			},
+			{
+				type: "custom",
+				id: "cleanup-old",
+				parentId: null,
+				timestamp: "2026-07-23T00:00:00.000Z",
+				customType: "cursor-sdk-agent-cleanup",
+				data: { version: 1, agentId: "agent-old" },
+			},
+			{
+				type: "custom",
+				id: "lineage-old",
+				parentId: null,
+				timestamp: "2026-07-23T00:00:00.000Z",
+				customType: CURSOR_SESSION_AGENT_LINEAGE_ENTRY_TYPE,
+				data: {
+					version: 1,
+					runtime: "local",
+					agentId: "agent-old",
+					sessionId: "session-1",
+					sessionFile: "/tmp/session.jsonl",
+					scopeKey: "/tmp/session.jsonl",
+					cwd: "/tmp/project",
+					timestamp: "2026-07-23T00:00:00.000Z",
+				},
+			},
+		];
+		await pi.runSessionStart({
+			cwd: "/tmp/project",
+			sessionManager: {
+				getSessionId: vi.fn(() => "session-1"),
+				getSessionFile: vi.fn(() => "/tmp/session.jsonl"),
+				getEntries: vi.fn(() => existingEntries),
+			},
+		});
+		mockedCreate.mockResolvedValueOnce(successfulAgent("agent-new"));
+
+		await collectEvents(streamCursor(makeModel(), makeContext(), { apiKey: "test-key" }));
+
+		expect(mockedResume).not.toHaveBeenCalled();
+		expect(mockedCreate).toHaveBeenCalled();
+		expect(pi.appendEntry).toHaveBeenCalledWith(
+			CURSOR_SESSION_AGENT_LINEAGE_ENTRY_TYPE,
+			expect.objectContaining({ agentId: "agent-new", sessionId: "session-1" }),
+		);
 	});
 });

@@ -86,7 +86,7 @@ export function resolveBundledCursorSandboxPath(
 /**
  * The SDK finds `cursorsandbox` by walking from `process.argv[1]`, not from
  * `require.resolve`. Point that walk at the installed platform package for the
- * duration of local `Agent.create` / `Agent.resume`.
+ * duration of local `Agent.create`.
  */
 export async function runWithCursorSdkPlatformPackageVisible<T>(
 	run: () => Promise<T>,

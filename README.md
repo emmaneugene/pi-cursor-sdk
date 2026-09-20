@@ -304,21 +304,9 @@ pi --model cursor/grok-4.6 --cursor-local-force
 
 This maps to the next actual `agent.send(..., { local: { force: true } })` only. SDK load, agent acquire, prompt preparation, or a pre-send abort does not consume it. A consumed CLI flag is not rearmed by session reload or tree lifecycle events. It is not a retry loop and does not cancel another live process's existing run handle. Use it only when you know the persisted local run is wedged.
 
-Branch-scoped local resume reattaches to recorded local SDK agents after a pi restart. It is on by default and records agent IDs plus their SDK store identity only in pi session custom entries, never user config. Independently of resume, each local agent whose send is initiated is also recorded once per native pi session as a best-effort non-resumable `cursor-sdk-agent-lineage` custom entry at the `Agent.send()` boundary for forensic lineage; cloned/forked sessions record their own lineage under their new pi session ID. Disable resume for one run with `--cursor-no-local-resume`, or persist an opt-out:
+Each local agent whose send is initiated is recorded once per native pi session as a best-effort non-resumable `cursor-sdk-agent-lineage` custom entry at the `Agent.send()` boundary. Cloned or forked sessions record their own lineage under their new pi session ID. After a pi process restart, the next turn always creates a new SDK agent and bootstraps from the pi transcript. Same-process pooling, incremental sends, the 20-send rebootstrap, and idle eviction stay.
 
-```bash
-pi --model cursor/grok-4.6 --cursor-no-local-resume
-```
-
-```json
-{
-  "local": {
-    "resume": false
-  }
-}
-```
-
-Resume is strict: the current pi session file/id, branch path prefix, cwd/repo root, model/API/tool-surface pool key, SDK store identity, and compaction generation must match. Each persisted pi session gets a SQLite store under `<getDefaultSdkStateRoot(cwd)>/pi-sessions/<session-hash>/`, and that same store is used for create/resume, transcript reads, checkpoint lookup, and exact-ID cleanup so parallel pi sessions do not contend on one workspace `index.db`. Fileless sessions use a unique OS-temporary store per acquisition, remove it on graceful disposal, and start a fresh agent after invalidation instead of reopening a disposed temporary store. Legacy resume entries still try the SDK's default workspace store; if that resume fails or the agent is later replaced, the new agent moves to the per-session store. A trailing user message already present at process startup is crash-ambiguous and invalidates the old handle; only a user message appended in the current process may span a recorded handle, preventing restart from resending an already-submitted prompt. A successful process reattachment bootstraps the current pi transcript once while retaining the resumed Cursor agent's native state; later in-process turns remain incremental. If `Agent.resume()` fails, pi bootstraps a new local Cursor agent from the current transcript and streams one display-only continuity note. Superseded local agents can be cleaned up explicitly with `/cursor-local-resume-cleanup --dry-run` and `/cursor-local-resume-cleanup --yes`; cleanup only deletes exact recorded `agent-*` IDs from their recorded store.
+Each persisted pi session gets a SQLite store under `<getDefaultSdkStateRoot(cwd)>/pi-sessions/<session-hash>/`. Fileless sessions use a unique OS-temporary store per acquisition and remove it on graceful disposal.
 
 Durable non-secret defaults live only in `~/.pi/agent/cursor-sdk.json`. Fast-default and HTTP transport saves preserve unrecognized fields, reject malformed or non-object JSON without rewriting it, and serialize concurrent writers. A completed global preference write is retained if Pi's subsequent session-journal append fails, because Pi may already have mutated the in-memory branch; the command reports that partial journal failure and ignores the uncertain session entry until a later successful save or session restart. If a process is force-killed during the tiny update window, the next save reports the `.lock` path; remove it only after confirming no pi process is writing that config.
 
@@ -326,8 +314,7 @@ Durable non-secret defaults live only in `~/.pi/agent/cursor-sdk.json`. Fast-def
 {
   "local": {
     "autoReview": true,
-    "sandbox": true,
-    "resume": true
+    "sandbox": true
   },
   "tools": {
     "bridge": {
@@ -339,18 +326,7 @@ Durable non-secret defaults live only in `~/.pi/agent/cursor-sdk.json`. Fast-def
 
 `tools.bridge.exclude` is a denylist of pi tool names for the pi tool bridge. Denylisted active pi tools are hidden from Cursor; everything else active stays exposed, so an unset or empty list means no restriction, not zero exposure. Names must be strings; empty and malformed entries are dropped. Overlapping built-in pi tools (`read`, `bash`, `write`, `edit`, `grep`, `find`, `ls`) stay hidden unless `tools.bridge.exposeBuiltins` is `true`, and a denylist entry keeps hiding a tool even with that opt-in. A change to the resulting exposed surface splits the local agent pool, so the next turn creates a Cursor agent with the narrowed bridge snapshot.
 
-### Local resume cleanup
-
-Local resume cleanup is explicit and session-ledger scoped:
-
-```bash
-/cursor-local-resume-cleanup --dry-run
-/cursor-local-resume-cleanup --yes
-```
-
-It only deletes superseded local `agent-*` IDs that this extension recorded as cleanup candidates, one exact ID at a time through the Cursor SDK using the candidate's recorded store identity (or the SDK default workspace store for legacy candidates without one), and protects agents still resumable from any session-tree branch. Before SDK deletion it verifies and fsyncs an exact intent in the Pi session JSONL, then verifies and fsyncs the result; a missing or non-durable intent prevents deletion, while a missing or non-durable result leaves the durable intent—and a conservative current-process marker—blocking automatic retry. A candidate with a recorded store identity that is invalid for the current session is durably marked non-retryable and excluded from later cleanup attempts. It does not sweep any SDK store or call lower-level empty delete filters. Removing a pi session file does not automatically remove its persisted store directory. After permanently retiring that session and confirming no pi process is using it, a recorded root may be removed manually only when it is the session-derived `<getDefaultSdkStateRoot(cwd)>/pi-sessions/<session-hash>/` path. Never manually remove the SDK default workspace root, which legacy entries may record and other sessions may share.
-
-Only enabled local safety values are passed to `Agent.create({ local })`; false/default values are omitted to preserve the current local-agent behavior. Local force is one-shot and CLI-only through `--cursor-local-force`, and is passed only to the next `Agent.send({ local: { force: true } })`. Local resume is enabled by default; opt out with `local.resume: false` or `--cursor-no-local-resume`. Changes take effect on the next turn without recreating a healthy pooled agent.
+Only enabled local safety values are passed to `Agent.create({ local })`; false/default values are omitted to preserve the current local-agent behavior. Local force is one-shot and CLI-only through `--cursor-local-force`, and is passed only to the next `Agent.send({ local: { force: true } })`. Changes take effect on the next turn without recreating a healthy pooled agent.
 
 ## Images
 
@@ -442,7 +418,7 @@ Actual Cursor runs still need a key from `/login`, `CURSOR_API_KEY`, or `--api-k
 
 - **The pi tool bridge is local and MCP-backed.** Bridgeable active pi tools are exposed to local Cursor agents through a tokenized `127.0.0.1` MCP endpoint; internal Cursor replay activity names are excluded, and overlapping built-in pi tools are hidden by default. Set `tools.bridge.enabled` to `false` to disable it, or `tools.bridge.exposeBuiltins` to `true` to expose overlapping built-ins too. Hide individual pi tools from Cursor with `tools.bridge.exclude` in `~/.pi/agent/cursor-sdk.json`.
 - **Cursor native tool replay is display-only.** Replay renders recorded Cursor SDK activity and never re-runs Cursor-side commands, reapplies Cursor edits, calls MCP servers, or mutates pi state. Workflow tools such as Cursor mode/task/todo/plan activity are not pi workflow controls. See [Cursor native tool replay](docs/native-tool-replay.md) for supported replay cards, ordering, conflict handling, and opt-out settings.
-- **Cursor run state can span tool-use turns.** Within a pi session, the extension reuses one Cursor SDK agent across compatible follow-up turns and sends incremental prompts when context still matches. It recreates the agent when context diverges, after compaction or `/tree` navigation, on API key changes, after send errors, after five minutes without a successful send, or on session shutdown. Idle recreate uses `Agent.create`, not `Agent.resume`. For bridged pi tools, the matching pi `toolResult` resolves into the same live Cursor SDK run without creating a new `Agent`, unless the run was disposed, aborted, or cancelled. Replay can also split one live Cursor SDK run across pi `toolUse` turns for display.
+- **Cursor run state can span tool-use turns.** Within a pi session, the extension reuses one Cursor SDK agent across compatible follow-up turns and sends incremental prompts when context still matches. It recreates the agent when context diverges, after compaction or `/tree` navigation, on API key changes, after send errors, after five minutes without a successful send, or on session shutdown. Idle recreate uses `Agent.create`. For bridged pi tools, the matching pi `toolResult` resolves into the same live Cursor SDK run without creating a new `Agent`, unless the run was disposed, aborted, or cancelled. Replay can also split one live Cursor SDK run across pi `toolUse` turns for display.
 - **Final assistant text is the last non-empty text part.** Composer responses can produce one assistant message with early progress `text`, thinking/tool metadata, and a later final `text` report. Consumers that need a final answer should scan assistant message content from the end and use the last non-empty `text` part, not the first. Cursor `thinking` deltas are shown as thinking traces when the SDK emits them; those traces can include draft answers or copied exact-output targets and are intentionally not collapsed by this extension.
 - **Cursor setting sources default to all.** The extension passes `local.settingSources: ["all"]` by default so configured Cursor MCP servers, plugin tools, project/user settings, and related Cursor-native capabilities are available like they are in Cursor. To narrow loading, set `local.settingSources` to a list such as `["project", "user", "plugins"]`. To disable ambient setting sources, set `local.settingSources` to `[]`. Direct Cursor SDK bootstrap logs (settings, skills, hook-load compatibility warnings, and similar) are suppressed so they do not pollute the TUI.
 - **AGENTS.md / CLAUDE.md are not duplicated on Cursor models when Cursor loads the same rules.** Pi discovers global and project context files (`AGENTS.md`, `CLAUDE.md`, and case variants) unless you start with `-nc`. On `cursor/*` models the extension removes only `<project_instructions>` blocks that overlap Cursor `settingSources` via the `before_agent_start` hook: `user` for `~/.pi/agent/AGENTS.md`, `project` for repo/parent `AGENTS.md` and `CLAUDE.md` (verified Cursor behavior: local agents load project `AGENTS.md` and `CLAUDE.md` alongside Cursor rules). `~/.pi/agent/CLAUDE.md` is not stripped (Cursor user rules use `~/.claude/CLAUDE.md`, not pi's agent dir). With `local.settingSources: []` or `plugins`-only, pi context is left intact. Set `local.preservePiAgentsContext` to `true` to keep duplicate injection.
@@ -461,7 +437,6 @@ Durable settings live only in `~/.pi/agent/cursor-sdk.json`. CLI flags and `/cur
 | `models.cache.ttlMs` | `86400000` (24h) | Fresh-cache lifetime. `0` disables fresh-cache hits but keeps the stale-cache fallback after a discovery failure. |
 | `local.autoReview` | `false` | Passes `autoReview: true` into Cursor SDK agent options when true. CLI: `--cursor-auto-review`. |
 | `local.sandbox` | `false` | Passes local sandbox enablement when true. CLI: `--cursor-sandbox`. The SDK runs `cursorsandbox` from the platform package. |
-| `local.resume` | `true` | Allows reuse of a matching persisted local agent. CLI: `--cursor-no-local-resume`. |
 | `local.transport` | `"default"` | `"http1"` forces Cursor SDK local-agent streams to HTTP/1.1/SSE. Session: `/cursor-http`. |
 | `local.settingSources` | `["all"]` | Cursor SDK setting sources. `[]` disables ambient sources. Other lists such as `["project", "user", "plugins"]` narrow loading. |
 | `local.preservePiAgentsContext` | `false` | Keeps pi `AGENTS.md`/`CLAUDE.md` context injection even when Cursor setting sources load the same rules. |

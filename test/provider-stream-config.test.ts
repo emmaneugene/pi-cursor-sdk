@@ -3,7 +3,6 @@ import { Type } from "typebox";
 import {
 	resetCursorProviderTestState,
 	mockedCreate,
-	mockedResume,
 	createPiHarness,
 	mockedCreateAgentPlatform,
 	makeModel,

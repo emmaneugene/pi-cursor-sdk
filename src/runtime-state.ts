@@ -82,11 +82,6 @@ export function restoreCursorCliState(pi: Pick<ExtensionAPI, "getFlag">): void {
 	const local: NonNullable<CursorExplicitSdkConfig["local"]> = {
 		...(pi.getFlag("cursor-auto-review") === true ? { autoReview: true } : {}),
 		...(pi.getFlag("cursor-sandbox") === true ? { sandbox: true } : {}),
-		...(pi.getFlag("cursor-no-local-resume") === true
-			? { resume: false }
-			: pi.getFlag("cursor-local-resume") === true
-				? { resume: true }
-				: {}),
 	};
 	cliCursorSnapshot = {
 		config: Object.keys(local).length ? { local } : {},
@@ -107,16 +102,6 @@ export function registerCursorLocalRuntimeFlags(pi: Pick<ExtensionAPI, "register
 	});
 	pi.registerFlag("cursor-local-force", {
 		description: "Force-expire a stuck local Cursor SDK run before sending this run.",
-		type: "boolean",
-		default: false,
-	});
-	pi.registerFlag("cursor-local-resume", {
-		description: "Resume recorded local Cursor SDK agents for matching pi session branches.",
-		type: "boolean",
-		default: false,
-	});
-	pi.registerFlag("cursor-no-local-resume", {
-		description: "Disable local Cursor SDK agent resume for this run.",
 		type: "boolean",
 		default: false,
 	});

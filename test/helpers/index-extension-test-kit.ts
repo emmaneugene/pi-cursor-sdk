@@ -12,7 +12,6 @@ import {
 import { __testUtils as nativeToolDisplayTestUtils } from "../../src/native-tool-display-state.js";
 import { __testUtils as cursorPiToolBridgeTestUtils } from "../../src/pi-tool-bridge.js";
 import { __testUtils as cursorSessionScopeTestUtils } from "../../src/session-scope.js";
-import { __testUtils as cursorSessionResumeTestUtils } from "../../src/session-agent-resume.js";
 import { __testUtils as cursorSessionLineageTestUtils } from "../../src/session-agent-lineage.js";
 import { __testUtils as cursorSdkProcessErrorGuardTestUtils } from "../../src/sdk-process-error-guard.js";
 import { __testUtils as cursorExtensionFactoryGuardTestUtils } from "../../src/extension-factory-guard.js";
@@ -22,7 +21,6 @@ export {
 	nativeToolDisplayTestUtils,
 	cursorPiToolBridgeTestUtils,
 	cursorSessionScopeTestUtils,
-	cursorSessionResumeTestUtils,
 };
 
 let isolatedAgentDir: string | undefined;
@@ -52,7 +50,6 @@ export async function resetIndexExtensionTestState(): Promise<void> {
 	await cursorPiToolBridgeTestUtils.resetRegisteredBridgeForTests();
 	cursorExtensionFactoryGuardTestUtils.reset();
 	cursorSessionScopeTestUtils.reset();
-	cursorSessionResumeTestUtils.reset();
 	cursorSessionLineageTestUtils.reset();
 	cursorSdkProcessErrorGuardTestUtils.resetLifecycleSessionGuard();
 	nativeToolDisplayTestUtils.reset();

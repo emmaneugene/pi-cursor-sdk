@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { registerCursorModelLifecycle } from "../src/model-lifecycle.js";
+import { registerCursorModelLifecycle } from "../src/model.js";
 import { createHarnessEventApi } from "./helpers/event-harness.js";
 import { makeModel } from "./helpers/model-fixtures.js";
 

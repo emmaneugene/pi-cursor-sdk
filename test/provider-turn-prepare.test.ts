@@ -60,6 +60,6 @@ describe("CursorProviderTurnRunner config snapshotting (F3)", () => {
 		expect(mockPrepareCursorProviderTurn).toHaveBeenCalledTimes(1);
 		const preparedCallArgs = mockPrepareCursorProviderTurn.mock.calls[0]?.[0] as { resolvedConfig: CursorResolvedSdkConfig };
 		expect(preparedCallArgs.resolvedConfig).toBe(localSnapshot);
-		expect(preparedCallArgs.resolvedConfig.local.resume.value).toBe(true);
+		expect(preparedCallArgs.resolvedConfig.local.transport.value).toBe("default");
 	});
 });

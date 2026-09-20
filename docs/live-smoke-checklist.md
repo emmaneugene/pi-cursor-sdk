@@ -8,7 +8,7 @@ Use this checklist for live provider/runtime evidence. Unit tests and mocks are 
 
 ## Inner-loop rule
 
-- Build first: `npm run build` after any `src/` edit — the pi manifest loads compiled `dist/`, so unbuilt runs validate stale code. (the steering/local-resume/provider-debug launchers rebuild automatically even when run directly with `node scripts/...`; `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; direct `pi -e .` invocations do not build.)
+- Build first: `npm run build` after any `src/` edit — the pi manifest loads compiled `dist/`, so unbuilt runs validate stale code. (the steering/provider-debug launchers rebuild automatically even when run directly with `node scripts/...`; `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; direct `pi -e .` invocations do not build.)
 - Run from a clean working tree except for the intended branch diff.
 - Use the local extension under test: `pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6`. `-ne` keeps a host `pi install` of this package from colliding with `-e .`.
 - Use a temporary `--session-dir` for every run.

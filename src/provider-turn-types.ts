@@ -42,7 +42,6 @@ export interface CursorProviderTurnSendMeta {
 	nativeReplayId: string;
 	agentMode: AgentModeOption;
 	modelSelection: ModelSelection;
-	resumeNotice?: string;
 }
 
 interface CursorProviderTurnRuntimeBase {

@@ -42,7 +42,7 @@ Nested factories must split registration by ownership:
 - Each nested child registers the Cursor provider on its own ExtensionAPI.
 - Each nested child uses its own scope key and SDK agent pool entry. A Cursor child must not wait for the busy parent agent that is waiting for the subagent result.
 - Each nested child uses its own bridge registry over the child's active pi tools. Child shutdown must not call the process-wide bridge abort path.
-- Nested children disable local resume and native replay wrappers. They dispose their isolated SDK agent after the provider run completes.
+- Nested children disable native replay wrappers. They dispose their isolated SDK agent after the provider run completes.
 
 Regression coverage:
 
@@ -483,6 +483,5 @@ rg '"type": "toolCall"|Tool call \(Cursor|cursor-replay-' "$SMOKE_DIR/session"/*
 - `scripts/debug-provider-events.mjs`
 - `shared/` — runtime-safe ESM helpers consumed by provider `src/` and maintainer scripts (`cursor-sensitive-text.mjs`, `cursor-setting-sources.mjs`).
 - `scripts/lib/` — maintainer plumbing (CLI arg parsing, secret-aware `fail()`, child-process shutdown, shell timeout/auth helpers). Re-exports `shared/` helpers so published smoke/debug scripts stay aligned with provider runtime (`test/maintainer-scripts-lib.test.ts`).
-- `npm run smoke:local-resume` and the per-lane `smoke:local-resume:*` scripts are the current local-resume proof. July 2026 platform-matrix writeups under `docs/evidence/` were deleted after they were superseded.
 - `test/helpers/pi-harness.ts` — canonical fake pi/extension harness (`createPiHarness`, shared model/context/event helpers)
 - `test/helpers/provider-harness.ts` — Cursor SDK provider mocks and stream helpers (re-exports pi-harness fixtures; `createNativeToolDisplayPiForTest` for native replay)

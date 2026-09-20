@@ -51,19 +51,19 @@ describe("Cursor SDK user config", () => {
 			bridge: { excludeTools: ["legacy"] },
 		})).toEqual({
 			models: { fastDefaults: { "composer-2": false }, cache: { enabled: true, ttlMs: 10 } },
-			local: { autoReview: true, sandbox: true, resume: false, transport: "http1", settingSources: ["user"], preservePiAgentsContext: true },
+			local: { autoReview: true, sandbox: true, transport: "http1", settingSources: ["user"], preservePiAgentsContext: true },
 			tools: { manifest: false, bridge: { enabled: true, exposeBuiltins: false, exclude: ["bash"], callTimeoutMs: 20, debug: { stderr: true, file: "debug.log" } }, mcp: { callTimeoutMs: 30, connectTimeoutMs: 40 }, display: { native: "on", taskPresentation: "subagent" } },
 			debug: { sdkEvents: { enabled: true, directory: ".debug", stderr: false } },
 		});
 	});
 
 	it("uses CLI, user, and built-in precedence without environment or project layers", () => {
-		const user = { local: { autoReview: true, sandbox: true, resume: false, transport: "http1" as const }, tools: { bridge: { exclude: ["bash"] } } };
+		const user = { local: { autoReview: true, sandbox: true, transport: "http1" as const }, tools: { bridge: { exclude: ["bash"] } } };
 		expect(resolveCursorSdkConfig({ user }).local).toMatchObject({
-			autoReview: { value: true, source: "user" }, sandboxEnabled: { value: true, source: "user" }, resume: { value: false, source: "user" }, force: { value: false, source: "builtin" }, transport: { value: "http1", source: "user" },
+			autoReview: { value: true, source: "user" }, sandboxEnabled: { value: true, source: "user" }, force: { value: false, source: "builtin" }, transport: { value: "http1", source: "user" },
 		});
-		expect(resolveCursorSdkConfig({ cli: { local: { autoReview: false, sandbox: false, resume: true } }, cliForce: true, user }).local).toMatchObject({
-			autoReview: { value: false, source: "cli" }, sandboxEnabled: { value: false, source: "cli" }, resume: { value: true, source: "cli" }, force: { value: true, source: "cli" },
+		expect(resolveCursorSdkConfig({ cli: { local: { autoReview: false, sandbox: false } }, cliForce: true, user }).local).toMatchObject({
+			autoReview: { value: false, source: "cli" }, sandboxEnabled: { value: false, source: "cli" }, force: { value: true, source: "cli" },
 		});
 		expect(resolveCursorSdkConfig({ session: { local: { transport: "default" } }, user }).local.transport).toEqual({ value: "default", source: "session" });
 		expect(resolveCursorSdkConfig({ user }).tools.bridge.exclude).toEqual({ value: ["bash"], source: "user" });
@@ -73,8 +73,8 @@ describe("Cursor SDK user config", () => {
 	it("loads only ~/.pi/agent/cursor-sdk.json", () => {
 		const path = getCursorSdkUserConfigPath(agentDir);
 		mkdirSync(agentDir, { recursive: true });
-		writeFileSync(path, JSON.stringify({ local: { resume: false } }));
-		expect(loadCursorSdkConfig({ agentDir })).toEqual({ user: { local: { resume: false } } });
+		writeFileSync(path, JSON.stringify({ local: { resume: false, sandbox: true } }));
+		expect(loadCursorSdkConfig({ agentDir })).toEqual({ user: { local: { sandbox: true } } });
 	});
 
 	it("updates models.fastDefaults and writes new user config as 0600", () => {

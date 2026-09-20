@@ -46,6 +46,19 @@ import type {
 } from "./replay-tool-details.js";
 
 export const CURSOR_REPLAY_ACTIVITY_TOOL_NAME = "cursor" as const;
+export const CURSOR_MODEL_ACTIVE_REPLAY_TOOL_NAMES = [CURSOR_REPLAY_ACTIVITY_TOOL_NAME] as const;
+export const CURSOR_REPLAY_TOOL_NAMES = [CURSOR_REPLAY_ACTIVITY_TOOL_NAME] as const;
+export const BUILTIN_NATIVE_CURSOR_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"] as const;
+export type BuiltinNativeCursorToolName = (typeof BUILTIN_NATIVE_CURSOR_TOOL_NAMES)[number];
+export type NativeCursorToolName = BuiltinNativeCursorToolName | (typeof CURSOR_REPLAY_TOOL_NAMES)[number];
+export const NATIVE_CURSOR_TOOL_NAMES = [
+	...BUILTIN_NATIVE_CURSOR_TOOL_NAMES,
+	...CURSOR_REPLAY_TOOL_NAMES,
+] as readonly NativeCursorToolName[];
+
+export function isNativeCursorToolName(toolName: string): toolName is NativeCursorToolName {
+	return NATIVE_CURSOR_TOOL_NAMES.some((nativeToolName) => nativeToolName === toolName);
+}
 
 // Single authority for the normalized SDK tool-name catalog. The presentation
 // specs below satisfy against this union, and the registry tests prove the

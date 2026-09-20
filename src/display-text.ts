@@ -1,3 +1,7 @@
+import { asRecord } from "./record-utils.js";
+
+const CURSOR_EDIT_DIFF_FIELD_ORDER = ["diffString", "diff", "unifiedDiff", "patch"] as const;
+
 /** Canonical single-line sanitization and truncation for Cursor replay/trace display. */
 export function sanitizeCursorDisplayLine(value: string): string {
 	return value
@@ -13,4 +17,14 @@ export function truncateCursorDisplayLine(value: string, maxLength = 240): strin
 	if (sanitized.length <= maxLength) return sanitized;
 	if (maxLength === 1) return "…";
 	return `${sanitized.slice(0, maxLength - 1).replace(/[\uD800-\uDBFF]$/, "")}…`;
+}
+
+export function resolveCursorEditDiff(source: unknown): string | undefined {
+	const record = asRecord(source);
+	if (!record) return undefined;
+	for (const key of CURSOR_EDIT_DIFF_FIELD_ORDER) {
+		const value = record[key];
+		if (typeof value === "string" && value.length > 0) return value;
+	}
+	return undefined;
 }

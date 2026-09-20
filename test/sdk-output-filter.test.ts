@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CURSOR_SDK_STARTUP_NOISE_PATTERNS, installCursorSdkOutputFilter, isCursorSdkStartupNoise } from "../src/sdk-output-filter.js";
+import { CURSOR_SDK_STARTUP_NOISE_PATTERNS, installCursorSdkOutputFilter, isCursorSdkStartupNoise } from "../shared/sdk-output-filter.mjs";
 import { installCursorSdkOutputFilter as installScriptCursorSdkOutputFilter } from "../scripts/lib/sdk-output-filter.mjs";
 
 describe("isCursorSdkStartupNoise", () => {

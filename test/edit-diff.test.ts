@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveCursorEditDiff } from "../src/edit-diff.js";
+import { resolveCursorEditDiff } from "../src/display-text.js";
 
 describe("resolveCursorEditDiff", () => {
 	it("prefers diffString over diff, unifiedDiff, and patch", () => {

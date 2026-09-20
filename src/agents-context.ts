@@ -4,7 +4,11 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./config.js";
-import { isCursorModel } from "./model.js";
+import {
+	isCursorModel,
+	registerCursorModelLifecycle,
+	type CursorModelLifecycleExtensionApi,
+} from "./model.js";
 import { cursorSettingSourcesIncludes, getEffectiveCursorSettingSources, resolveCursorSettingSources } from "./setting-sources.js";
 import type { SettingSource } from "@cursor/sdk";
 
@@ -162,4 +166,27 @@ export function resolveCursorFacingSystemPrompt(
 		return systemPrompt;
 	}
 	return removePiAgentsContextFromSystemPrompt(systemPrompt, contextFiles, settingSources, agentDir);
+}
+
+export type CursorAgentsContextExtensionApi = CursorModelLifecycleExtensionApi;
+
+export function registerCursorAgentsContextDedup(
+	pi: CursorAgentsContextExtensionApi,
+	config: CursorSdkConfig = loadCursorSdkUserConfig(),
+): void {
+	registerCursorModelLifecycle(pi, {
+		beforeAgentStart: (event, ctx) => {
+			if (!isCursorModel(ctx.model)) return undefined;
+			const resolved = resolveCursorFacingSystemPrompt(
+				event.systemPrompt,
+				ctx.model,
+				event.systemPromptOptions,
+				undefined,
+				undefined,
+				config,
+			);
+			if (resolved === event.systemPrompt) return undefined;
+			return { systemPrompt: resolved };
+		},
+	});
 }

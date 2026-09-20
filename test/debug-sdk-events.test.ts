@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CURSOR_SDK_STARTUP_NOISE_PATTERNS as providerNoisePatterns } from "../src/sdk-output-filter.js";
+import { CURSOR_SDK_STARTUP_NOISE_PATTERNS as providerNoisePatterns } from "../shared/sdk-output-filter.mjs";
 import { resolveCursorSettingSources as resolveProviderSettingSources } from "../src/setting-sources.js";
 import { scrubSensitiveText as scrubProviderSensitiveText } from "../src/sensitive-text.js";
 import { CURSOR_SDK_STARTUP_NOISE_PATTERNS as scriptNoisePatterns } from "../scripts/lib/sdk-output-filter.mjs";

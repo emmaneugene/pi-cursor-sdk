@@ -25,7 +25,6 @@ export interface CursorSmokeUserConfigOptions {
 	exposeBuiltinTools?: boolean;
 	bridgeDebug?: boolean;
 	bridgeDebugFile?: string;
-	localResume?: boolean;
 	transport?: "default" | "http1";
 	eventDebugDir?: string;
 }

@@ -42,7 +42,6 @@ vi.mock("@cursor/sdk", () => {
 
 import { Agent, createAgentPlatform, Cursor } from "@cursor/sdk";
 import { __testUtils as cursorSessionScopeTestUtils } from "../../src/session-scope.js";
-import { __testUtils as cursorSessionResumeTestUtils } from "../../src/session-agent-resume.js";
 import { __testUtils as cursorSessionLineageTestUtils } from "../../src/session-agent-lineage.js";
 import { __testUtils as cursorStateTestUtils } from "../../src/state.js";
 import { __testUtils as cursorHttp1TestUtils } from "../../src/http1.js";
@@ -378,7 +377,6 @@ export async function resetCursorProviderTestState(): Promise<void> {
 	await cursorProviderTestUtils.resetSessionCursorAgents();
 	cursorProviderTestUtils.resetSessionTurnQueue();
 	cursorSessionScopeTestUtils.reset();
-	cursorSessionResumeTestUtils.reset();
 	cursorSessionLineageTestUtils.reset();
 	cursorStateTestUtils.resetCursorModeStateForTests();
 	cursorHttp1TestUtils.reset();

@@ -8,7 +8,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 
 - `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, and pi tool bridge hooks. The first in-process factory owns process-global state. Nested child factories register an isolated Cursor provider and bridge without replacing the owner.
 - `src/extension-factory-guard.ts` owns the tokenized process-owner claim/release so a child session cannot dispose the parent bridge, rewrite parent session scope, or replace the parent pooled SDK agent.
-- `src/provider-runtime-context.ts` carries the nested child's explicit scope, cwd, bridge, replay, and resume policy through provider turns.
+- `src/provider-runtime-context.ts` carries the nested child's explicit scope, cwd, bridge, and replay policy through provider turns.
 - `src/model-discovery.ts` discovers Cursor models, builds pi model metadata, stores per-model metadata, and defines fallback models.
 - `src/model-list-cache.ts` owns the on-disk Cursor model catalog cache and classifies a matching file as `fresh` or `stale`.
 - `src/fallback-models.generated.ts` is the bundled fallback catalog snapshot used when live discovery and cache both miss.
@@ -34,11 +34,10 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/http1.ts` owns branch-scoped local HTTP/1.1 session state, global-preference override tracking, and extension-owned SDK configuration/null reset.
 - `src/sdk-platform-package.ts` owns bundled Cursor SDK platform-package resolution for ripgrep, the tree-sitter vendor directory, and `cursorsandbox`, plus the local-agent argv[1] host-entry so the SDK locator can see that package.
 - `src/session-agent.ts` owns session-scoped SDK agent pooling, explicit nested-child pool scopes, transport-aware pool identity, send-state commits, busy tracking for in-flight SDK `run.wait()` work, and scoped acquire/dispose state.
-- `src/session-agent-resume.ts` owns local resume handle persist/parse for `cursor-sdk-agent-resume` session entries.
 - `src/session-turn-queue.ts` serializes in-flight provider turns per session scope.
-- `src/session-agent-lineage.ts` owns non-resumable per-session local agent lineage custom entries independent of local resume.
+- `src/session-agent-lineage.ts` owns non-resumable per-session local agent lineage custom entries (`cursor-sdk-agent-lineage`) recorded at `Agent.send()`.
 - `src/session-agent-lifecycle.ts` owns lazy session-agent lifecycle invalidation on model select, compaction, tree navigation, shutdown, and scope changes, including shutdown-time HTTP transport reset before module reload.
-- `src/session-compaction-prep.ts` owns `prepareCursorSessionForCompaction()` (release scoped live runs, reset pooled agent, suppress summarizer resume-handle persist) wired from `session_before_compact` in `src/index.ts`.
+- `src/session-compaction-prep.ts` owns `prepareCursorSessionForCompaction()` (release scoped live runs, reset pooled agent) wired from `session_before_compact` in `src/index.ts`.
 - `src/session-send-policy.ts` owns session send planning (`bootstrap` vs `incremental`), periodic agent rebootstrap threshold, and prompt mode selection.
 - `src/provider-live-run-drain.ts` owns live-run drain/replay mirroring, pre-send continuation, and native replay turn emission.
 - `src/provider-turn-coordinator.ts` orchestrates SDK delta/step handling during a turn over focused collaborators.
@@ -53,9 +52,8 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/sdk-event-debug.ts` owns opt-in provider event artifact capture for Cursor SDK callbacks, stream events, replay/drain/bridge decisions, final partials, and summaries under `.debug/cursor-sdk-events/`, including discarded incomplete started tool calls when user JSON `debug.sdkEvents.enabled` is true.
 - `shared/sdk-event-debug-env.mjs` owns canonical Cursor SDK event-debug env names; `src/sdk-event-debug-constants.ts` re-exports them and owns debug artifact base-dir resolution.
 - `src/sdk-event-debug-session.ts` owns debug session grouping, turn artifact directory allocation, and session manifest updates.
-- `src/agents-context.ts` owns Cursor-model suppression of pi `<project_context>` / `AGENTS.md` duplication and `local.preservePiAgentsContext`; `src/agents-context-registration.ts` owns the static lifecycle registration for that suppression.
-- `src/sdk-output-filter.ts` suppresses Cursor SDK integrator bootstrap noise from pi's TUI.
-- `src/edit-diff.ts` owns canonical edit diff fallback resolution for replay/display paths.
+- `src/agents-context.ts` owns Cursor-model suppression of pi `<project_context>` / `AGENTS.md` duplication, `local.preservePiAgentsContext`, and the static lifecycle registration for that suppression.
+- `shared/sdk-output-filter.mjs` suppresses Cursor SDK integrator bootstrap noise from pi's TUI; provider turns and maintainer scripts import it directly.
 - `src/record-utils.ts` owns shared record/string-key parsing and neutral unknown-value stringification helpers used across bridge and transcript layers.
 - `src/partial-content-emitter.ts` owns shared thinking/text block emission for live-run drain and turn coordinator paths.
 - `shared/sensitive-text.mjs` owns canonical secret scrubbing; `src/sensitive-text.ts` and maintainer scripts import it directly.
@@ -77,33 +75,28 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/pi-tool-bridge-abort.ts` owns bridge pi tool execution abort tracking and process signal handling.
 - `src/pi-tool-bridge-diagnostics.ts` owns bridge debug diagnostics serialization and stderr logging.
 - `src/pi-tool-bridge-mcp.ts` owns MCP name/schema conversion and pi-to-MCP content helpers for the bridge.
-- `src/model-lifecycle.ts` owns the canonical effective Cursor model lifecycle/sync helper for `session_start`, `before_agent_start`, `model_select` with event-model override, and `turn_start`; callers keep Cursor-only filtering explicit.
-- `src/model.ts` owns the `cursor` provider id and Cursor-model identity helpers.
-- `src/fallback-warning.ts` owns per-session Cursor fallback catalog warning activation.
+- `src/model.ts` owns the `cursor` provider id, Cursor-model identity helpers, the empty pi-tool-list check, model lifecycle registration, and fallback catalog warnings. Callers keep Cursor-only filtering explicit.
 - `src/native-tool-display-registration.ts` owns native replay tool registration and model-scoped activation.
 - `src/native-replay-routing.ts` owns canonical native replay disposition (`queue_replay` / `inactive_trace` / `transcript_trace`) and context-tool partitioning for drain.
 - `src/native-replay-trace.ts` owns inactive native replay trace formatting (`title: summary`).
 - `src/context-tools.ts` owns `context.tools` snapshot helpers at provider stream start.
-- `src/display-text.ts` owns shared single-line sanitization and 240-char truncation for replay/trace display.
+- `src/display-text.ts` owns shared single-line sanitization, 240-char truncation, and canonical edit-diff fallback resolution for replay/trace display.
 - `src/native-tool-display-replay.ts` owns replay card rendering and diff/preview formatting.
 - `src/replay-tool-details.ts` owns parsed replay-detail variants (`nativeEdit` / `nativeWrite` / `activity` / `generateImage` / `genericFallback`).
-- `src/replay-activity-builders.ts` and `src/replay-summary-args.ts` own activity-card construction and summary args; the normalized tool-name catalog lives in `src/tool-presentation-registry.ts`.
-- `src/native-tool-names.ts` owns native and replay tool-name sets.
+- `src/replay-activity-builders.ts` and `src/replay-summary-args.ts` own activity-card construction and summary args; the normalized tool-name catalog and native/replay tool-name sets live in `src/tool-presentation-registry.ts`.
 - `src/native-tool-display-tools.ts` owns native/replay tool definition factories and replay execute wrappers.
 - `src/native-tool-display-state.ts` owns native replay display state, `tools.display.native` gating, and record/consume helpers.
 - `src/tool-result-display-readers.ts` owns canonical result readers shared by transcript/replay paths, including MCP-like content display normalization.
 - `src/tool-transcript.ts` owns the raw `unknown toolCall -> transcript/display` façade; `src/transcript-tool-specs.ts`, `src/transcript-utils.ts`, and `src/transcript-tool-formatters.ts` implement spec dispatch and formatting.
 - `src/compact-tool-summary.ts` owns compact one-line tool summaries.
-- `src/display-only-trace.ts` owns display-only thinking traces that do not change assistant text.
-- `src/web-tool-args.ts` and `src/web-tool-activity.ts` own web-search/fetch arg and activity display.
+- `src/web-tool-args.ts` owns web-search/fetch argument extraction; `src/tool-visibility.ts` remaps MCP/web tool names before transcript/display lookup.
 - `src/agent-message-web-tools.ts` owns transcript web-tool call loading after an agent-message offset.
 - `src/mcp-timeout-override.ts` owns Cursor SDK MCP timeout overrides: 3600s default for `callTool`, 10s default for verified initialize/listTools paths on first send, and SDK-default behavior for unknown MCP protocol stacks.
 - `src/config.ts` owns user-only `~/.pi/agent/cursor-sdk.json` loading, parsing, CLI/session/user/builtin precedence, and fast-default persistence.
-- `src/durable-fs.ts` owns the canonical no-follow regular-file open (`openExistingRegularFileNoFollow`) and read-write fsync (`fsyncExistingRegularFile`) helpers used to durably fsync session files without following an attacker-replaced symlink; `src/session-agent-cleanup.ts` consumes it instead of duplicating the identity-check logic.
+- `src/durable-fs.ts` owns the canonical no-follow regular-file open (`openExistingRegularFileNoFollow`) and read-write fsync (`fsyncExistingRegularFile`) helpers used to durably fsync session files without following an attacker-replaced symlink.
 - `src/state.ts` owns Cursor fast/mode controls, `/cursor-http` session/user persistence, `/cursor-tools`, local config refresh/cleanup wiring, and stable state re-exports.
 - `src/runtime-state.ts` owns effective Cursor runtime status helpers.
 - `src/task-presentation.ts` owns `tools.display.taskPresentation` (`task` / `subagent` / `subagent-meta`).
-- `src/active-tools.ts` owns the empty pi-tool-list check used when Cursor skills/tools must hide.
 - `src/skill-tool.ts` owns the Cursor `cursor_activate_skill` tool and skill-catalog prompt section.
 - `src/context.ts`, `src/context-window-cache.ts`, and `src/bundled-context-windows.ts` handle prompt conversion and context-window caches.
 - `src/bridge-contract.ts` owns pi bridge naming, preference text, and MCP description helpers.
@@ -132,7 +125,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 ## Setup and commands
 
 - Install dependencies: `npm install` (runs `prepare`, which compiles `src/` into `dist/` — the manifest entry pi loads)
-- Build after editing `src/`: `npm run build` — required before any direct `pi -e .` run, or pi loads the previous build. The steering/local-resume/provider-debug launchers rebuild automatically (even when run directly with `node scripts/...`), `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; only direct `pi -e .` runs need a manual build.
+- Build after editing `src/`: `npm run build` — required before any direct `pi -e .` run, or pi loads the previous build. The steering/provider-debug launchers rebuild automatically (even when run directly with `node scripts/...`), `smoke:live`/`smoke:visual`/`smoke:isolated` build via their npm scripts; only direct `pi -e .` runs need a manual build.
 - Run tests: `npm test`
 - Typecheck (src + tests): `npm run typecheck`
 - Typecheck src only: `npm run typecheck:src`
@@ -164,7 +157,7 @@ Done means:
 - `npm pack --dry-run` passes when package metadata, publishable docs, dependencies, or ignored artifacts change.
 - Related README/docs/tests are updated when behavior, commands, user-visible model IDs, flags, or troubleshooting change.
 - No secrets, local API keys, or noisy local state are added.
-- Session, resume, lifecycle, and cleanup behavior is verified against persisted session entries and provider/debug metadata, not assistant text alone.
+- Session, lifecycle, and lineage behavior is verified against persisted session entries and provider/debug metadata, not assistant text alone.
 
 If validation fails:
 

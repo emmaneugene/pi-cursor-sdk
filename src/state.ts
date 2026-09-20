@@ -4,7 +4,6 @@ import {
 	buildCursorToolManifestText,
 	resolveCursorToolManifestEnabled,
 } from "./tool-manifest.js";
-import { runCursorSessionAgentCleanupCommand } from "./session-agent-cleanup.js";
 import {
 	CURSOR_HTTP1_ENTRY_TYPE,
 	getStoredCursorHttp1Enabled,
@@ -16,8 +15,7 @@ import {
 import { buildCursorPiToolBridgeSnapshot } from "./pi-tool-bridge-snapshot.js";
 import { resolveCursorPiToolBridgeConfig } from "./pi-tool-bridge-config.js";
 import { getEffectiveCursorSettingSources } from "./setting-sources.js";
-import { isCursorModel } from "./model.js";
-import { registerCursorModelLifecycle } from "./model-lifecycle.js";
+import { isCursorModel, registerCursorModelLifecycle } from "./model.js";
 import { asRecord } from "./record-utils.js";
 import { getCursorSessionScopeKey } from "./session-scope.js";
 import { refreshSessionCursorAgentConfig } from "./session-agent.js";
@@ -560,13 +558,6 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 				appendFailed: "Cursor HTTP/1.1 preference was saved globally, but persisting the session entry failed",
 				success: `Cursor HTTP/1.1/SSE transport ${next ? "enabled" : "disabled"}`,
 			});
-		},
-	});
-
-	pi.registerCommand("cursor-local-resume-cleanup", {
-		description: "Dry-run or delete recorded superseded local Cursor SDK agents",
-		handler: async (args, ctx) => {
-			await runCursorSessionAgentCleanupCommand(pi, args, ctx);
 		},
 	});
 

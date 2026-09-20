@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveTranscriptToolName } from "../src/web-tool-activity.js";
+import { resolveTranscriptToolName } from "../src/tool-visibility.js";
 import { classifyCursorWebToolKind, CURSOR_REPLAY_ACTIVITY_TOOL_NAME } from "../src/tool-presentation-registry.js";
 import { extractWebFetchTarget, extractWebSearchQuery } from "../src/web-tool-args.js";
 import { buildCursorPiToolDisplay, formatCursorToolTranscript } from "../src/tool-transcript.js";

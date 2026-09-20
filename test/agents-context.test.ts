@@ -24,8 +24,8 @@ import {
 	serializePiProjectInstructionsBlock,
 	shouldRemovePiAgentsContextFile,
 	shouldSuppressPiAgentsContext,
+	registerCursorAgentsContextDedup,
 } from "../src/agents-context.js";
-import { registerCursorAgentsContextDedup } from "../src/agents-context-registration.js";
 import { buildCursorPrompt } from "../src/context.js";
 import { createEventHarness, makeModel } from "./helpers/pi-harness.js";
 import { buildPiSystemPromptWithContextFiles, makeSystemPromptOptions } from "./helpers/pi-system-prompt.js";

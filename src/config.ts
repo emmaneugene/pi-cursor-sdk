@@ -27,7 +27,6 @@ export interface CursorSdkConfig {
 	local?: {
 		autoReview?: boolean;
 		sandbox?: boolean;
-		resume?: boolean;
 		transport?: "default" | "http1";
 		settingSources?: string[];
 		preservePiAgentsContext?: boolean;
@@ -59,7 +58,6 @@ export interface CursorResolvedSdkConfig {
 		autoReview: CursorResolvedSetting<boolean>;
 		sandboxEnabled: CursorResolvedSetting<boolean>;
 		force: CursorResolvedSetting<boolean>;
-		resume: CursorResolvedSetting<boolean>;
 		transport: CursorResolvedSetting<"default" | "http1">;
 	};
 	tools: {
@@ -134,7 +132,6 @@ export function parseCursorSdkConfig(value: unknown): CursorSdkConfig | undefine
 		const parsed: NonNullable<CursorSdkConfig["local"]> = {};
 		if (typeof local.autoReview === "boolean") parsed.autoReview = local.autoReview;
 		if (typeof local.sandbox === "boolean") parsed.sandbox = local.sandbox;
-		if (typeof local.resume === "boolean") parsed.resume = local.resume;
 		const transport = parseStringLiteral(local.transport, ["default", "http1"] as const);
 		if (transport) parsed.transport = transport;
 		const settingSources = parseStringList(local.settingSources);
@@ -341,7 +338,6 @@ export function resolveCursorSdkConfig(options: ResolveCursorSdkConfigOptions = 
 			autoReview: resolveField([valueFrom("cli", cli?.local?.autoReview), valueFrom("user", user?.local?.autoReview), resolved("builtin", false)]),
 			sandboxEnabled: resolveField([valueFrom("cli", cli?.local?.sandbox), valueFrom("user", user?.local?.sandbox), resolved("builtin", false)]),
 			force: resolveField([valueFrom("cli", options.cliForce), resolved("builtin", false)]),
-			resume: resolveField([valueFrom("cli", cli?.local?.resume), valueFrom("user", user?.local?.resume), resolved("builtin", true)]),
 			transport: resolveField([valueFrom("session", session?.local?.transport), valueFrom("user", user?.local?.transport), resolved("builtin", "default")]),
 		},
 		tools: {

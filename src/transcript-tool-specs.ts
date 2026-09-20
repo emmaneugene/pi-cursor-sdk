@@ -8,7 +8,7 @@ import {
 	type CursorNormalizedToolName,
 	type CursorReplayActivityToolName,
 } from "./tool-presentation-registry.js";
-import { resolveCursorEditDiff } from "./edit-diff.js";
+import { resolveCursorEditDiff } from "./display-text.js";
 import {
 	assembleCursorReplayActivityDetails,
 	assembleCursorReplayGenerateImageDetails,

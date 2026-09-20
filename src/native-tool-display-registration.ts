@@ -1,19 +1,22 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { arePiToolsDisabled } from "./active-tools.js";
+import {
+	arePiToolsDisabled,
+	isCursorModel,
+	registerCursorModelLifecycle,
+	type CursorModelLifecycleExtensionApi,
+} from "./model.js";
 import {
 	CURSOR_MODEL_ACTIVE_REPLAY_TOOL_NAMES,
 	NATIVE_CURSOR_TOOL_NAMES,
+	isCursorReplayToolName,
 	type NativeCursorToolName,
-} from "./native-tool-names.js";
-import { isCursorModel } from "./model.js";
-import { registerCursorModelLifecycle, type CursorModelLifecycleExtensionApi } from "./model-lifecycle.js";
+} from "./tool-presentation-registry.js";
 import {
 	isCursorNativeToolRegistrationRequested,
 	registeredNativeToolNames,
 	setCursorNativeToolDisplayRuntimeRequested,
 	skippedNativeToolNames,
 } from "./native-tool-display-state.js";
-import { isCursorReplayToolName } from "./tool-presentation-registry.js";
 import { loadCursorSdkUserConfig } from "./config.js";
 import { registerNativeCursorTool } from "./native-tool-display-tools.js";
 

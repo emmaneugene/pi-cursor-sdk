@@ -90,14 +90,6 @@ describe("extension registration and discovery", () => {
 			"cursor-sandbox",
 			expect.objectContaining({ type: "boolean", default: false }),
 		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-local-resume",
-			expect.objectContaining({ type: "boolean", default: false }),
-		);
-		expect(pi.registerFlag).toHaveBeenCalledWith(
-			"cursor-no-local-resume",
-			expect.objectContaining({ type: "boolean", default: false }),
-		);
 		expect(pi.registerCommand).toHaveBeenCalledWith(
 			"cursor-fast",
 			expect.objectContaining({ description: expect.stringContaining("Toggle Cursor fast") }),
@@ -113,10 +105,6 @@ describe("extension registration and discovery", () => {
 		expect(pi.registerCommand).toHaveBeenCalledWith(
 			"cursor-http",
 			expect.objectContaining({ description: expect.stringContaining("Toggle Cursor SDK HTTP/1.1") }),
-		);
-		expect(pi.registerCommand).toHaveBeenCalledWith(
-			"cursor-local-resume-cleanup",
-			expect.objectContaining({ description: expect.stringContaining("superseded local Cursor SDK agents") }),
 		);
 		expect(pi.registerCommand).toHaveBeenCalledWith(
 			"cursor-refresh-models",
