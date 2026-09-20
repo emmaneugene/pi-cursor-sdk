@@ -5,7 +5,7 @@ Short maintainer checklist for **minimal-surface** validation after prompt, brid
 ## Minimal environment
 
 - Build first after any `src/` edit: `npm run build` (the pi manifest loads compiled `dist/`)
-- Extension only: `pi --approve -e . --cursor-no-fast --model cursor/grok-4.6`
+- Extension only: `pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6`. `-ne` keeps a host `pi install` of this package from colliding with `-e .`.
 - Fresh session dir: `--session-dir /tmp/pi-cursor-dogfood-<id>`
 - Baseline surface (no ambient Cursor MCP/rules):
   - `local.settingSources: []` in the isolated or user `cursor-sdk.json`, **or**
@@ -24,7 +24,7 @@ In-session debug: `/cursor-tools` prints `tools.bridge.enabled`, `tools.manifest
 
 ## CLI spot-check
 
-`pi --approve -e . --list-models cursor` should exit 0 and show a Cursor model table. On pi 0.79.x that table can land on stderr in automation, so capture both streams or redirect `2>&1` before treating empty stdout as a discovery failure.
+`pi -ne --approve -e . --list-models cursor` should exit 0 and show a Cursor model table. Capture both stdout and stderr before treating empty stdout as a discovery failure.
 
 ## JSONL spot-check
 

@@ -6,7 +6,7 @@ This workflow is the canonical repo path for verifying Cursor SDK tool replay th
 
 Use it before accepting replay-card commits or PRs, and for every Cursor provider/runtime release where TUI card/color behavior could regress. Text logs and JSONL are necessary, but they are not enough when the claim is visual parity: always keep PNGs for the exact prompt, and keep before/after PNGs when reviewing a rendering change.
 
-Current validation baseline: Pi 0.84.0 or later, exact `@cursor/sdk@1.0.30`, and local validation packages `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, and `@earendil-works/pi-tui` at exact 0.84.0. Optional published Pi core peer dependencies use `"*"` ranges per current Pi package guidance.
+Current validation baseline: Pi 0.84.0 or later, exact `@cursor/sdk@1.0.30`, and local validation packages `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, and `@earendil-works/pi-tui` at exact 0.86.0. Optional published Pi core peer dependencies use `"*"` ranges per current Pi package guidance.
 
 ## Cursor SDK 1.0.17 / pi 0.79.0 cutover visual record
 
@@ -15,7 +15,7 @@ Record the required cutover validation here or in the final release handoff. The
 | Field | Required value / evidence |
 | --- | --- |
 | Command/session used | `npm run smoke:visual -- --ext "$PWD" --cwd "$PWD" --mode plan --out-dir <fresh /tmp dir> --label release-check --prompt <bounded prompt>` with default native-replay isolation |
-| Baseline versions | `pi --version` = 0.84.0; `npm ls` = `@cursor/sdk@1.0.30` and local `@earendil-works/*@0.84.0` |
+| Baseline versions | `pi --version` = 0.86.0; `npm ls` = `@cursor/sdk@1.0.30` and local `@earendil-works/*@0.86.0` |
 | Card categories checked | Claim only categories proven by both PNG and JSONL. Required cutover categories are read, grep/search, find/glob, shell success, write, edit/diff, and true read failure. Direct `ls`/list is tracked as optional because composer-2.5 does not route it through native `ls` reliably; source-enumeration coverage is gated through find/glob. Neutral Cursor plan/todo/task/mode activity is optional/opportunistic and only counts when JSONL contains a completed Cursor workflow event. |
 | Observed status/card colors | Confirm native-looking cards use native pi styling; neutral Cursor activity is not red; true errors are distinct; diff previews show red/green; plan status is readable |
 | Screenshot/ANSI evidence location | External path only, for example `/tmp/pi-cursor-sdk-1016-visual.*/read-package.{ansi,txt,html,png,jsonl.path}` |

@@ -214,7 +214,7 @@ Simulate plan-mode execute stripping with the repo fixture:
 It sets active tools to `read`, `bash`, `edit`, `write` on each `turn_start`. Run pi with:
 
 ```bash
-pi --approve -e scripts/fixtures/plan-strip-shim --cursor-no-fast --model cursor/grok-4.6 \
+pi -ne --approve -e scripts/fixtures/plan-strip-shim --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/plan-strip" \
   -p 'After reset, read README.md and answer PLAN_STRIP_OK=yes.'
 ```
@@ -289,7 +289,7 @@ The script writes timestamped artifacts under `--out` (default `/tmp/pi-cursor-s
 
 Stdout prints artifact paths and summary counts only. Raw payloads stay on disk and may contain local paths, project text, tool args/results, or secrets — do not commit or share them.
 
-Hard repo rule: Cursor SDK behavior claims must come from the installed `@cursor/sdk` package and/or https://cursor.com/docs/sdk/typescript, not from memory or ad-hoc probes alone. Current cutover validation targets exact `@cursor/sdk@1.0.30` and Pi 0.84.0 local packages.
+Hard repo rule: Cursor SDK behavior claims must come from the installed `@cursor/sdk` package and/or https://cursor.com/docs/sdk/typescript, not from memory or ad-hoc probes alone. Current cutover validation targets exact `@cursor/sdk@1.0.30` and Pi 0.86.0 local packages.
 
 ## Pi provider SDK event capture
 
@@ -415,7 +415,7 @@ chmod 600 "$SMOKE_DIR/home/.pi/agent/auth.json"
 printf '%s\n' '{"tools":{"bridge":{"debug":{"stderr":true}}}}' > "$SMOKE_DIR/home/.pi/agent/cursor-sdk.json"
 env -i HOME="$SMOKE_DIR/home" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" \
   MISE_DISABLE=1 \
-  pi --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
+  pi -ne --approve -e . --cursor-no-fast --model cursor/grok-4.6 \
   --session-dir "$SMOKE_DIR/session" \
   -p '<exact reporter prompt>'
 ```

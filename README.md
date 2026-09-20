@@ -164,8 +164,8 @@ pi --list-models cursor
 Expected behavior:
 
 - with a valid key, Cursor models appear under the `cursor` provider
-- on pi 0.79.x, the model table may be written to stderr in automation; treat exit 0 plus a table on either stdout or stderr as success
 - if discovery cannot authenticate or reach Cursor, pi may still show fallback Cursor models; after adding auth with `/login`, fallback model runs can use the saved key, and `/cursor-refresh-models` refreshes the live catalog
+- capture both stdout and stderr before treating empty stdout as a discovery failure
 
 Smoke test:
 

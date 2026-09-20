@@ -2,10 +2,18 @@
 
 ## Unreleased
 
+## 0.6.0 - 2026-09-20
+
+### Breaking changes
+
+- Drop cross-process Cursor SDK local resume, `--cursor-local-resume`, `--cursor-no-local-resume`, and `/cursor-local-resume-cleanup`. After a pi restart the next turn always uses `Agent.create()` and bootstraps from the pi transcript. Same-process pooling, incremental sends, and idle eviction stay. Silent `cursor-sdk-agent-lineage` JSONL logging stays.
+- Ignore leftover `local.resume` keys and old `cursor-sdk-agent-resume` / `cursor-sdk-agent-cleanup` session entries.
+
 ### Changed
 
-- Drop cross-process Cursor SDK local resume and `/cursor-local-resume-cleanup`. After a pi restart the next turn always `Agent.create()`s and bootstraps from the pi transcript. Same-process pooling stays. Silent `cursor-sdk-agent-lineage` JSONL logging stays.
-- Ignore leftover `local.resume` keys and old `cursor-sdk-agent-resume` / `cursor-sdk-agent-cleanup` session entries.
+- Strip redundant `cursor-` prefixes from repo filenames. Product names such as `cursor-sdk.json`, CLI flags, the `cursor` provider id, and `cursor-replay-*` tool ids stay.
+- Fold leftover pass-through helpers: compaction prep into session-agent lifecycle, context-tool names into native replay routing, and delete unused `durable-fs` after resume cleanup.
+- Pin maintainer live, visual, and dogfood docs to Pi 0.86.0, and use `pi -ne` for local `-e .` runs.
 
 ## 0.5.2 - 2026-09-20
 
