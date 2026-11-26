@@ -97,6 +97,7 @@ export function createPiHarness(options: PiHarnessOptions = {}): PiHarness {
 					name: tool.name,
 					description: tool.description,
 					parameters: tool.parameters,
+					exposure: "direct",
 					sourceInfo: { source: "test", path: "pi-cursor-sdk-test", scope: "temporary", origin: "top-level" },
 				});
 			}

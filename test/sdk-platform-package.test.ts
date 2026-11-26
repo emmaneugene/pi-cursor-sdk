@@ -56,11 +56,11 @@ describe("Cursor ripgrep path", () => {
 			const nestedRg = join(nestedBinDir, rgBinaryName);
 
 			mkdirSync(nestedBinDir, { recursive: true });
-			writeFileSync(join(sdkDir, "package.json"), JSON.stringify({ name: "@cursor/sdk", version: "1.0.30", main: "index.js" }));
+			writeFileSync(join(sdkDir, "package.json"), JSON.stringify({ name: "@cursor/sdk", version: "1.5.2", main: "index.js" }));
 			writeFileSync(join(sdkDir, "index.js"), "module.exports = {};\n");
 			writeFileSync(
 				join(nestedPlatformDir, "package.json"),
-				JSON.stringify({ name: platformPackage, version: "1.0.30", bin: { rg: `bin/${rgBinaryName}` } }),
+				JSON.stringify({ name: platformPackage, version: "1.5.2", bin: { rg: `bin/${rgBinaryName}` } }),
 			);
 			writeFileSync(nestedRg, "#!/bin/sh\nexit 0\n");
 			chmodSync(nestedRg, 0o755);
@@ -78,21 +78,20 @@ describe("Cursor ripgrep path", () => {
 		}
 	});
 
-	it("locks installed @cursor/sdk 1.0.30 Agent.create ripgrep contract", () => {
+	it("locks installed @cursor/sdk 1.5.2 Agent.create ripgrep contract", () => {
 		const require = createRequire(import.meta.url);
 		const sdkEntry = require.resolve("@cursor/sdk");
 		const sdkRoot = join(dirname(sdkEntry), "..", "..");
 		const sdkPackage = JSON.parse(readFileSync(join(sdkRoot, "package.json"), "utf8")) as { version: string };
-		expect(sdkPackage.version).toBe("1.0.30");
+		expect(sdkPackage.version).toBe("1.5.2");
 
-		// Agent.create lives in the local-runtime chunk (esm/357.js beside cjs entry's sibling esm).
-		const bundle = readFileSync(join(sdkRoot, "dist", "esm", "357.js"), "utf8");
+		// Agent.create lives in the local-runtime chunk (esm/544.js beside cjs entry's sibling esm).
+		const bundle = readFileSync(join(sdkRoot, "dist", "esm", "544.js"), "utf8");
 
 		// Absolute CURSOR_RIPGREP_PATH wins; otherwise platform-package lookup, then PATH, then configure.
 		expect(bundle).toContain(
-			"CURSOR_RIPGREP_PATH;M=W&&(0,a.isAbsolute)(W)?W:(0,F.hQ)({binaryName:z,excludedWorkspaceDir:E}),M||(M=(0,I.resolveRipgrepFromPath)()),M&&(0,I.configureRipgrepPath)(M)",
+			"CURSOR_RIPGREP_PATH;g=v&&(0,i.isAbsolute)(v)?v:(0,Qz.hQ)({binaryName:w,excludedWorkspaceDir:p}),g||(g=(0,Vo.xS)()),g&&(0,Vo.J)(g)",
 		);
-		expect(bundle).toContain("resolveRipgrepFromPath");
 		expect(bundle).toContain("excludedWorkspaceDir");
 		expect(bundle).toContain('throw new Error("configureRipgrepPath: path must not be empty")');
 		expect(bundle).toContain("Ripgrep path not configured. Call configureRipgrepPath() at startup.");
@@ -128,11 +127,11 @@ describe("Cursor tree-sitter vendor dir", () => {
 			const nestedVendorIndex = join(nestedPlatformDir, "vendor", "tree-sitter", "index.js");
 
 			mkdirSync(dirname(nestedVendorIndex), { recursive: true });
-			writeFileSync(join(sdkDir, "package.json"), JSON.stringify({ name: "@cursor/sdk", version: "1.0.30", main: "index.js" }));
+			writeFileSync(join(sdkDir, "package.json"), JSON.stringify({ name: "@cursor/sdk", version: "1.5.2", main: "index.js" }));
 			writeFileSync(join(sdkDir, "index.js"), "module.exports = {};\n");
 			writeFileSync(
 				join(nestedPlatformDir, "package.json"),
-				JSON.stringify({ name: platformPackage, version: "1.0.30" }),
+				JSON.stringify({ name: platformPackage, version: "1.5.2" }),
 			);
 			writeFileSync(nestedVendorIndex, "module.exports = {};\n");
 			writeFileSync(consumerModule, "export {};\n");
@@ -148,16 +147,16 @@ describe("Cursor tree-sitter vendor dir", () => {
 		}
 	});
 
-	it("locks installed @cursor/sdk 1.0.30 Agent.create tree-sitter vendor contract", () => {
+	it("locks installed @cursor/sdk 1.5.2 Agent.create tree-sitter vendor contract", () => {
 		const require = createRequire(import.meta.url);
 		const sdkEntry = require.resolve("@cursor/sdk");
 		const sdkRoot = join(dirname(sdkEntry), "..", "..");
 		const sdkPackage = JSON.parse(readFileSync(join(sdkRoot, "package.json"), "utf8")) as { version: string };
-		expect(sdkPackage.version).toBe("1.0.30");
+		expect(sdkPackage.version).toBe("1.5.2");
 
 		const bundle = readFileSync(join(sdkRoot, "dist", "esm", "index.js"), "utf8");
 		expect(bundle).toContain(
-			"CURSOR_TREE_SITTER_VENDOR_DIR;return e&&(0,s.isAbsolute)(e)?e:(0,o.nk)({relativePath:\"vendor\",excludedWorkspaceDirs:i.size>0?[...i]:[process.cwd()],accept:e=>(0,r.existsSync)((0,s.join)(e,\"tree-sitter\",\"index.js\"))})",
+			"CURSOR_TREE_SITTER_VENDOR_DIR;return t&&(0,s.isAbsolute)(t)?t:(0,i.nk)({relativePath:\"vendor\",excludedWorkspaceDirs:a.size>0?[...a]:[process.cwd()],accept:t=>(0,n.existsSync)((0,s.join)(t,\"tree-sitter\",\"index.js\"))})",
 		);
 		expect(bundle).toContain("CURSOR_TREE_SITTER_STUBBED");
 		expect(bundle).toContain("shell command analysis is disabled");
@@ -208,11 +207,11 @@ describe("Cursor sandbox binary", () => {
 			const nestedSandbox = join(nestedBinDir, sandboxBinaryName);
 
 			mkdirSync(nestedBinDir, { recursive: true });
-			writeFileSync(join(sdkDir, "package.json"), JSON.stringify({ name: "@cursor/sdk", version: "1.0.30", main: "index.js" }));
+			writeFileSync(join(sdkDir, "package.json"), JSON.stringify({ name: "@cursor/sdk", version: "1.5.2", main: "index.js" }));
 			writeFileSync(join(sdkDir, "index.js"), "module.exports = {};\n");
 			writeFileSync(
 				join(nestedPlatformDir, "package.json"),
-				JSON.stringify({ name: platformPackage, version: "1.0.30" }),
+				JSON.stringify({ name: platformPackage, version: "1.5.2" }),
 			);
 			writeFileSync(nestedSandbox, "#!/bin/sh\nexit 0\n");
 			chmodSync(nestedSandbox, 0o755);
@@ -229,19 +228,19 @@ describe("Cursor sandbox binary", () => {
 		}
 	});
 
-	it("locks installed @cursor/sdk 1.0.30 Agent.create sandbox binary contract", () => {
+	it("locks installed @cursor/sdk 1.5.2 Agent.create sandbox binary contract", () => {
 		const require = createRequire(import.meta.url);
 		const sdkEntry = require.resolve("@cursor/sdk");
 		const sdkRoot = join(dirname(sdkEntry), "..", "..");
 		const sdkPackage = JSON.parse(readFileSync(join(sdkRoot, "package.json"), "utf8")) as { version: string };
-		expect(sdkPackage.version).toBe("1.0.30");
+		expect(sdkPackage.version).toBe("1.5.2");
 
-		const bundle = readFileSync(join(sdkRoot, "dist", "esm", "357.js"), "utf8");
+		const bundle = readFileSync(join(sdkRoot, "dist", "esm", "544.js"), "utf8");
 		expect(bundle).toContain(
-			"cursorsandbox.exe\":\"cursorsandbox\",r=(0,F.hQ)({binaryName:t,excludedWorkspaceDir:e});r&&(0,I.configureSandboxPrereqs)({sandboxBinaryPath:r})",
+			'cursorsandbox.exe":"cursorsandbox";return(0,Qz.hQ)({binaryName:r,excludedWorkspaceDir:e.cwd})',
 		);
-		expect(bundle).not.toContain("CURSOR_SANDBOX_PATH");
-		expect(bundle).toContain("Local SDK sandboxing was requested, but sandboxing is not supported in this environment.");
+		expect(bundle).toContain("CURSOR_SDK_SANDBOX_BINARY");
+		expect(bundle).toContain("Local SDK sandboxing was requested, but sandboxing is not supported in this environment");
 	});
 
 	it("points the SDK argv[1] walk at the platform package, then restores it", async () => {

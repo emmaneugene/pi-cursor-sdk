@@ -82,7 +82,7 @@ describe("cursor usage accounting", () => {
 		};
 		const partial = makeAssistantMessage([{ type: "text", text: "A" }]);
 		// Observed raw local turn-ended.usage (issue #196): inputTokens is full prompt; cache fields partition it.
-		// Distinct from published SDK toTokenUsage additive totalTokens (see turn-ended usage contract fixture).
+		// Distinct from older SDK additive totalTokens (1.5.2 toTokenUsage now sets totalTokens = inputTokens + outputTokens).
 		const turn = {
 			inputTokens: 46_965,
 			outputTokens: 3,
@@ -179,9 +179,13 @@ describe("cursor usage accounting", () => {
 		expect(TurnEndedUpdateSchema.safeParse(update).success).toBe(true);
 		expect(InteractionUpdateSchema.safeParse(update).success).toBe(true);
 		expect(readCursorSdkTurnUsageFromUpdate(update)).toEqual({ inputTokens: 1, outputTokens: 2, cacheReadTokens: 3, cacheWriteTokens: 4 });
-		// Published SDK toTokenUsage/sumTokenUsage formula only — not the observed raw local turn-ended mapping.
+		// Published SDK 1.5.2 toTokenUsage/sumTokenUsage uses full-prompt totalTokens = inputTokens + outputTokens.
 		const sdkBundle = readFileSync(createRequire(import.meta.url).resolve("@cursor/sdk"), "utf8");
-		expect(sdkBundle).toMatch(/totalTokens:\w\+\w\+\w\+\w/);
+		const usageTypesModule = sdkBundle.match(/"\.\/src\/agent\/usage-types\.ts"\([^)]*\)\{[\s\S]{0,1200}/)?.[0];
+		expect(usageTypesModule).toBeDefined();
+		expect(usageTypesModule).toMatch(
+			/inputTokens:\w,outputTokens:\w,cacheReadTokens:\w,cacheWriteTokens:\w,totalTokens:\w\+\w,/,
+		);
 		expect(calculateContextTokens({
 			input: 1,
 			output: 2,

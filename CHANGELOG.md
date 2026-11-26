@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.6.1 - 2026-11-26
+
+### Fixed
+
+- Support Cursor's `reasoning_effort` thinking parameter in `src/model-discovery.ts` so models exposing `reasoning_effort` (`gemini-4-neon`, `gemini-4-hydrogen`, `gemini-4-carbon`, `gemini-4-argon`, `claude-sonnet-5-5`, `grok-4.7`) register `reasoning: true` and honor Pi thinking selection.
+- Upgrade `@cursor/sdk` from `1.0.30` to `1.5.2`, fixing `Invalid parameters for registry model` failures on models whose default 1M-context variant requires max mode, and extend `src/mcp-timeout-override.ts` for `@cursor/sdk@1.5.2`'s `McpSdkClient.sendToolCall` wrapper.
+
+### Changed
+
+- Upgrade local Pi devDependencies (`@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`) from `0.86.0` to `1.6.1`, narrow `discoverModels()` return types to Pi's chat `ProviderModelConfig` variant, refresh `src/fallback-models.generated.ts` (40 models with `@cursor/sdk@1.5.2`) and prune retired entries from `src/bundled-context-windows.ts`, and align contract tests and maintainer docs with `@cursor/sdk@1.5.2` and Pi `1.6.1`.
+
 ## 0.6.0 - 2026-09-20
 
 ### Breaking changes

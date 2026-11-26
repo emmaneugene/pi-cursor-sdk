@@ -1,5 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
-import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import type { CursorProviderModelConfig } from "../../src/model-discovery.js";
 
 export function makeModel(id = "test-model"): Model<"cursor-sdk"> {
 	return {
@@ -39,8 +39,8 @@ export function makeHarnessModel<TApi extends Api>(
 
 export function makeProviderModelConfig(
 	id: string,
-	overrides: Partial<ProviderModelConfig> = {},
-): ProviderModelConfig {
+	overrides: Partial<CursorProviderModelConfig> = {},
+): CursorProviderModelConfig {
 	return {
 		id,
 		name: id,

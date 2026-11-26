@@ -15,6 +15,7 @@ export function createBuiltinToolInfo(
 		name,
 		description,
 		parameters,
+		exposure: "direct",
 		...(promptGuidelines ? { promptGuidelines } : {}),
 		sourceInfo: { source: "builtin", path: `<builtin:${name}>`, scope: "temporary", origin: "top-level" },
 	};
@@ -31,6 +32,7 @@ export function createTestToolInfo(
 		name,
 		description,
 		parameters,
+		exposure: "direct",
 		...(promptGuidelines ? { promptGuidelines } : {}),
 		sourceInfo: { source: "test", path: `test:${name}`, scope: "temporary", origin: "top-level" },
 	};

@@ -319,7 +319,7 @@ describe("Cursor fast preference persistence", () => {
 	});
 
 
-	it("contracts Pi append failure as a possible in-memory partial commit", () => {
+	it("contracts Pi append failure rolling back the in-memory entry", () => {
 		const manager = SessionManager.create(tmpAgentDir, tmpAgentDir, { id: "fast-append-contract" });
 		manager.appendMessage({ role: "user", content: "hello", timestamp: 1 });
 		manager.appendMessage(makeAssistantMessage("ready"));
@@ -328,7 +328,7 @@ describe("Cursor fast preference persistence", () => {
 		mkdirSync(sessionFile);
 
 		expect(() => manager.appendCustomEntry(__testUtils.FAST_ENTRY_TYPE, { modelId: "composer-2", fast: false })).toThrow();
-		expect(manager.getBranch()).toEqual(expect.arrayContaining([
+		expect(manager.getBranch()).not.toEqual(expect.arrayContaining([
 			expect.objectContaining({
 				type: "custom",
 				customType: __testUtils.FAST_ENTRY_TYPE,

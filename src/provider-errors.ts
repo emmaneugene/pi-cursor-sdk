@@ -103,19 +103,23 @@ function isUnavailableConnectCode(code: unknown): boolean {
 	return code === 14 || (typeof code === "string" && /^(?:14|unavailable)$/i.test(code));
 }
 
+function hasCursorSdkStack(stack: string): boolean {
+	return /(?:^|[\\/])node_modules[\\/]@cursor[\\/]sdk[\\/]dist[\\/]/.test(stack) || stack.includes("@cursor/sdk");
+}
+
 function isCursorSdkStallAbortNetworkError(code: unknown, evidence: string, stackEvidence: string): boolean {
 	return (
 		(code === 2 || (typeof code === "string" && /^(?:2|unknown)$/i.test(code))) &&
 		/(?:operation was aborted|canceled)/i.test(evidence) &&
 		/(?:AbortError|operation was aborted)/i.test(`${evidence}\n${stackEvidence}`) &&
-		stackEvidence.includes("@cursor/sdk") &&
-		stackEvidence.includes("@connectrpc/connect-node") &&
+		hasCursorSdkStack(stackEvidence) &&
+		!stackEvidence.includes("@connectrpc/connect-web") &&
 		/\b(?:onStall|reportStall|StallDetected)\b/i.test(stackEvidence)
 	);
 }
 
 /**
- * @cursor/sdk@1.0.30 throws internal RetriableError (name/kind "RetriableError") with message
+ * @cursor/sdk@1.0.30+ (verified in 1.5.2) throws internal RetriableError (name/kind "RetriableError") with message
  * "Connection stalled" or "Connection stalled repeatedly" after fetchWithRetry exhausts stalls.
  * The ConnectError is only the cause; the top-level error is not a ConnectError.
  */
@@ -127,18 +131,19 @@ export function isCursorSdkConnectionStalledError(error: unknown): boolean {
 	const message = (error instanceof Error ? error.message : getErrorStringField(record, "message") ?? "").trim();
 	if (!/^Connection stalled(?: repeatedly)?$/i.test(message)) return false;
 	const stack = getErrorStack(error, record);
-	return /(?:^|[\\/])node_modules[\\/]@cursor[\\/]sdk[\\/]dist[\\/]/.test(stack) || stack.includes("@cursor/sdk");
+	return hasCursorSdkStack(stack);
 }
 
 function isCursorExtensionConnectStack(stack: string): boolean {
-	// pi runs Cursor SDK in Node, where the SDK dynamically imports connect-node.
-	// connect-web is the SDK's Bun/Deno path and is intentionally not classified for supported pi runs.
+	// Retain compatibility with external @connectrpc/connect-node stacks nested under pi-cursor-sdk;
+	// @cursor/sdk@1.5.2 bundles connect-node into @cursor/sdk/dist/esm/*.js (handled by cursor-sdk-stack).
+	// connect-web is not classified for supported pi Node runs.
 	return stack.includes("@connectrpc/connect-node") && /(?:^|[\\/])pi-cursor-sdk(?:[\\/]|$)/.test(stack);
 }
 
 function getCursorConnectSource(error: unknown, record: Record<string, unknown> | undefined): CursorConnectErrorSource {
 	const stack = getErrorStack(error, record);
-	if (stack.includes("@cursor/sdk")) return "cursor-sdk-stack";
+	if (hasCursorSdkStack(stack)) return "cursor-sdk-stack";
 	if (isCursorExtensionConnectStack(stack)) return "cursor-extension-connect-stack";
 	const details = Array.isArray(record?.details) ? record.details : [];
 	const hasCursorBackendDetails = details.some((detail) => {
@@ -178,8 +183,8 @@ export function classifyCursorConnectError(error: unknown): CursorConnectErrorCl
 		(code === 1 || code === "canceled") &&
 		Boolean(rawMessage && /(?:operation was aborted|canceled)/i.test(rawMessage)) &&
 		(causeName === "AbortError" || /AbortError/.test(stack)) &&
-		stack.includes("@cursor/sdk") &&
-		stack.includes("@connectrpc/connect-node")
+		hasCursorSdkStack(stack) &&
+		!stack.includes("@connectrpc/connect-web")
 	) {
 		return { kind: "abort", source: "cursor-sdk-stack" };
 	}

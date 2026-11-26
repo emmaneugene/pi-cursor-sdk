@@ -790,4 +790,372 @@ describe("discoverModels", () => {
 		});
 	});
 
+	it("maps reasoning_effort parameters to pi thinking levels and model selections", () => {
+		const models = register([
+			{
+				id: "gemini-4-neon",
+				displayName: "Gemini 4 Neon",
+				parameters: [
+					{ id: "context", displayName: "Context", values: [{ value: "300k" }, { value: "1m" }] },
+					{
+						id: "reasoning_effort",
+						displayName: "Effort",
+						values: [{ value: "low" }, { value: "medium" }, { value: "high" }, { value: "xhigh" }],
+					},
+				],
+				variants: [
+					{
+						params: [
+							{ id: "context", value: "1m" },
+							{ id: "reasoning_effort", value: "high" },
+						],
+						displayName: "Gemini 4 Neon 1M High",
+						isDefault: true,
+					},
+				],
+			},
+			{
+				id: "claude-sonnet-5-5",
+				displayName: "Claude Sonnet 5.5",
+				parameters: [
+					{ id: "context", displayName: "Context", values: [{ value: "300k" }, { value: "1m" }] },
+					{
+						id: "reasoning_effort",
+						displayName: "Effort",
+						values: [{ value: "low" }, { value: "medium" }, { value: "high" }, { value: "xhigh" }, { value: "max" }],
+					},
+				],
+				variants: [
+					{
+						params: [
+							{ id: "context", value: "1m" },
+							{ id: "reasoning_effort", value: "high" },
+						],
+						displayName: "Claude Sonnet 5.5 1M High",
+						isDefault: true,
+					},
+				],
+			},
+		]);
+
+		const neon = models.find((model) => model.id === "gemini-4-neon");
+		const sonnet = models.find((model) => model.id === "claude-sonnet-5-5");
+
+		expect(neon?.reasoning).toBe(true);
+		expect(neon?.thinkingLevelMap).toEqual({
+			off: null,
+			minimal: null,
+			low: "low",
+			medium: "medium",
+			high: "high",
+			xhigh: "xhigh",
+			max: null,
+		});
+		expect(sonnet?.reasoning).toBe(true);
+		expect(sonnet?.thinkingLevelMap).toEqual({
+			off: null,
+			minimal: null,
+			low: "low",
+			medium: "medium",
+			high: "high",
+			xhigh: "xhigh",
+			max: "max",
+		});
+
+		expect(buildCursorModelSelection("gemini-4-neon", "low")).toEqual({
+			id: "gemini-4-neon",
+			params: [
+				{ id: "context", value: "1m" },
+				{ id: "reasoning_effort", value: "low" },
+			],
+		});
+		expect(buildCursorModelSelection("gemini-4-neon", "xhigh")).toEqual({
+			id: "gemini-4-neon",
+			params: [
+				{ id: "context", value: "1m" },
+				{ id: "reasoning_effort", value: "xhigh" },
+			],
+		});
+		// Unsupported level ("off") leaves default reasoning_effort intact.
+		expect(buildCursorModelSelection("gemini-4-neon", "off")).toEqual({
+			id: "gemini-4-neon",
+			params: [
+				{ id: "context", value: "1m" },
+				{ id: "reasoning_effort", value: "high" },
+			],
+		});
+		expect(buildCursorModelSelection("claude-sonnet-5-5", "max")).toEqual({
+			id: "claude-sonnet-5-5",
+			params: [
+				{ id: "context", value: "1m" },
+				{ id: "reasoning_effort", value: "max" },
+			],
+		});
+	});
+
+	it("maps reasoning_effort with none/off and extra-high values", () => {
+		const models = register([
+			{
+				id: "effort-none-model",
+				displayName: "Effort None",
+				parameters: [
+					{
+						id: "reasoning_effort",
+						displayName: "Reasoning Effort",
+						values: [{ value: "none" }, { value: "low" }, { value: "high" }, { value: "extra-high" }],
+					},
+				],
+				variants: [{ params: [{ id: "reasoning_effort", value: "high" }], displayName: "Default", isDefault: true }],
+			},
+			{
+				id: "effort-off-model",
+				displayName: "Effort Off",
+				parameters: [
+					{
+						id: "reasoning_effort",
+						displayName: "Reasoning Effort",
+						values: [{ value: "off" }, { value: "medium" }],
+					},
+				],
+				variants: [{ params: [{ id: "reasoning_effort", value: "medium" }], displayName: "Default", isDefault: true }],
+			},
+		]);
+
+		expect(models.find((m) => m.id === "effort-none-model")?.thinkingLevelMap).toEqual({
+			off: "none",
+			minimal: null,
+			low: "low",
+			medium: null,
+			high: "high",
+			xhigh: "extra-high",
+			max: null,
+		});
+		expect(buildCursorModelSelection("effort-none-model", "off")).toEqual({
+			id: "effort-none-model",
+			params: [{ id: "reasoning_effort", value: "none" }],
+		});
+		expect(buildCursorModelSelection("effort-none-model", "xhigh")).toEqual({
+			id: "effort-none-model",
+			params: [{ id: "reasoning_effort", value: "extra-high" }],
+		});
+		expect(buildCursorModelSelection("effort-off-model", "off")).toEqual({
+			id: "effort-off-model",
+			params: [{ id: "reasoning_effort", value: "off" }],
+		});
+	});
+
+	it("maps thinking plus reasoning_effort with case-insensitive boolean values", () => {
+		const models = register([
+			{
+				id: "hybrid-thinking-effort",
+				displayName: "Hybrid Thinking Effort",
+				parameters: [
+					{ id: "thinking", displayName: "Thinking", values: [{ value: "False" }, { value: "True" }] },
+					{
+						id: "reasoning_effort",
+						displayName: "Reasoning Effort",
+						values: [{ value: "low" }, { value: "high" }],
+					},
+				],
+				variants: [
+					{
+						params: [
+							{ id: "thinking", value: "True" },
+							{ id: "reasoning_effort", value: "high" },
+						],
+						displayName: "Default",
+						isDefault: true,
+					},
+				],
+			},
+		]);
+
+		expect(models[0]?.thinkingLevelMap).toEqual({
+			off: "False",
+			minimal: null,
+			low: "low",
+			medium: null,
+			high: "high",
+			xhigh: null,
+			max: null,
+		});
+		expect(buildCursorModelSelection("hybrid-thinking-effort", "off")).toEqual({
+			id: "hybrid-thinking-effort",
+			params: [{ id: "thinking", value: "False" }],
+		});
+		expect(buildCursorModelSelection("hybrid-thinking-effort", "low")).toEqual({
+			id: "hybrid-thinking-effort",
+			params: [
+				{ id: "thinking", value: "True" },
+				{ id: "reasoning_effort", value: "low" },
+			],
+		});
+	});
+
+	it("respects multi-parameter precedence and writes off only to the owning parameter", () => {
+		const models = register([
+			{
+				id: "effort-and-reasoning-mismatched-off",
+				displayName: "Effort + Reasoning (effort owns off)",
+				parameters: [
+					{ id: "reasoning", displayName: "Reasoning", values: [{ value: "low" }, { value: "high" }] },
+					{ id: "effort", displayName: "Effort", values: [{ value: "off" }, { value: "low" }, { value: "high" }] },
+				],
+				variants: [
+					{
+						params: [
+							{ id: "reasoning", value: "high" },
+							{ id: "effort", value: "high" },
+						],
+						displayName: "Default",
+						isDefault: true,
+					},
+				],
+			},
+			{
+				id: "effort-without-off-and-reasoning-with-none",
+				displayName: "Effort (no off) + Reasoning (none)",
+				parameters: [
+					{ id: "reasoning", displayName: "Reasoning", values: [{ value: "none" }, { value: "low" }, { value: "high" }] },
+					{ id: "effort", displayName: "Effort", values: [{ value: "low" }, { value: "high" }] },
+				],
+				variants: [
+					{
+						params: [{ id: "effort", value: "high" }],
+						displayName: "Default",
+						isDefault: true,
+					},
+				],
+			},
+			{
+				id: "reasoning-effort-over-reasoning",
+				displayName: "Reasoning Effort + Reasoning",
+				parameters: [
+					{ id: "reasoning", displayName: "Reasoning", values: [{ value: "none" }, { value: "low" }] },
+					{ id: "reasoning_effort", displayName: "Effort", values: [{ value: "off" }, { value: "low" }, { value: "high" }] },
+				],
+				variants: [
+					{
+						params: [{ id: "reasoning_effort", value: "high" }],
+						displayName: "Default",
+						isDefault: true,
+					},
+				],
+			},
+		]);
+
+		// effort wins over reasoning and owns "off" -> off writes to effort, never reasoning.
+		expect(models.find((m) => m.id === "effort-and-reasoning-mismatched-off")?.thinkingLevelMap?.off).toBe("off");
+		expect(buildCursorModelSelection("effort-and-reasoning-mismatched-off", "off")).toEqual({
+			id: "effort-and-reasoning-mismatched-off",
+			params: [
+				{ id: "reasoning", value: "high" },
+				{ id: "effort", value: "off" },
+			],
+		});
+
+		// effort wins over reasoning but has no off/none -> off is null (does not cross-wire to reasoning="none").
+		expect(models.find((m) => m.id === "effort-without-off-and-reasoning-with-none")?.thinkingLevelMap?.off).toBeNull();
+		expect(buildCursorModelSelection("effort-without-off-and-reasoning-with-none", "off")).toEqual({
+			id: "effort-without-off-and-reasoning-with-none",
+			params: [{ id: "effort", value: "high" }],
+		});
+
+		// reasoning_effort wins over reasoning -> off writes to reasoning_effort="off", not reasoning.
+		expect(models.find((m) => m.id === "reasoning-effort-over-reasoning")?.thinkingLevelMap?.off).toBe("off");
+		expect(buildCursorModelSelection("reasoning-effort-over-reasoning", "off")).toEqual({
+			id: "reasoning-effort-over-reasoning",
+			params: [{ id: "reasoning_effort", value: "off" }],
+		});
+		expect(buildCursorModelSelection("reasoning-effort-over-reasoning", "low")).toEqual({
+			id: "reasoning-effort-over-reasoning",
+			params: [{ id: "reasoning_effort", value: "low" }],
+		});
+	});
+
+	it("sets reasoning false when a thinking parameter has only unrecognized values", () => {
+		const models = register([
+			{
+				id: "unrecognized-effort",
+				displayName: "Unrecognized Effort",
+				parameters: [
+					{
+						id: "reasoning_effort",
+						displayName: "Effort",
+						values: [{ value: "auto" }, { value: "adaptive" }],
+					},
+				],
+				variants: [{ params: [{ id: "reasoning_effort", value: "auto" }], displayName: "Default", isDefault: true }],
+			},
+			{
+				id: "non-boolean-thinking",
+				displayName: "Non-boolean Thinking",
+				parameters: [
+					{
+						id: "thinking",
+						displayName: "Thinking",
+						values: [{ value: "adaptive" }],
+					},
+				],
+				variants: [{ params: [{ id: "thinking", value: "adaptive" }], displayName: "Default", isDefault: true }],
+			},
+		]);
+
+		for (const model of models) {
+			expect(model.reasoning).toBe(false);
+			expect(model.thinkingLevelMap).toBeUndefined();
+		}
+	});
+
+	it("preserves reasoning_effort metadata across a cached discoverModels() round-trip", async () => {
+		process.env.CURSOR_API_KEY = "test-key-cache-roundtrip";
+		mockedList.mockResolvedValueOnce([
+			{
+				id: "gemini-4-neon",
+				displayName: "Gemini 4 Neon",
+				parameters: [
+					{ id: "context", displayName: "Context", values: [{ value: "300k" }, { value: "1m" }] },
+					{
+						id: "reasoning_effort",
+						displayName: "Effort",
+						values: [{ value: "low" }, { value: "medium" }, { value: "high" }, { value: "xhigh" }],
+					},
+				],
+				variants: [
+					{
+						params: [
+							{ id: "context", value: "1m" },
+							{ id: "reasoning_effort", value: "high" },
+						],
+						displayName: "Gemini 4 Neon 1M High",
+						isDefault: true,
+					},
+				],
+			},
+		]);
+
+		const first = await discoverModels();
+		const second = await discoverModels();
+
+		expect(mockedList).toHaveBeenCalledTimes(1);
+		expect(second).toEqual(first);
+		expect(second[0]?.reasoning).toBe(true);
+		expect(second[0]?.thinkingLevelMap).toEqual({
+			off: null,
+			minimal: null,
+			low: "low",
+			medium: "medium",
+			high: "high",
+			xhigh: "xhigh",
+			max: null,
+		});
+		expect(buildCursorModelSelection("gemini-4-neon", "xhigh")).toEqual({
+			id: "gemini-4-neon",
+			params: [
+				{ id: "context", value: "1m" },
+				{ id: "reasoning_effort", value: "xhigh" },
+			],
+		});
+	});
+
 });

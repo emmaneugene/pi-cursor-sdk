@@ -327,6 +327,7 @@ describe("registerCursorAgentsContextDedup", () => {
 			"before_agent_start",
 			{
 				type: "before_agent_start",
+				messageType: "user",
 				prompt: "hello",
 				systemPrompt: prompt,
 				systemPromptOptions: makeSystemPromptOptions([PROJECT_FILE]),
@@ -347,6 +348,7 @@ describe("registerCursorAgentsContextDedup", () => {
 			"before_agent_start",
 			{
 				type: "before_agent_start",
+				messageType: "user",
 				prompt: "hello",
 				systemPrompt: prompt,
 			} as BeforeAgentStartEvent,
@@ -365,6 +367,7 @@ describe("registerCursorAgentsContextDedup", () => {
 			"before_agent_start",
 			{
 				type: "before_agent_start",
+				messageType: "user",
 				prompt: "hello",
 				systemPrompt: prompt,
 				systemPromptOptions: makeSystemPromptOptions([PROJECT_FILE]),
@@ -384,6 +387,7 @@ describe("registerCursorAgentsContextDedup", () => {
 			"before_agent_start",
 			{
 				type: "before_agent_start",
+				messageType: "user",
 				prompt: "hello",
 				systemPrompt: prompt,
 				systemPromptOptions: makeSystemPromptOptions([PROJECT_FILE]),
@@ -403,6 +407,7 @@ describe("registerCursorAgentsContextDedup", () => {
 			"before_agent_start",
 			{
 				type: "before_agent_start",
+				messageType: "user",
 				prompt: "hello",
 				systemPrompt: prompt,
 				systemPromptOptions: makeSystemPromptOptions([PROJECT_FILE]),

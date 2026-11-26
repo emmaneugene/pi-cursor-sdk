@@ -1,4 +1,4 @@
-// Generated from Cursor SDK checkpoint tokenDetails.maxTokens on 2026-09-13.
+// Generated from Cursor SDK checkpoint tokenDetails.maxTokens on 2026-11-26.
 // Refresh with: npm run refresh:cursor-snapshots -- --write --context-windows ~/.pi/agent/cursor-sdk-context-windows.json
 // Keys are canonical Cursor catalog model IDs. Evidence for a model's default
 // context is normalized to that ID; aliases, forced-speed variants, non-default
@@ -16,9 +16,6 @@ export const BUNDLED_CONTEXT_WINDOWS = {
 	"gemini-3-flash": 200000,
 	"gemini-3.1-pro": 200000,
 	"gemini-3.5-flash": 200000,
-	"gemini-3.6-flash": 200000,
-	"gemini-3.7-flash": 200000,
-	"glm-5.2": 200000,
 	"gpt-5-mini": 272000,
 	"gpt-5.1": 272000,
 	"gpt-5.2": 272000,
@@ -28,6 +25,4 @@ export const BUNDLED_CONTEXT_WINDOWS = {
 	"gpt-5.6-sol": 272000,
 	"grok-4.5": 256000,
 	"grok-4.6": 256000,
-	"kimi-k2.7-code": 200000,
-	"kimi-k3": 200000,
 } as const satisfies Record<string, number>;

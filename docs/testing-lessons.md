@@ -189,7 +189,7 @@ Session summaries can hide per-message usage bugs. When investigating token or c
 
 - `usage.input`, `usage.output`, `usage.cacheRead`, and `usage.cacheWrite` are additive spend-style counters for the assistant turn.
 - `usage.totalTokens` is pi context occupancy for that turn, not a value to sum across all assistant messages.
-- Distinguish published SDK `TokenUsage` from observed raw local `turn-ended.usage`: installed `@cursor/sdk` `toTokenUsage` sets `totalTokens = input+output+cacheRead+cacheWrite`, but captured local raw `turn-ended.usage` keeps `inputTokens` as the full prompt while cache fields partition it (see `test/fixtures/sdk-turn-ended-usage-1.0.23.json` / issue #196). Map raw turn-ended samples to pi as uncached `input = inputTokens - cacheReadTokens - cacheWriteTokens` and `totalTokens = inputTokens + outputTokens`.
+- Distinguish published SDK `TokenUsage` from observed raw local `turn-ended.usage`: `@cursor/sdk@1.5.2` `toTokenUsage` now sets `totalTokens = inputTokens + outputTokens` (older SDKs summed `input+output+cacheRead+cacheWrite`), while captured local raw `turn-ended.usage` still keeps `inputTokens` as the full prompt with cache fields partitioning it (see `test/fixtures/sdk-turn-ended-usage-1.0.23.json` / issue #196). Map raw turn-ended samples to pi as uncached `input = inputTokens - cacheReadTokens - cacheWriteTokens` and `totalTokens = inputTokens + outputTokens`.
 - No single assistant message should persist SDK/full-agent-context-sized usage outside the selected model window.
 - Real bad-session evidence should be reduced to a sanitized fixture, like `test/fixtures/run-usage-compaction-poison.jsonl`, instead of committing raw session JSONL.
 
@@ -289,7 +289,7 @@ The script writes timestamped artifacts under `--out` (default `/tmp/pi-cursor-s
 
 Stdout prints artifact paths and summary counts only. Raw payloads stay on disk and may contain local paths, project text, tool args/results, or secrets — do not commit or share them.
 
-Hard repo rule: Cursor SDK behavior claims must come from the installed `@cursor/sdk` package and/or https://cursor.com/docs/sdk/typescript, not from memory or ad-hoc probes alone. Current cutover validation targets exact `@cursor/sdk@1.0.30` and Pi 0.86.0 local packages.
+Hard repo rule: Cursor SDK behavior claims must come from the installed `@cursor/sdk` package and/or https://cursor.com/docs/sdk/typescript, not from memory or ad-hoc probes alone. Current cutover validation targets exact `@cursor/sdk@1.5.2` and Pi 1.6.1 local packages.
 
 ## Pi provider SDK event capture
 

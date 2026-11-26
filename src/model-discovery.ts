@@ -17,10 +17,12 @@ import {
 	saveModelListCache,
 } from "./model-list-cache.js";
 
+export type CursorProviderModelConfig = Extract<ProviderModelConfig, { type?: "chat" }>;
+
 const FALLBACK_CONTEXT_WINDOW = 128000;
 const FALLBACK_MAX_TOKENS = 16384;
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-const TEXT_AND_IMAGE_INPUT: ProviderModelConfig["input"] = ["text", "image"];
+const TEXT_AND_IMAGE_INPUT: CursorProviderModelConfig["input"] = ["text", "image"];
 const AUTH_SETUP_HINT = "/login (Use an API key -> Cursor) or CURSOR_API_KEY; startup discovery does not parse Pi CLI arguments, and Cursor Agent CLI/Desktop login is not reused";
 const CATALOG_REFRESH_HINT =
 	"After adding auth to an already-started pi session, run /cursor-refresh-models to refresh the full live Cursor model catalog without restarting pi.";
@@ -46,6 +48,8 @@ async function getDiscoveryApiKey(apiKey?: string): Promise<string | undefined> 
 	return resolveCursorApiKey(apiKey) ?? resolveCursorRuntimeApiKey();
 }
 
+export type CursorThinkingParameterId = "effort" | "reasoning_effort" | "reasoning" | "thinking";
+
 export interface CursorModelMetadata {
 	piModelId: string;
 	displayName: string;
@@ -55,13 +59,24 @@ export interface CursorModelMetadata {
 	defaultFast: boolean;
 	supportsReasoning: boolean;
 	thinkingLevelMap?: ThinkingLevelMap;
+	thinkingLevelParamId?: CursorThinkingParameterId;
+	offParamId?: CursorThinkingParameterId;
+	thinkingTrueValue?: string;
 	parameterIds: {
 		context: boolean;
 		reasoning: boolean;
+		reasoningEffort: boolean;
 		effort: boolean;
 		thinking: boolean;
 		fast: boolean;
 	};
+}
+
+interface ResolvedThinkingMapping {
+	thinkingLevelMap: ThinkingLevelMap;
+	thinkingLevelParamId: CursorThinkingParameterId;
+	offParamId?: CursorThinkingParameterId;
+	thinkingTrueValue?: string;
 }
 
 const metadataByPiModelId = new Map<string, CursorModelMetadata>();
@@ -105,36 +120,62 @@ function mapComparableLevel(
 	return getParameterValue(parameter, level);
 }
 
-function getThinkingLevelMap(item: ModelListItem): ThinkingLevelMap | undefined {
+function resolveThinkingMapping(item: ModelListItem): ResolvedThinkingMapping | undefined {
 	const reasoningParameter = getParameter(item, "reasoning");
+	const reasoningEffortParameter = getParameter(item, "reasoning_effort");
 	const effortParameter = getParameter(item, "effort");
 	const thinkingParameter = getParameter(item, "thinking");
-	const valueParameter = effortParameter ?? reasoningParameter ?? thinkingParameter;
+	const valueParameter = effortParameter ?? reasoningEffortParameter ?? reasoningParameter ?? thinkingParameter;
 	if (!valueParameter) return undefined;
 
-	if (valueParameter.id === "thinking" && hasBooleanValues(valueParameter)) {
+	const thinkingLevelParamId = valueParameter.id as CursorThinkingParameterId;
+	const thinkingTrueValue = getParameterValue(thinkingParameter, "true") ?? undefined;
+
+	if (thinkingLevelParamId === "thinking") {
+		if (!hasBooleanValues(valueParameter)) return undefined;
+		const offValue = getParameterValue(valueParameter, "false");
+		const highValue = getParameterValue(valueParameter, "true");
 		return {
-			off: getParameterValue(valueParameter, "false"),
-			minimal: null,
-			low: null,
-			medium: null,
-			high: getParameterValue(valueParameter, "true"),
-			xhigh: null,
-			max: null,
+			thinkingLevelParamId: "thinking",
+			...(offValue !== null ? { offParamId: "thinking" as const } : {}),
+			...(thinkingTrueValue ? { thinkingTrueValue } : {}),
+			thinkingLevelMap: {
+				off: offValue,
+				minimal: null,
+				low: null,
+				medium: null,
+				high: highValue,
+				xhigh: null,
+				max: null,
+			},
 		};
 	}
 
-	return {
-		off:
-			getParameterValue(reasoningParameter, "none") ??
-			getParameterValue(reasoningParameter, "off") ??
-			getParameterValue(thinkingParameter, "false"),
+	const valueOff = getPreferredParameterValue(valueParameter, ["none", "off"]);
+	const thinkingOff = valueOff === null ? getParameterValue(thinkingParameter, "false") : null;
+	const offValue = valueOff ?? thinkingOff;
+	const offParamId: CursorThinkingParameterId | undefined =
+		valueOff !== null ? thinkingLevelParamId : thinkingOff !== null ? "thinking" : undefined;
+
+	const thinkingLevelMap: ThinkingLevelMap = {
+		off: offValue,
 		minimal: mapComparableLevel(valueParameter, "minimal"),
 		low: mapComparableLevel(valueParameter, "low"),
 		medium: mapComparableLevel(valueParameter, "medium"),
 		high: mapComparableLevel(valueParameter, "high"),
 		xhigh: mapComparableLevel(valueParameter, "xhigh"),
 		max: mapComparableLevel(valueParameter, "max"),
+	};
+
+	if (Object.values(thinkingLevelMap).every((value) => value === null)) {
+		return undefined;
+	}
+
+	return {
+		thinkingLevelMap,
+		thinkingLevelParamId,
+		...(offParamId ? { offParamId } : {}),
+		...(thinkingTrueValue ? { thinkingTrueValue } : {}),
 	};
 }
 
@@ -179,7 +220,7 @@ function toMetadata(
 	contextWindowCache: Map<string, number>,
 	contextWindowKey: string,
 ): CursorModelMetadata {
-	const thinkingLevelMap = getThinkingLevelMap(item);
+	const thinking = resolveThinkingMapping(item);
 	const fastValue = getParamValue(defaultParams, "fast")?.toLowerCase();
 	return {
 		piModelId: item.id,
@@ -188,11 +229,19 @@ function toMetadata(
 		contextWindow: getContextWindow(contextWindowCache, item.id, defaultContext, contextWindowKey),
 		supportsFast: getParameter(item, "fast") !== undefined,
 		defaultFast: fastValue === "true",
-		supportsReasoning: thinkingLevelMap !== undefined,
-		...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+		supportsReasoning: thinking !== undefined,
+		...(thinking
+			? {
+					thinkingLevelMap: thinking.thinkingLevelMap,
+					thinkingLevelParamId: thinking.thinkingLevelParamId,
+					...(thinking.offParamId ? { offParamId: thinking.offParamId } : {}),
+					...(thinking.thinkingTrueValue ? { thinkingTrueValue: thinking.thinkingTrueValue } : {}),
+				}
+			: {}),
 		parameterIds: {
 			context: getParameter(item, "context") !== undefined,
 			reasoning: getParameter(item, "reasoning") !== undefined,
+			reasoningEffort: getParameter(item, "reasoning_effort") !== undefined,
 			effort: getParameter(item, "effort") !== undefined,
 			thinking: getParameter(item, "thinking") !== undefined,
 			fast: getParameter(item, "fast") !== undefined,
@@ -200,7 +249,7 @@ function toMetadata(
 	};
 }
 
-function toModelConfig(metadata: CursorModelMetadata, name: string): ProviderModelConfig {
+function toModelConfig(metadata: CursorModelMetadata, name: string): CursorProviderModelConfig {
 	return {
 		id: metadata.piModelId,
 		name,
@@ -213,7 +262,7 @@ function toModelConfig(metadata: CursorModelMetadata, name: string): ProviderMod
 	};
 }
 
-function registerModelItems(items: ModelListItem[]): ProviderModelConfig[] {
+function registerModelItems(items: ModelListItem[]): CursorProviderModelConfig[] {
 	metadataByPiModelId.clear();
 	const contextWindowCache = loadContextWindowCache();
 	return getCursorModelSelectionIdentities(items).map(({ model: item, piModelId, defaultContext, contextWindowKey }) => {
@@ -265,31 +314,26 @@ function applyThinkingLevel(
 	if (mapped === undefined || mapped === null) return;
 
 	if (level === "off") {
-		if (metadata.parameterIds.thinking && mapped === "false") {
-			setParam(params, "thinking", mapped);
-			deleteParam(params, "effort");
-			return;
+		const targetParamId = metadata.offParamId;
+		if (!targetParamId) return;
+		setParam(params, targetParamId, mapped);
+		if (
+			targetParamId === "thinking" &&
+			mapped.toLowerCase() === "false" &&
+			metadata.thinkingLevelParamId &&
+			metadata.thinkingLevelParamId !== "thinking"
+		) {
+			deleteParam(params, metadata.thinkingLevelParamId);
 		}
-		if (metadata.parameterIds.reasoning) {
-			setParam(params, "reasoning", mapped);
-		}
 		return;
 	}
 
-	if (metadata.parameterIds.effort) {
-		if (metadata.parameterIds.thinking) setParam(params, "thinking", "true");
-		setParam(params, "effort", mapped);
-		return;
+	const targetParamId = metadata.thinkingLevelParamId;
+	if (!targetParamId) return;
+	if (targetParamId !== "thinking" && metadata.thinkingTrueValue) {
+		setParam(params, "thinking", metadata.thinkingTrueValue);
 	}
-
-	if (metadata.parameterIds.reasoning) {
-		setParam(params, "reasoning", mapped);
-		return;
-	}
-
-	if (metadata.parameterIds.thinking) {
-		setParam(params, "thinking", mapped);
-	}
+	setParam(params, targetParamId, mapped);
 }
 
 export function buildCursorModelSelection(
@@ -315,13 +359,13 @@ function sanitizeDiscoveryError(error: unknown, apiKey: string): string | undefi
 	return scrubSensitiveText(message, apiKey).trim() || undefined;
 }
 
-async function useFallbackModels(options: DiscoverModelsOptions, issue: CursorModelFallbackIssue): Promise<ProviderModelConfig[]> {
+async function useFallbackModels(options: DiscoverModelsOptions, issue: CursorModelFallbackIssue): Promise<CursorProviderModelConfig[]> {
 	options.onFallback?.(issue);
 	const { FALLBACK_MODEL_ITEMS } = await import("./fallback-models.generated.js");
 	return registerModelItems(FALLBACK_MODEL_ITEMS);
 }
 
-export async function discoverModels(options: DiscoverModelsOptions = {}): Promise<ProviderModelConfig[]> {
+export async function discoverModels(options: DiscoverModelsOptions = {}): Promise<CursorProviderModelConfig[]> {
 	const apiKey = await getDiscoveryApiKey(options.apiKey);
 	if (!apiKey) {
 		return useFallbackModels(options, {

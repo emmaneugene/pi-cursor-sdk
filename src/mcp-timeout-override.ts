@@ -62,15 +62,12 @@ function isCursorSdkMcpProtocolTimeoutStack(stack: string | undefined): boolean 
 
 export function isCursorSdkMcpToolTimeoutStack(stack: string | undefined): boolean {
 	if (!stack) return false;
-	return (
-		isCursorSdkMcpProtocolTimeoutStack(stack) &&
-		/\bcallTool\b|\bClient\.callTool\b|\bMcpSdkClient\.callTool\b/.test(stack)
-	);
+	return isCursorSdkMcpProtocolTimeoutStack(stack) && /\.(?:callTool|sendToolCall)\b/.test(stack);
 }
 
 export function isCursorSdkMcpConnectTimeoutStack(stack: string | undefined): boolean {
 	if (!stack || !isCursorSdkMcpProtocolTimeoutStack(stack)) return false;
-	return /\bClient\.(?:connect|listTools)\b|\bMcpSdkClient\.getTools\b/.test(stack);
+	return /\.(?:connect|listTools|getTools)\b/.test(stack);
 }
 
 function isCursorSdkDefaultMcpTimeout(delay: SetTimeoutDelay): boolean {

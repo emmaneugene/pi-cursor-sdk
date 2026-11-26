@@ -637,7 +637,7 @@ describe("extension native Cursor tool replay", () => {
 			expect(readFileSync(join(dir, "input.txt"), "utf8")).toBe("after\n");
 
 			const theme = createRenderTheme({ bg: (_style: string, text: string) => text });
-			const renderCall = (tool: { renderCall?: (...args: any[]) => { render(width: number): string[] } }, args: Record<string, unknown>) =>
+			const renderCall = (tool: { renderCall?: (...args: any[]) => { render(width: number): readonly string[] } }, args: Record<string, unknown>) =>
 				stripVTControlCharacters(
 					tool.renderCall?.(
 						args,
@@ -666,6 +666,7 @@ describe("extension native Cursor tool replay", () => {
 				name: "read",
 				description: "hashline read",
 				parameters: Type.Object({}),
+				exposure: "direct",
 				sourceInfo: {
 					source: "package",
 					path: "/opt/homebrew/lib/node_modules/pi-hashline-edit/index.ts",
@@ -721,6 +722,7 @@ describe("extension native Cursor tool replay", () => {
 				name: "read",
 				description: "hashline read",
 				parameters: Type.Object({}),
+				exposure: "direct",
 				sourceInfo: {
 					source: "package",
 					path: "/opt/homebrew/lib/node_modules/pi-hashline-edit/index.ts",

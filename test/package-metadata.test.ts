@@ -73,8 +73,8 @@ describe("package metadata cutover baselines", () => {
 	});
 
 	it("pins Cursor SDK exactly", () => {
-		expect(packageJson.dependencies["@cursor/sdk"]).toBe("1.0.30");
-		expect(lockPackageVersion("@cursor/sdk")).toBe("1.0.30");
+		expect(packageJson.dependencies["@cursor/sdk"]).toBe("1.5.2");
+		expect(lockPackageVersion("@cursor/sdk")).toBe("1.5.2");
 	});
 
 	it("keeps lockfile resolved URLs on the public npm registry", () => {
@@ -99,7 +99,7 @@ describe("package metadata cutover baselines", () => {
 		expect(sdkOptions).toMatch(/export interface AgentOptions[\s\S]*?\bagentId\?: string;/);
 	});
 
-	it("pins the Node ConnectRPC transport required by Cursor SDK's Node seam", () => {
+	it("leaves ConnectRPC transport bundling to Cursor SDK", () => {
 		const sdkTransportDts = readFileSync(
 			join(process.cwd(), "node_modules/@cursor/sdk/dist/esm/transport.d.ts"),
 			"utf8",
@@ -107,23 +107,14 @@ describe("package metadata cutover baselines", () => {
 
 		expect(sdkTransportDts).toContain("Node");
 		expect(sdkTransportDts).toContain("`@connectrpc/connect-node`");
-		expect(packageLock.packages["node_modules/@cursor/sdk"]?.dependencies?.["@connectrpc/connect-node"]).toBe("^1.6.1");
 		expect(packageJson.dependencies["@connectrpc/connect-node"]).toBeUndefined();
-		expect(lockPackageVersion("@connectrpc/connect-node")).toBe("1.7.0");
-	});
-
-	it("keeps installed ConnectRPC transport siblings aligned", () => {
-		expect(lockPackageVersion("@connectrpc/connect-node")).toBe("1.7.0");
-		expect(lockPackageVersion("@connectrpc/connect-web")).toBe("1.7.0");
-	});
-
-	it("leaves the Cursor SDK transport dependency tree to npm resolution", () => {
+		expect(packageLock.packages["node_modules/@cursor/sdk"]?.dependencies?.["@connectrpc/connect-node"]).toBeUndefined();
+		expect(lockPackageVersion("@connectrpc/connect-node")).toBeUndefined();
 		expect(packageJson.dependencies.undici).toBeUndefined();
 		expect(packageJson.bundledDependencies).toEqual([...BUNDLED_MCP_HONO_CLOSURE]);
 		expect(packageJson.bundledDependencies).not.toContain("undici");
 		expect(packageJson.bundledDependencies).not.toContain("@cursor/sdk");
 		expect(packageJson.overrides).toBeUndefined();
-		expect(packageLock.packages["node_modules/@connectrpc/connect-node/node_modules/undici"]?.version).toBe("5.29.0");
 	});
 
 	it("removes the obsolete sqlite override", () => {
@@ -192,17 +183,17 @@ describe("package metadata cutover baselines", () => {
 
 	it("pins pi validation baselines", () => {
 		for (const packageName of PI_PACKAGES) {
-			expect(packageJson.devDependencies[packageName]).toBe("0.86.0");
-			expect(lockPackageVersion(packageName)).toBe("0.86.0");
+			expect(packageJson.devDependencies[packageName]).toBe("1.6.1");
+			expect(lockPackageVersion(packageName)).toBe("1.6.1");
 		}
 	});
 
-	it("pins Pi 0.86.0's TypeBox validation baseline", () => {
+	it("pins Pi 1.6.1's TypeBox validation baseline", () => {
 		expect(packageJson.devDependencies.typebox).toBe("1.3.27");
 		expect(lockPackageVersion("typebox")).toBe("1.3.27");
 	});
 
-	it("tracks Pi 0.86.0 GPT-5.6 Codex metadata", () => {
+	it("tracks Pi 1.6.1 GPT-5.6 Codex metadata", () => {
 		for (const modelId of ["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"] as const) {
 			expect(OPENAI_CODEX_MODELS[modelId]).toMatchObject({
 				contextWindow: 272000,

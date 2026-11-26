@@ -171,6 +171,45 @@ function makeCursorSdkHttp2EnhanceYourCalmConnectError(): Error & {
 	return error;
 }
 
+function makeBundledCursorSdkAbortConnectError(): Error & { rawMessage: string; code: number; cause: DOMException } {
+	const error = makeCursorSdkAbortConnectError();
+	error.stack =
+		"ConnectError: [canceled] This operation was aborted\n" +
+		"    at a.from (file:///repo/node_modules/@cursor/sdk/dist/esm/index.js:1:1125976)\n" +
+		"    at Object.reject (file:///repo/node_modules/@cursor/sdk/dist/esm/793.js:1:14210)\n" +
+		"    at file:///repo/node_modules/@cursor/sdk/dist/esm/441.js:1:812";
+	return error;
+}
+
+function makeBundledCursorSdkStallAbortWrapperConnectError(): Error & { rawMessage: string; code: number; cause: Error } {
+	const cause = Object.assign(new Error("[canceled] This operation was aborted"), {
+		name: "ConnectError",
+		rawMessage: "This operation was aborted",
+		code: 1,
+		cause: new DOMException("This operation was aborted", "AbortError"),
+	});
+	cause.stack =
+		"ConnectError: [canceled] This operation was aborted\n" +
+		"    at a.from (file:///repo/node_modules/@cursor/sdk/dist/esm/index.js:1:1125976)\n" +
+		"    at Object.reject (file:///repo/node_modules/@cursor/sdk/dist/esm/793.js:1:14210)\n" +
+		"    at AbortSignal.r (file:///repo/node_modules/@cursor/sdk/dist/esm/411.js:1:5705)\n" +
+		"    at Y.onStall (file:///repo/node_modules/@cursor/sdk/dist/esm/544.js:1:75246)";
+	const error = new Error("[unknown] [canceled] This operation was aborted") as Error & {
+		rawMessage: string;
+		code: number;
+		cause: Error;
+	};
+	error.name = "ConnectError";
+	error.rawMessage = "[canceled] This operation was aborted";
+	error.code = 2;
+	error.cause = cause;
+	error.stack =
+		"ConnectError: [unknown] [canceled] This operation was aborted\n" +
+		"    at a.from (file:///repo/node_modules/@cursor/sdk/dist/esm/index.js:1:1125976)\n" +
+		"    at file:///repo/node_modules/@cursor/sdk/dist/esm/544.js:1:5832";
+	return error;
+}
+
 function makeCursorSdkStallAbortWrapperConnectError(): Error & { rawMessage: string; code: number; cause: Error } {
 	const cause = Object.assign(new Error("[canceled] This operation was aborted"), {
 		name: "ConnectError",
@@ -363,12 +402,12 @@ describe("Cursor SDK process error guard", () => {
 	});
 
 	it("tracks the installed Cursor SDK closed-writable error contract", () => {
-		const controlledExecBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/357.js", "utf8");
+		const controlledExecBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/544.js", "utf8");
 		expect(controlledExecBundle).toContain('this.name="WriteIterableClosedError"');
 		expect(controlledExecBundle).toContain('"WritableIterable is closed"');
 		expect(controlledExecBundle).toContain('SimpleControlledExecManager');
-		expect(controlledExecBundle).toContain('catch(e){if(e instanceof s.W2)return;');
-		expect(controlledExecBundle).toContain('yield l.write(new i.$Y({message:{case:"throw"');
+		expect(controlledExecBundle).toContain('catch(e){if(u||e instanceof p.W2)return;');
+		expect(controlledExecBundle).toContain('await d(new h.$Y({message:{case:"throw"');
 	});
 
 	it("contains delayed exact SDK failures after the provider-turn guard is disposed in real Node", () => {
@@ -684,20 +723,28 @@ setTimeout(() => {
 	});
 
 	it("tracks the installed Cursor SDK local-executor stdin write contract", () => {
-		// 1.0.30 attaches a no-op error listener before local shell snapshot writes.
-		// Command-hook stdin still uses callback-style write; MCP stdio has its own listener.
-		const shellExecBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/357.js", "utf8");
-		expect(shellExecBundle).toContain("writeCommandHookStdinPayload");
-		expect(shellExecBundle).toContain("stdin.write(e,(e=>{e?n(e):t(void 0)}))");
-		expect(shellExecBundle).toContain("o.stdin.write(`${t.join(\"\\n\")}\\n`),o.stdin.end()");
-		expect(shellExecBundle).toContain('function We(e){e?.on("error",(()=>{}))}function He(e,t){e&&(We(e),e.write(t),e.end())}');
-		const mcpStdioBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/877.js", "utf8");
+		// 1.5.2 local shell warm-spare stdin helper attaches a no-op error listener before ending stdin.
+		// Command-hook stdin writes via writeCommandHookStdinPayload() using end() with EPIPE handling,
+		// distinct from backgroundShellManager.writeStdin() (stdin.write callback) and MCP stdio.
+		const shellExecBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/544.js", "utf8");
+		expect(shellExecBundle).toMatch(
+			/function \w+\(e,t\)\{e\.stdin\?\.on\("error",\(\(\)=>\{\}\)\),e\.stdin\?\.end\(Buffer\.from\(t,"utf8"\)\)\}/,
+		);
+		expect(shellExecBundle).toMatch(
+			/async writeCommandHookStdinPayload\(e,t\)\{[\s\S]{0,220}e\.end\(Buffer\.from\(t,"utf8"\)\)/,
+		);
+		expect(shellExecBundle).toMatch(
+			/async writeStdin\(e,t\)\{[\s\S]{0,360}stdin\.write\(e,\(e=>\{e\?n\(e\):t\(void 0\)\}\)\)/,
+		);
+		const mcpStdioBundle = readFileSync("node_modules/@cursor/sdk/dist/esm/128.js", "utf8");
 		expect(mcpStdioBundle).toContain('stdin?.on("error"');
 	});
 
-	it("matches local Cursor SDK abort ConnectError shape", () => {
+	it("matches local Cursor SDK abort ConnectError shape (bundled 1.5.2 and legacy connect-node)", () => {
 		expect(isCursorSdkAbortConnectError(makeCursorSdkAbortConnectError())).toBe(true);
+		expect(isCursorSdkAbortConnectError(makeBundledCursorSdkAbortConnectError())).toBe(true);
 		expect(isCursorSdkAbortConnectError(makeCursorSdkStallAbortWrapperConnectError())).toBe(false);
+		expect(isCursorSdkAbortConnectError(makeBundledCursorSdkStallAbortWrapperConnectError())).toBe(false);
 		expect(isCursorSdkAbortConnectError(new Error("boom"))).toBe(false);
 	});
 
@@ -727,6 +774,13 @@ setTimeout(() => {
 			suppression.suppressAbortErrors();
 			const emitted = process.emit("uncaughtException", makeCursorSdkAbortConnectError(), "uncaughtException");
 			expect(emitted).toBe(true);
+			expect(listenerCalled).toBe(false);
+			const bundledEmitted = process.emit(
+				"uncaughtException",
+				makeBundledCursorSdkAbortConnectError(),
+				"uncaughtException",
+			);
+			expect(bundledEmitted).toBe(true);
 			expect(listenerCalled).toBe(false);
 		} finally {
 			process.removeListener("uncaughtException", listener);
@@ -814,7 +868,10 @@ setTimeout(() => {
 		}
 	});
 
-	it("suppresses Cursor SDK stall abort wrappers while a provider turn is active", () => {
+	it.each([
+		["legacy connect-node stall abort wrapper", makeCursorSdkStallAbortWrapperConnectError],
+		["bundled @cursor/sdk 1.5.2 stall abort wrapper", makeBundledCursorSdkStallAbortWrapperConnectError],
+	])("suppresses %s while a provider turn is active", (_name, makeError) => {
 		const suppression = installCursorSdkProcessErrorGuard();
 		let listenerCalled = false;
 		const listener = () => {
@@ -822,7 +879,7 @@ setTimeout(() => {
 		};
 		process.once("uncaughtException", listener);
 		try {
-			const emitted = process.emit("uncaughtException", makeCursorSdkStallAbortWrapperConnectError(), "uncaughtException");
+			const emitted = process.emit("uncaughtException", makeError(), "uncaughtException");
 			expect(emitted).toBe(true);
 			expect(listenerCalled).toBe(false);
 		} finally {

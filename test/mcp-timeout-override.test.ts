@@ -165,7 +165,7 @@ describe("Cursor MCP timeout override", () => {
 	it("tracks the installed Cursor SDK MCP callTool timeout seam", () => {
 		const sdkMcpBundle = readCursorSdkEsmBundleContaining(
 			'withName("McpSdkClient.callTool")',
-			'this.client.callTool({name:t,arguments:r})',
+			'this.sendToolCall({name:t,arguments:r}',
 		);
 		const sdkProtocolBundle = readCursorSdkEsmBundleContaining(
 			'this.request({method:"initialize"',
@@ -173,11 +173,11 @@ describe("Cursor MCP timeout override", () => {
 		);
 
 		expect(sdkMcpBundle).toContain('withName("McpSdkClient.callTool")');
-		expect(sdkMcpBundle).toContain('this.client.callTool({name:t,arguments:r})');
+		expect(sdkMcpBundle).toContain('this.client.callTool(e,void 0,n)');
 		expect(sdkMcpBundle).toContain('withName("McpSdkClient.getTools")');
-		expect(sdkMcpBundle).toContain('this.client.listTools({cursor:e})');
+		expect(sdkMcpBundle).toContain('e.listTools({cursor:t})');
 		expect(sdkProtocolBundle).toContain('this.request({method:"initialize"');
-		expect(sdkProtocolBundle).toContain('_setupTimeout(e,t,s,n,i=!1)');
+		expect(sdkProtocolBundle).toContain('_setupTimeout(e,t,s,n,r=!1)');
 		expect(sdkProtocolBundle).toContain('timeoutId:setTimeout(n,t)');
 	});
 
@@ -186,18 +186,51 @@ describe("Cursor MCP timeout override", () => {
     at Protocol._setupTimeout (${process.cwd()}/node_modules/@cursor/sdk/dist/esm/index.js:1:1)
     at Client.callTool (${process.cwd()}/node_modules/@cursor/sdk/dist/esm/index.js:1:1)
     at McpSdkClient.callTool (${process.cwd()}/node_modules/@cursor/sdk/dist/esm/index.js:1:1)`;
+		const sendToolCallStack = `Error
+    at Protocol._setupTimeout (${process.cwd()}/node_modules/@cursor/sdk/dist/esm/128.js:1:1)
+    at Client.request (${process.cwd()}/node_modules/@cursor/sdk/dist/esm/128.js:1:1)
+    at McpSdkClient.sendToolCall (${process.cwd()}/node_modules/@cursor/sdk/dist/esm/544.js:1:1)`;
 
 		const listToolsStack = stack.replace(/callTool/g, "listTools").replace(/McpSdkClient\.listTools/, "McpSdkClient.getTools");
 		const initializeStack = stack.replace(/callTool/g, "connect");
 		const unknownProtocolStack = stack.replace(/callTool/g, "listPrompts");
 
 		expect(isCursorSdkMcpToolTimeoutStack(stack)).toBe(true);
+		expect(isCursorSdkMcpToolTimeoutStack(sendToolCallStack)).toBe(true);
 		expect(isCursorSdkMcpToolTimeoutStack(listToolsStack)).toBe(false);
 		expect(isCursorSdkMcpConnectTimeoutStack(listToolsStack)).toBe(true);
 		expect(isCursorSdkMcpConnectTimeoutStack(initializeStack)).toBe(true);
 		expect(isCursorSdkMcpConnectTimeoutStack(unknownProtocolStack)).toBe(false);
 		expect(isCursorSdkMcpConnectTimeoutStack(stack)).toBe(false);
 		expect(isCursorSdkMcpToolTimeoutStack(stack.replace(/node_modules\/\@cursor\/sdk/g, "src"))).toBe(false);
+	});
+
+	it("recognizes minified @cursor/sdk 1.5.2 MCP stack frames and rejects other protocol methods", () => {
+		const sdk128 = `${process.cwd()}/node_modules/@cursor/sdk/dist/esm/128.js:1:952118`;
+		const sdk544 = `${process.cwd()}/node_modules/@cursor/sdk/dist/esm/544.js:1:756567`;
+
+		const minifiedSendToolCallStack = `Error\n    at g._setupTimeout (${sdk128})\n    at g.request (${sdk128})\n    at rT.sendToolCall (${sdk544})`;
+		const minifiedCallToolStack = `Error\n    at d._setupTimeout (${sdk128})\n    at g.callTool (${sdk128})\n    at rT.callTool (${sdk544})`;
+		const minifiedConnectStack = `Error\n    at g._setupTimeout (${sdk128})\n    at g.request (${sdk128})\n    at g.connect (${sdk128})`;
+		const minifiedListToolsStack = `Error\n    at g._setupTimeout (${sdk128})\n    at g.request (${sdk128})\n    at g.listTools (${sdk128})\n    at rT.getTools (${sdk544})`;
+		const minifiedListPromptsStack = `Error\n    at g._setupTimeout (${sdk128})\n    at g.request (${sdk128})\n    at g.listPrompts (${sdk128})`;
+		const minifiedListResourcesStack = `Error\n    at g._setupTimeout (${sdk128})\n    at g.request (${sdk128})\n    at g.listResources (${sdk128})`;
+		const minifiedPingStack = `Error\n    at g._setupTimeout (${sdk128})\n    at g.request (${sdk128})\n    at g.ping (${sdk128})`;
+
+		expect(isCursorSdkMcpToolTimeoutStack(minifiedSendToolCallStack)).toBe(true);
+		expect(isCursorSdkMcpToolTimeoutStack(minifiedCallToolStack)).toBe(true);
+		expect(isCursorSdkMcpToolTimeoutStack(minifiedConnectStack)).toBe(false);
+		expect(isCursorSdkMcpToolTimeoutStack(minifiedListToolsStack)).toBe(false);
+
+		expect(isCursorSdkMcpConnectTimeoutStack(minifiedConnectStack)).toBe(true);
+		expect(isCursorSdkMcpConnectTimeoutStack(minifiedListToolsStack)).toBe(true);
+		expect(isCursorSdkMcpConnectTimeoutStack(minifiedSendToolCallStack)).toBe(false);
+		expect(isCursorSdkMcpConnectTimeoutStack(minifiedCallToolStack)).toBe(false);
+
+		expect(isCursorSdkMcpToolTimeoutStack(minifiedListPromptsStack)).toBe(false);
+		expect(isCursorSdkMcpConnectTimeoutStack(minifiedListPromptsStack)).toBe(false);
+		expect(isCursorSdkMcpConnectTimeoutStack(minifiedListResourcesStack)).toBe(false);
+		expect(isCursorSdkMcpConnectTimeoutStack(minifiedPingStack)).toBe(false);
 	});
 
 	it("installs the override before Cursor session agent acquisition", async () => {

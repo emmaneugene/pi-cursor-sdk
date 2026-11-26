@@ -62,6 +62,72 @@ function makeCursorSdkHttp2EnhanceYourCalmConnectError(): Error & {
 	return error;
 }
 
+function makeBundledCursorSdkAbortConnectError(): Error & { rawMessage: string; code: number; cause: DOMException } {
+	const error = new Error("[canceled] This operation was aborted") as Error & {
+		rawMessage: string;
+		code: number;
+		cause: DOMException;
+	};
+	error.name = "ConnectError";
+	error.rawMessage = "This operation was aborted";
+	error.code = 1;
+	error.cause = new DOMException("This operation was aborted", "AbortError");
+	error.stack =
+		"ConnectError: [canceled] This operation was aborted\n" +
+		"    at a.from (file:///repo/node_modules/@cursor/sdk/dist/esm/index.js:1:1125976)\n" +
+		"    at Object.reject (file:///repo/node_modules/@cursor/sdk/dist/esm/793.js:1:14210)\n" +
+		"    at file:///repo/node_modules/@cursor/sdk/dist/esm/441.js:1:812";
+	return error;
+}
+
+function makeBundledCursorSdkStallAbortWrapperConnectError(): Error & { rawMessage: string; code: number; cause: Error } {
+	const cause = Object.assign(new Error("[canceled] This operation was aborted"), {
+		name: "ConnectError",
+		rawMessage: "This operation was aborted",
+		code: 1,
+		cause: new DOMException("This operation was aborted", "AbortError"),
+	});
+	cause.stack =
+		"ConnectError: [canceled] This operation was aborted\n" +
+		"    at a.from (file:///repo/node_modules/@cursor/sdk/dist/esm/index.js:1:1125976)\n" +
+		"    at Object.reject (file:///repo/node_modules/@cursor/sdk/dist/esm/793.js:1:14210)\n" +
+		"    at AbortSignal.r (file:///repo/node_modules/@cursor/sdk/dist/esm/411.js:1:5705)\n" +
+		"    at Y.onStall (file:///repo/node_modules/@cursor/sdk/dist/esm/544.js:1:75246)";
+	const error = new Error("[unknown] [canceled] This operation was aborted") as Error & {
+		rawMessage: string;
+		code: number;
+		cause: Error;
+	};
+	error.name = "ConnectError";
+	error.rawMessage = "[canceled] This operation was aborted";
+	error.code = 2;
+	error.cause = cause;
+	error.stack =
+		"ConnectError: [unknown] [canceled] This operation was aborted\n" +
+		"    at a.from (file:///repo/node_modules/@cursor/sdk/dist/esm/index.js:1:1125976)\n" +
+		"    at file:///repo/node_modules/@cursor/sdk/dist/esm/441.js:1:5832";
+	return error;
+}
+
+function makeNonCursorAbortConnectError(): Error & { rawMessage: string; code: number; cause: DOMException } {
+	const error = makeBundledCursorSdkAbortConnectError();
+	error.stack =
+		"ConnectError: [canceled] This operation was aborted\n" +
+		"    at Object.reject (file:///repo/node_modules/some-other-connect-client/index.js:293:63)";
+	return error;
+}
+
+function makeNonCursorStallAbortWrapperConnectError(): Error & { rawMessage: string; code: number; cause: Error } {
+	const error = makeBundledCursorSdkStallAbortWrapperConnectError();
+	error.stack =
+		"ConnectError: [unknown] [canceled] This operation was aborted\n" +
+		"    at Object.reject (file:///repo/node_modules/some-other-connect-client/index.js:10:1)";
+	error.cause.stack =
+		"ConnectError: [canceled] This operation was aborted\n" +
+		"    at Y.onStall (file:///repo/node_modules/some-other-connect-client/index.js:20:1)";
+	return error;
+}
+
 function makeCursorSdkStallAbortWrapperConnectError(): Error & { rawMessage: string; code: number; cause: Error } {
 	const cause = Object.assign(new Error("[canceled] This operation was aborted"), {
 		name: "ConnectError",
@@ -306,6 +372,26 @@ describe("cursor-provider-errors", () => {
 		expect(message).toContain("Network error");
 		expect(message).toContain("pi will retry automatically");
 		expect(message).not.toContain("operation was aborted");
+	});
+
+	it("classifies bundled @cursor/sdk 1.5.2 abort and stall-abort ConnectErrors without @connectrpc/connect-node frames", () => {
+		const abortError = makeBundledCursorSdkAbortConnectError();
+		expect(abortError.stack).not.toContain("@connectrpc/connect-node");
+		expect(classifyCursorConnectError(abortError)).toEqual({ kind: "abort", source: "cursor-sdk-stack" });
+
+		const stallError = makeBundledCursorSdkStallAbortWrapperConnectError();
+		expect(stallError.stack).not.toContain("@connectrpc/connect-node");
+		expect(stallError.cause.stack).not.toContain("@connectrpc/connect-node");
+		expect(classifyCursorConnectError(stallError)).toEqual({ kind: "network", source: "cursor-sdk-stack" });
+		const message = sanitizeCursorProviderError(stallError, "test-key");
+		expect(message).toContain("Network error");
+		expect(message).toContain("pi will retry automatically");
+		expect(message).not.toContain("operation was aborted");
+	});
+
+	it("does not classify unrelated non-Cursor abort or stall-abort ConnectErrors", () => {
+		expect(classifyCursorConnectError(makeNonCursorAbortConnectError())).toBeUndefined();
+		expect(classifyCursorConnectError(makeNonCursorStallAbortWrapperConnectError())).toBeUndefined();
 	});
 
 	it.each([

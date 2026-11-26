@@ -7,6 +7,7 @@ import {
 	type NormalizedBuildSystemPromptOptions,
 	type ExtensionCommandContext,
 	type ExtensionContext,
+	type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
 import { makeModel } from "./model-fixtures.js";
 import type { ExtensionCommandContextOverrides, ExtensionContextOverrides } from "./pi-harness-types.js";
@@ -25,6 +26,7 @@ export function createDefaultSystemPromptOptions(cwd: string): NormalizedBuildSy
 	return {
 		cwd,
 		selectedTools: ["read", "bash", "edit", "write"],
+		hiddenTools: [],
 		toolSnippets: {},
 		toolGuidelines: {},
 		promptGuidelines: [],
@@ -47,6 +49,12 @@ function createMinimalSessionManager(cwd: string, overrides: Partial<ExtensionCo
 		getLabel: vi.fn(() => undefined),
 		getBranch: vi.fn(() => []),
 		buildContextEntries: vi.fn(() => []),
+		buildSessionProjection: vi.fn(() => ({
+			entries: [],
+			messages: [],
+			thinkingLevel: "off",
+			model: null,
+		})),
 		getHeader: vi.fn(() => null),
 		getEntries: vi.fn(() => []),
 		getTree: vi.fn(() => []),
@@ -88,7 +96,7 @@ function createMinimalExtensionUi(): ExtensionContext["ui"] {
 	} satisfies ExtensionContext["ui"];
 }
 
-function createMinimalExtensionContextInternal(overrides: ExtensionContextOverrides = {}): ExtensionContext {
+function createMinimalExtensionBaseContext(overrides: ExtensionContextOverrides = {}): ExtensionContext {
 	const cwd = overrides.cwd ?? process.cwd();
 	const base: ExtensionContext = {
 		ui: createMinimalExtensionUi(),
@@ -123,10 +131,22 @@ function createMinimalExtensionContextInternal(overrides: ExtensionContextOverri
 	};
 }
 
+function createMinimalExtensionContextInternal(overrides: ExtensionContextOverrides = {}): ExtensionToolContext {
+	return {
+		...createMinimalExtensionBaseContext(overrides),
+		tools: [],
+		executeTool: vi.fn(async (name: string) => ({
+			toolCall: { type: "toolCall" as const, id: "nested-call-1", name, arguments: {} },
+			result: { content: [{ type: "text" as const, text: "Tool not found" }], details: undefined },
+			isError: true,
+		})),
+	};
+}
+
 function createMinimalExtensionCommandContextInternal(
 	overrides: ExtensionCommandContextOverrides = {},
 ): ExtensionCommandContext {
-	const base = createMinimalExtensionContextInternal(overrides) as ExtensionCommandContext;
+	const base = createMinimalExtensionBaseContext(overrides);
 	return {
 		...base,
 		...overrides,
@@ -149,7 +169,7 @@ function createMinimalExtensionCommandContextInternal(
 	};
 }
 
-export function createExtensionTestContext(ctxOverrides: ExtensionContextOverrides = {}): ExtensionContext {
+export function createExtensionTestContext(ctxOverrides: ExtensionContextOverrides = {}): ExtensionToolContext {
 	return createMinimalExtensionContextInternal(ctxOverrides);
 }
 
