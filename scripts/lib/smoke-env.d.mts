@@ -9,15 +9,11 @@ export {
 } from "../../shared/sdk-event-debug-env.mjs";
 
 export declare const CURSOR_SDK_STALE_PUBLIC_ENV_NAMES: readonly string[];
+export declare const CURSOR_SDK_CLEARED_ENV_NAMES: readonly string[];
 
 export declare function sealedNodePath(nodePath?: string, envPath?: string): string;
 export declare function clearCursorSdkEventDebugEnv<TEnv extends Record<string, string | undefined>>(env: TEnv): TEnv;
-export declare function clearCursorSdkStalePublicEnv<TEnv extends Record<string, string | undefined>>(env: TEnv): TEnv;
 export declare function writeCursorSdkUserConfig(agentDir: string, patch?: Record<string, unknown>): string;
-export declare function writeCursorSdkEventDebugUserConfig(
-	agentDir: string,
-	sdkEvents?: { enabled?: boolean; directory?: string; stderr?: boolean },
-): string;
 export interface CursorSmokeUserConfigOptions {
 	settingSources?: string | null;
 	nativeDisplay?: "on" | "off";
@@ -28,22 +24,20 @@ export interface CursorSmokeUserConfigOptions {
 	transport?: "default" | "http1";
 	eventDebugDir?: string;
 }
-export declare function buildCursorSmokeUserConfig(options?: CursorSmokeUserConfigOptions): Record<string, unknown>;
-export declare function buildCursorSmokeEnv(options?: CursorSmokeUserConfigOptions & {
+export interface CursorSmokeEnvOptions {
 	baseEnv?: Record<string, string | undefined>;
 	nodePath?: string;
 	term?: string;
 	agentDir?: string;
-}): Record<string, string | undefined>;
-export declare function buildCursorSmokeEnvPlan(options?: CursorSmokeUserConfigOptions & {
-	baseEnv?: Record<string, string | undefined>;
-	nodePath?: string;
-	term?: string;
-	agentDir?: string;
-}): {
+}
+export interface CursorSmokeEnvPlan {
 	env: Record<string, string | undefined>;
 	sealedPath: string;
 	clearEnvNames: string[];
 	envEntries: Array<[string, string]>;
 	userConfig?: Record<string, unknown>;
-};
+}
+export declare function buildCursorSmokeUserConfig(options?: CursorSmokeUserConfigOptions): Record<string, unknown>;
+export declare function buildCursorSmokeEnv(options?: CursorSmokeEnvOptions): Record<string, string | undefined>;
+export declare function buildCursorSmokeEnvPlan(options?: CursorSmokeUserConfigOptions & CursorSmokeEnvOptions): CursorSmokeEnvPlan;
+export declare function prepareCursorSmokeEnv(options?: CursorSmokeUserConfigOptions & CursorSmokeEnvOptions): Record<string, string | undefined>;

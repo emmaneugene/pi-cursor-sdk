@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commonBooleanFlag, commonRepeatStringFlag, parseArgv } from "./lib/cli-args.mjs";
-import { buildCursorSmokeEnvPlan, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES, sealedNodePath, writeCursorSdkEventDebugUserConfig } from "./lib/smoke-env.mjs";
+import { buildCursorSmokeEnvPlan, CURSOR_SDK_EVENT_DEBUG_ENV_NAMES, sealedNodePath, writeCursorSdkUserConfig } from "./lib/smoke-env.mjs";
 import { writeVisualManifest } from "./lib/visual-manifest.mjs";
 import { runVisualSmokeSelfTest } from "./visual-tui-smoke-self-test.mjs";
 import { buildTerminalHtml, writeTerminalScreenshot } from "./lib/visual-render.mjs";
@@ -219,10 +219,6 @@ function seedVisualAgentDir(agentDir) {
 	);
 }
 
-function seedVisualEventDebugConfig(agentDir, directory) {
-	writeCursorSdkEventDebugUserConfig(agentDir, { enabled: true, directory });
-}
-
 function sanitizeLabel(label) {
 	const safe = label.trim().replace(/[^A-Za-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "");
 	return safe || "visual-smoke";
@@ -413,7 +409,6 @@ function visualEventDebugDir(options) {
 function buildLaunchPlan(options, commands, shell) {
 	const agentDir = options.agentDir ?? resolve(options.outDir, "pi-agent");
 	const eventDebugDir = options.eventDebug ? visualEventDebugDir(options) : undefined;
-	if (eventDebugDir) seedVisualEventDebugConfig(agentDir, eventDebugDir);
 	const smokeEnvPlan = buildCursorSmokeEnvPlan({
 		baseEnv: process.env,
 		nodePath: commands.node,
@@ -454,7 +449,7 @@ function buildLaunchPlan(options, commands, shell) {
 	]
 		.filter(Boolean)
 		.join("\n");
-	return { command, clearEnvNames, envAssignments, script, shell };
+	return { agentDir, command, clearEnvNames, envAssignments, script, shell, userConfig: smokeEnvPlan.userConfig };
 }
 
 function runVisualSmoke(options) {
@@ -475,7 +470,8 @@ function runVisualSmoke(options) {
 	const sessionName = `pi-visual-${options.safeLabel}-${process.pid}`;
 	const bufferName = `pi-visual-prompt-${process.pid}`;
 	const shell = resolveShell(process.env.SHELL || "/bin/bash");
-	const { script } = buildLaunchPlan(options, commands, shell);
+	const { agentDir, script, userConfig } = buildLaunchPlan(options, commands, shell);
+	if (userConfig) writeCursorSdkUserConfig(agentDir, userConfig);
 
 	console.log(`[visual-smoke] out-dir=${options.outDir}`);
 	console.log(`[visual-smoke] session-dir=${options.sessionDir}`);

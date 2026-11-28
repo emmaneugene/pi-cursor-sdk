@@ -44,16 +44,22 @@ import {
 import {
 	buildCursorSmokeEnv,
 	buildCursorSmokeEnvPlan,
+	CURSOR_SDK_CLEARED_ENV_NAMES,
 	CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as SCRIPT_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES,
+	prepareCursorSmokeEnv,
 	sealedNodePath,
 } from "../scripts/lib/smoke-env.mjs";
 import {
 	CHILD_PROCESS_TREE_SPAWN_OPTIONS,
 	DEFAULT_CHILD_SHUTDOWN_GRACE_MS,
+	openJsonlRpcSession,
 	parseJsonLines,
 	signalChild,
 	terminateChild,
 	waitForChildClose,
+	type JsonlRpcSession,
+	type JsonlRpcSessionOptions,
+	type WaitForChildCloseOptions,
 } from "../scripts/lib/child-process.mjs";
 import { createScriptFail } from "../scripts/lib/script-fail.mjs";
 import {
@@ -98,7 +104,14 @@ const DECLARATION_TYPE_ONLY_EXPORTS: Record<string, readonly string[]> = {
 		"CursorSdkEventTimingSnapshot",
 		"CursorSdkEventJsonlSink",
 	],
+	"scripts/lib/child-process.d.mts": [
+		"JsonlRpcSession",
+		"JsonlRpcSessionOptions",
+		"WaitForChildCloseOptions",
+	],
 	"scripts/lib/smoke-env.d.mts": [
+		"CursorSmokeEnvOptions",
+		"CursorSmokeEnvPlan",
 		"CursorSmokeUserConfigOptions",
 	],
 	"scripts/lib/cli-args.d.mts": [
@@ -217,6 +230,9 @@ const _backfillPiSessionSnapshot: (
 const _sdkArgsHelp: boolean = parseDebugSdkEventsArgs(["--prompt", "hello"], { CURSOR_API_KEY: "key" }).help;
 const _providerArgsHelp: boolean = parseDebugProviderEventsArgs(["--prompt", "hello"], { CURSOR_API_KEY: "key" }).help;
 const _childShutdownGraceMs: number = DEFAULT_CHILD_SHUTDOWN_GRACE_MS;
+const _waitForChildCloseWithOptions: (child: ChildProcess, options?: WaitForChildCloseOptions) => Promise<number> = waitForChildClose;
+const _openJsonlRpcSession: (child: ChildProcess, options?: JsonlRpcSessionOptions) => JsonlRpcSession = openJsonlRpcSession;
+const _jsonlRpcSessionOptions = { secrets: ["key"] } satisfies JsonlRpcSessionOptions;
 const _childProcessTreeSpawnOptions: Readonly<{ detached: boolean }> = CHILD_PROCESS_TREE_SPAWN_OPTIONS;
 const _startupNoisePatternValue: readonly string[] = CURSOR_SDK_STARTUP_NOISE_PATTERNS;
 const _timingSnapshot = createTimingTracker().snapshot();
@@ -247,8 +263,10 @@ const _commonFlags: Record<string, unknown> = commonProbeFlags;
 const _readArgvValue: string = readArgvValue(["--model", "cursor"], 1, "--model", createScriptFail("test"));
 const _parsedArgv: Record<string, unknown> = parseArgv([], { defaults: {}, flags: {}, fail: createScriptFail("test") });
 const _sealedNodePath: string = sealedNodePath("/usr/local/bin/node", "/tmp/bin");
-const _smokeEnv: Record<string, string | undefined> = buildCursorSmokeEnv({ settingSources: "none", nativeDisplay: "on" });
-const _smokeEnvPlan: { envEntries: Array<[string, string]> } = buildCursorSmokeEnvPlan({ settingSources: "none" });
+const _clearedEnvNames: readonly string[] = CURSOR_SDK_CLEARED_ENV_NAMES;
+const _smokeEnv: Record<string, string | undefined> = buildCursorSmokeEnv({ term: "xterm-256color" });
+const _preparedSmokeEnv: Record<string, string | undefined> = prepareCursorSmokeEnv({ settingSources: "none", nativeDisplay: "on" });
+const _smokeEnvPlan: { envEntries: Array<[string, string]>; clearEnvNames: string[] } = buildCursorSmokeEnvPlan({ settingSources: "none" });
 const _terminalHtml: string = buildTerminalHtml({
 	ansi: "ok",
 	plain: "ok",
@@ -347,7 +365,14 @@ void [
 	_sdkArgsHelp,
 	_providerArgsHelp,
 	_childShutdownGraceMs,
+	_waitForChildCloseWithOptions,
+	_openJsonlRpcSession,
+	_jsonlRpcSessionOptions,
 	_childProcessTreeSpawnOptions,
+	_clearedEnvNames,
+	_smokeEnv,
+	_preparedSmokeEnv,
+	_smokeEnvPlan,
 	_startupNoisePatternValue,
 	_timingSnapshot,
 	_eventJsonlSinkFactory,

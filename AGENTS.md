@@ -7,7 +7,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 ## Repository map
 
 - `src/index.ts` registers the pi extension, provider, fallback warnings, Cursor runtime controls, native replay wrappers, and pi tool bridge hooks. The first in-process factory owns process-global state. Nested child factories register an isolated Cursor provider and bridge without replacing the owner.
-- `src/extension-factory-guard.ts` owns the tokenized process-owner claim/release so a child session cannot dispose the parent bridge, rewrite parent session scope, or replace the parent pooled SDK agent.
+- `src/extension-factory-guard.ts` owns the tokenized process-owner claim/release and active owner model catalog (`initializing` / `ready` + `setCursorExtensionOwnerModels`) shared with nested child factories so a child session cannot dispose the parent bridge, rewrite parent session scope, or replace the parent pooled SDK agent.
 - `src/provider-runtime-context.ts` carries the nested child's explicit scope, cwd, bridge, and replay policy through provider turns.
 - `src/model-discovery.ts` discovers Cursor models, builds pi model metadata, stores per-model metadata, and defines fallback models.
 - `src/model-list-cache.ts` owns the on-disk Cursor model catalog cache and classifies a matching file as `fresh` or `stale`.
@@ -59,7 +59,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `shared/setting-sources.mjs` owns canonical setting-source list parsing/serialization for maintainer CLI flags; `src/setting-sources.ts` reads `local.settingSources` from user JSON at runtime.
 - `src/usage-accounting.ts` owns pi usage mapping from local turn-ended and billed `Agent.getUsage()` spend, plus post-compaction occupancy floors.
 - `src/sdk-billed-usage.ts` owns `Agent.getUsage()` fetch, local usage-UUID watermarks, and billed turn selection.
-- `scripts/lib/smoke-env.mjs`, `scripts/lib/smoke-shell.sh`, and `scripts/lib/visual-render.mjs` own maintainer smoke PATH/env isolation and browser-rendered visual artifacts; smoke runners should consume these helpers instead of duplicating debug env names, sealed Node PATH logic, or xterm/Playwright rendering.
+- `scripts/lib/smoke-env.mjs`, `scripts/lib/smoke-shell.sh`, `scripts/lib/visual-render.mjs`, and `scripts/lib/child-process.mjs` own maintainer smoke PATH/env isolation, browser-rendered visual artifacts, and child-process helpers (`openJsonlRpcSession` and bounded `waitForChildClose`); smoke and debug runners should consume these helpers instead of duplicating debug env names, sealed Node PATH logic, xterm/Playwright rendering, or JSONL RPC child lifecycle.
 - `src/tool-presentation-registry.ts` is the canonical typed registry for Cursor tool names, labels, visibility, lifecycle, replay metadata (legacy wrapper names, wrapper labels, side-effect policy, call-summary policy), web remapping, alias normalization, and bridge exclusions for internal replay wrappers only (`cursor`, `cursor_*`); sibling modules derive from it.
 - `src/transcript-tool-specs.ts` owns per-tool transcript formatters and pi display builders keyed by normalized tool name; its display implementation keys must match registry entries exactly (`CURSOR_TOOL_DISPLAY_SPEC_KEYS`).
 - `src/pi-tool-bridge-types.ts` owns shared bridge/MCP type contracts.
@@ -91,7 +91,7 @@ This repository is a pi provider extension that registers Cursor SDK-backed mode
 - `src/agent-message-web-tools.ts` owns transcript web-tool call loading after an agent-message offset.
 - `src/mcp-timeout-override.ts` owns Cursor SDK MCP timeout overrides: 3600s default for `callTool`, 10s default for verified initialize/listTools paths on first send, and SDK-default behavior for unknown MCP protocol stacks.
 - `src/config.ts` owns user-only `~/.pi/agent/cursor-sdk.json` loading, parsing, CLI/session/user/builtin precedence, and fast-default persistence.
-- `src/state.ts` owns Cursor fast/mode controls, `/cursor-http` session/user persistence, `/cursor-tools`, local config refresh/cleanup wiring, and stable state re-exports.
+- `src/state.ts` owns Cursor fast/mode controls, `/cursor-http` session/user persistence, `/cursor-tools`, and local config refresh/cleanup wiring.
 - `src/runtime-state.ts` owns effective Cursor runtime status helpers.
 - `src/task-presentation.ts` owns `tools.display.taskPresentation` (`task` / `subagent` / `subagent-meta`).
 - `src/skill-tool.ts` owns the Cursor `cursor_activate_skill` tool and skill-catalog prompt section.

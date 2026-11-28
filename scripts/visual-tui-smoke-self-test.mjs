@@ -94,13 +94,14 @@ export function runVisualSmokeSelfTest(deps) {
 		assertSelfTest(!defaults.has("PI_CURSOR_PI_TOOL_BRIDGE"), "bridge must not use the removed public env var");
 		assertSelfTest(!defaults.has("PI_CURSOR_EXPOSE_BUILTIN_TOOLS"), "built-in exposure must not use the removed public env var");
 		assertSelfTest(defaults.get("PI_CODING_AGENT_DIR") === join(tempDir, "pi-agent"), "agent dir must be isolated under out-dir");
-		const defaultConfig = JSON.parse(readFileSync(join(tempDir, "pi-agent", "cursor-sdk.json"), "utf8"));
-		assertSelfTest(defaultConfig.tools?.display?.native === "on", "native display must be forced on in isolated user config");
-		assertSelfTest(Array.isArray(defaultConfig.local?.settingSources) && defaultConfig.local.settingSources.length === 0, "setting sources must default to none in isolated user config");
-		assertSelfTest(defaultConfig.tools?.bridge?.enabled === false, "bridge must default off in isolated user config");
-		assertSelfTest(defaultConfig.tools?.bridge?.exposeBuiltins === false, "built-in exposure must default off in isolated user config");
+		assertSelfTest(!existsSync(join(tempDir, "pi-agent", "cursor-sdk.json")), "buildLaunchPlan must not write cursor-sdk.json to disk");
+		assertSelfTest(plan.userConfig?.tools?.display?.native === "on", "native display must be forced on in planned user config");
+		assertSelfTest(Array.isArray(plan.userConfig?.local?.settingSources) && plan.userConfig.local.settingSources.length === 0, "setting sources must default to none in planned user config");
+		assertSelfTest(plan.userConfig?.tools?.bridge?.enabled === false, "bridge must default off in planned user config");
+		assertSelfTest(plan.userConfig?.tools?.bridge?.exposeBuiltins === false, "built-in exposure must default off in planned user config");
 		assertSelfTest(defaults.get("PI_OFFLINE") === "1", "startup network operations must be off");
 		assertSelfTest(defaults.get("PI_SKIP_VERSION_CHECK") === "1", "pi.dev version check must be off");
+		assertSelfTest(new Set(plan.clearEnvNames).size === plan.clearEnvNames.length, "clearEnvNames must not contain duplicates");
 		for (const name of DEBUG_ENV_NAMES) {
 			assertSelfTest(plan.clearEnvNames.includes(name), `${name} must be cleared by default`);
 		}
@@ -141,12 +142,12 @@ export function runVisualSmokeSelfTest(deps) {
 		assertSelfTest(!optIns.has("PI_CURSOR_EXPOSE_BUILTIN_TOOLS"), "built-in exposure opt-in must not use the removed public env var");
 		assertSelfTest(!optIns.has("PI_CURSOR_SDK_EVENT_DEBUG"), "event debug opt-in must not use the removed public env var");
 		assertSelfTest(!optIns.has("PI_CURSOR_SDK_EVENT_DEBUG_DIR"), "event debug dir must not use the removed public env var");
-		const eventDebugConfig = JSON.parse(readFileSync(join(tempDir, "pi-agent", "cursor-sdk.json"), "utf8"));
-		assertSelfTest(eventDebugConfig.local?.settingSources?.[0] === "all", "setting source opt-in must write isolated cursor-sdk.json");
-		assertSelfTest(eventDebugConfig.tools?.bridge?.enabled === true, "bridge opt-in must write isolated cursor-sdk.json");
-		assertSelfTest(eventDebugConfig.tools?.bridge?.exposeBuiltins === true, "built-in exposure opt-in must write isolated cursor-sdk.json");
-		assertSelfTest(eventDebugConfig.debug?.sdkEvents?.enabled === true, "event debug opt-in must write isolated cursor-sdk.json");
-		assertSelfTest(eventDebugConfig.debug?.sdkEvents?.directory === join(tempDir, "self-test.cursor-sdk-events"), "event debug dir must be deterministic under out-dir");
+		assertSelfTest(!existsSync(join(tempDir, "pi-agent", "cursor-sdk.json")), "opt-in buildLaunchPlan must not write cursor-sdk.json to disk");
+		assertSelfTest(optInPlan.userConfig?.local?.settingSources?.[0] === "all", "setting source opt-in must populate planned user config");
+		assertSelfTest(optInPlan.userConfig?.tools?.bridge?.enabled === true, "bridge opt-in must populate planned user config");
+		assertSelfTest(optInPlan.userConfig?.tools?.bridge?.exposeBuiltins === true, "built-in exposure opt-in must populate planned user config");
+		assertSelfTest(optInPlan.userConfig?.debug?.sdkEvents?.enabled === true, "event debug opt-in must populate planned user config");
+		assertSelfTest(optInPlan.userConfig?.debug?.sdkEvents?.directory === join(tempDir, "self-test.cursor-sdk-events"), "event debug dir must be deterministic under out-dir");
 		for (const name of DEBUG_ENV_NAMES) {
 			assertSelfTest(optInPlan.clearEnvNames.includes(name), `${name} must be cleared even when event debug is explicit`);
 		}
@@ -203,6 +204,12 @@ esac
 				missingJsonlFailed = /no current-run persisted \.jsonl/.test(missingJsonlError);
 			}
 			assertSelfTest(missingJsonlFailed, `missing JSONL should fail after partial visual artifacts are written: ${missingJsonlError || "no error"}`);
+			assertSelfTest(existsSync(join(tempDir, "pi-agent", "cursor-sdk.json")), "runVisualSmoke should write isolated cursor-sdk.json at launch");
+			const launchedConfig = JSON.parse(readFileSync(join(tempDir, "pi-agent", "cursor-sdk.json"), "utf8"));
+			assertSelfTest(launchedConfig.tools?.display?.native === "on", "launched cursor-sdk.json should force native display on");
+			assertSelfTest(Array.isArray(launchedConfig.local?.settingSources) && launchedConfig.local.settingSources.length === 0, "launched cursor-sdk.json should default setting sources to none");
+			assertSelfTest(launchedConfig.tools?.bridge?.enabled === false, "launched cursor-sdk.json should default bridge off");
+			assertSelfTest(launchedConfig.tools?.bridge?.exposeBuiltins === false, "launched cursor-sdk.json should default built-in exposure off");
 			assertSelfTest(existsSync(noJsonlManifest), "missing JSONL should still write a failure manifest");
 			const manifest = JSON.parse(readFileSync(noJsonlManifest, "utf8"));
 			assertSelfTest(manifest.failure?.message?.includes("no current-run persisted .jsonl"), "failure manifest should record the missing JSONL reason");

@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -18,6 +19,7 @@ import {
 } from "../scripts/lib/cli-args.mjs";
 import {
 	CHILD_PROCESS_TREE_SPAWN_OPTIONS,
+	openJsonlRpcSession,
 	parseJsonLines,
 	terminateChild,
 	waitForChildClose,
@@ -25,9 +27,11 @@ import {
 import {
 	buildCursorSmokeEnv,
 	buildCursorSmokeEnvPlan,
+	CURSOR_SDK_CLEARED_ENV_NAMES,
 	CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as scriptSdkEventDebugEnvNames,
+	CURSOR_SDK_STALE_PUBLIC_ENV_NAMES,
+	prepareCursorSmokeEnv,
 	sealedNodePath,
-	writeCursorSdkEventDebugUserConfig,
 } from "../scripts/lib/smoke-env.mjs";
 import { CURSOR_SDK_EVENT_DEBUG_ENV_NAMES as sharedSdkEventDebugEnvNames } from "../shared/sdk-event-debug-env.mjs";
 import {
@@ -74,20 +78,6 @@ async function readChildPids(parent: ChildProcess): Promise<{ parentPid: number;
 	});
 }
 
-async function waitForChildCloseWithinTest(parent: ChildProcess, timeoutMs = 5_000): Promise<number> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	try {
-		return await Promise.race([
-			waitForChildClose(parent),
-			new Promise<never>((_resolve, reject) => {
-				timer = setTimeout(() => reject(new Error("timed out waiting for child close")), timeoutMs);
-			}),
-		]);
-	} finally {
-		if (timer) clearTimeout(timer);
-	}
-}
-
 async function forceCleanupProcess(pid: number | undefined): Promise<void> {
 	if (!pid || !processExists(pid)) return;
 	if (process.platform === "win32") {
@@ -114,11 +104,19 @@ describe("maintainer scripts shared lib", () => {
 
 	it("builds sealed smoke env without leaking debug or setting-source state", () => {
 		expect(scriptSdkEventDebugEnvNames).toEqual(sharedSdkEventDebugEnvNames);
+		expect(new Set(CURSOR_SDK_CLEARED_ENV_NAMES).size).toBe(CURSOR_SDK_CLEARED_ENV_NAMES.length);
+		expect(CURSOR_SDK_CLEARED_ENV_NAMES).toEqual(expect.arrayContaining([...scriptSdkEventDebugEnvNames, ...CURSOR_SDK_STALE_PUBLIC_ENV_NAMES]));
 		expect(sealedNodePath("/opt/node/bin/node", `/tmp/bin${delimiter}/usr/bin`)).toBe(`/opt/node/bin${delimiter}/tmp/bin${delimiter}/usr/bin`);
 		expect(sealedNodePath("/opt/node/bin/node", "")).toBe("/opt/node/bin");
 		const agentDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-smoke-event-debug-"));
 		try {
-			const env = buildCursorSmokeEnv({
+			const configPath = join(agentDir, "cursor-sdk.json");
+			const purePlan = buildCursorSmokeEnvPlan({ baseEnv: { PATH: "/usr/bin" }, settingSources: "none", agentDir });
+			expect(purePlan.clearEnvNames).toEqual([...CURSOR_SDK_CLEARED_ENV_NAMES]);
+			expect(buildCursorSmokeEnv({ baseEnv: { PATH: "/usr/bin" }, agentDir }).PI_CODING_AGENT_DIR).toBe(agentDir);
+			expect(existsSync(configPath)).toBe(false);
+
+			const env = prepareCursorSmokeEnv({
 				baseEnv: {
 					PATH: "/tmp/fake:/usr/bin",
 					PI_CURSOR_SETTING_SOURCES: "all",
@@ -141,17 +139,17 @@ describe("maintainer scripts shared lib", () => {
 			expect(env.PI_CURSOR_SDK_EVENT_DEBUG).toBeUndefined();
 			expect(env.PI_CURSOR_SDK_EVENT_DEBUG_DIR).toBeUndefined();
 			expect(env.PI_CURSOR_SDK_EVENT_DEBUG_STDERR).toBeUndefined();
-			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8"))).toEqual({
+			expect(JSON.parse(readFileSync(configPath, "utf8"))).toEqual({
 				local: { settingSources: [] },
 				tools: {
 					display: { native: "on" },
 					bridge: { enabled: false, exposeBuiltins: false },
 				},
 			});
-			buildCursorSmokeEnv({ baseEnv: { PATH: "/usr/bin" }, nativeDisplay: "off", agentDir });
-			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8")).tools.display).toEqual({ native: "off" });
+			prepareCursorSmokeEnv({ baseEnv: { PATH: "/usr/bin" }, nativeDisplay: "off", agentDir });
+			expect(JSON.parse(readFileSync(configPath, "utf8")).tools.display).toEqual({ native: "off" });
 
-			const withBridgeDebug = buildCursorSmokeEnv({
+			const withBridgeDebug = prepareCursorSmokeEnv({
 				baseEnv: { PATH: "/usr/bin" },
 				nodePath: "/opt/node/bin/node",
 				bridge: true,
@@ -162,14 +160,14 @@ describe("maintainer scripts shared lib", () => {
 			});
 			expect(withBridgeDebug.PI_CURSOR_PI_TOOL_BRIDGE_DEBUG).toBeUndefined();
 			expect(withBridgeDebug.PI_CURSOR_PI_TOOL_BRIDGE_DEBUG_FILE).toBeUndefined();
-			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8")).tools.bridge).toEqual({
+			expect(JSON.parse(readFileSync(configPath, "utf8")).tools.bridge).toEqual({
 				enabled: true,
 				exposeBuiltins: true,
 				debug: { stderr: true, file: "/tmp/bridge.jsonl" },
 			});
 			expect(() => (sharedSdkEventDebugEnvNames as unknown as string[]).push("MUTATED")).toThrow(TypeError);
 
-			const withDebug = buildCursorSmokeEnv({
+			const withDebug = prepareCursorSmokeEnv({
 				baseEnv: { PATH: "/usr/bin" },
 				nodePath: "/opt/node/bin/node",
 				eventDebugDir: "/tmp/events",
@@ -177,16 +175,14 @@ describe("maintainer scripts shared lib", () => {
 			});
 			expect(withDebug.PI_CURSOR_SDK_EVENT_DEBUG).toBeUndefined();
 			expect(withDebug.PI_CURSOR_SDK_EVENT_DEBUG_DIR).toBeUndefined();
-			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8"))).toMatchObject({
+			expect(JSON.parse(readFileSync(configPath, "utf8"))).toMatchObject({
 				debug: { sdkEvents: { enabled: true, directory: "/tmp/events" } },
 			});
-			writeCursorSdkEventDebugUserConfig(agentDir, { stderr: true });
-			expect(JSON.parse(readFileSync(join(agentDir, "cursor-sdk.json"), "utf8")).debug.sdkEvents.stderr).toBe(true);
 		} finally {
 			rmSync(agentDir, { recursive: true, force: true });
 		}
 
-		const defaultSettingsEnv = buildCursorSmokeEnv({
+		const defaultSettingsEnv = prepareCursorSmokeEnv({
 			baseEnv: { PATH: "/usr/bin", PI_CURSOR_SETTING_SOURCES: "none" },
 			nodePath: "/opt/node/bin/node",
 			settingSources: null,
@@ -199,6 +195,7 @@ describe("maintainer scripts shared lib", () => {
 		});
 		expect(plan.envEntries).toEqual([]);
 		expect(plan.env.PI_CURSOR_NATIVE_TOOL_DISPLAY).toBeUndefined();
+		expect(plan.userConfig).toBeUndefined();
 	});
 
 	it("keeps setting-source parsing aligned with provider runtime", () => {
@@ -384,7 +381,7 @@ console.log(JSON.stringify({ parentPid: process.pid, grandchildPid: grandchild.p
 		try {
 			const pids = await readChildPids(parent);
 			grandchildPid = pids.grandchildPid;
-			expect(await waitForChildCloseWithinTest(parent)).toBe(0);
+			expect(await waitForChildClose(parent, { timeoutMs: 5_000, label: "detached parent" })).toBe(0);
 			expect(processExists(pids.parentPid)).toBe(false);
 			expect(processExists(pids.grandchildPid)).toBe(true);
 
@@ -396,6 +393,102 @@ console.log(JSON.stringify({ parentPid: process.pid, grandchildPid: grandchild.p
 			await forceCleanupProcess(grandchildPid);
 		}
 	}, 30_000);
+
+	it("openJsonlRpcSession rejects waitFor immediately on early non-zero exit with scrubbed output", async () => {
+		const secret = "cursor-super-secret-rpc-key";
+		const child = spawn(process.execPath, ["-e", `process.stderr.write("fatal Bearer ${secret}\\n"); process.exit(7);`], {
+			stdio: ["pipe", "pipe", "pipe"],
+			...CHILD_PROCESS_TREE_SPAWN_OPTIONS,
+		});
+		const rpc = openJsonlRpcSession(child, { secrets: [secret] });
+		try {
+			const startedAt = Date.now();
+			const error = await rpc.waitFor(() => false, { timeoutMs: 30_000, label: "agent_settled" }).catch((err: Error) => err);
+			expect(error).toBeInstanceOf(Error);
+			expect(Date.now() - startedAt).toBeLessThan(5_000);
+			expect((error as Error).message).toContain("code=7");
+			expect((error as Error).message).not.toContain(secret);
+		} finally {
+			await rpc.dispose();
+		}
+	}, 15_000);
+
+	it("openJsonlRpcSession enforces bounded close timeout and disposes active waiters and listeners", async () => {
+		const fakeChild = Object.assign(new EventEmitter(), {
+			exitCode: null,
+			signalCode: null,
+			stdout: new EventEmitter(),
+			stderr: new EventEmitter(),
+			stdin: new EventEmitter(),
+		});
+		const rpc = openJsonlRpcSession(fakeChild as unknown as ChildProcess);
+		fakeChild.stdout.emit("data", '{"type":"ready"}\nnon-json\n');
+		expect(await rpc.waitFor((events) => events.length === 1, { timeoutMs: 1_000 })).toEqual([{ type: "ready" }]);
+		await expect(rpc.close({ timeoutMs: 25, label: "hung child" })).rejects.toThrow(
+			/hung child did not exit within 25ms.*stdoutTail=.*non-json/s,
+		);
+		const pendingWait = rpc.waitFor(() => false, { timeoutMs: 30_000, label: "never settles" });
+		await rpc.dispose();
+		await expect(pendingWait).rejects.toThrow(/never settles: child exited \(code=null, signal=null\)/);
+		expect([
+			fakeChild.listenerCount("close"),
+			fakeChild.listenerCount("error"),
+			fakeChild.stdout.listenerCount("data"),
+			fakeChild.stderr.listenerCount("data"),
+			fakeChild.stdin.listenerCount("error"),
+		]).toEqual([0, 0, 0, 0, 0]);
+	});
+
+	it("openJsonlRpcSession dispose terminates a still-running child even after a child error event", async () => {
+		const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 60_000)"], {
+			stdio: ["pipe", "pipe", "pipe"],
+			...CHILD_PROCESS_TREE_SPAWN_OPTIONS,
+		});
+		const rpc = openJsonlRpcSession(child);
+		try {
+			const pendingWait = rpc.waitFor(() => false, { timeoutMs: 30_000, label: "wait after error" });
+			child.emit("error", new Error("simulated kill failure"));
+			await expect(pendingWait).rejects.toThrow(/wait after error: child process error: simulated kill failure/);
+			expect(child.pid && processExists(child.pid)).toBe(true);
+			await rpc.dispose({ graceMs: 500 });
+			expect(child.pid ? await waitUntilGone([child.pid]) : false).toBe(true);
+		} finally {
+			await forceCleanupProcess(child.pid);
+		}
+	}, 15_000);
+
+	if (process.platform !== "win32") {
+		it("smoke-shell deduplicates cleared env unsets and delegates agent-home seeding", () => {
+			const tempDir = mkdtempSync(join(tmpdir(), "pi-cursor-sdk-smoke-shell-"));
+			try {
+				const srcDir = join(tempDir, "src");
+				const targetHome = join(tempDir, "home");
+				mkdirSync(srcDir, { recursive: true });
+				writeFileSync(join(srcDir, "auth.json"), '{"cursor":{"apiKey":"k"}}\n', "utf8");
+				writeFileSync(join(srcDir, "models.json"), '{"models":[]}\n', "utf8");
+				const script = [
+					". scripts/lib/smoke-shell.sh",
+					'smoke_load_cursor_sdk_event_debug_env_names "$1" scripts/lib/smoke-env.mjs',
+					'smoke_load_cursor_sdk_stale_public_env_names "$1" scripts/lib/smoke-env.mjs',
+					'smoke_build_cursor_sdk_cleared_env_unsets && printf "%s\\n" "${SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS[@]}"',
+					'smoke_seed_pi_agent_home "$2" "$3" "$4"',
+				].join("\n");
+				const result = spawnSync(
+					"bash",
+					["-euo", "pipefail", "-c", script, "bash", process.execPath, targetHome, join(srcDir, "auth.json"), join(srcDir, "models.json")],
+					{ encoding: "utf8" },
+				);
+				expect(result.status, result.stderr).toBe(0);
+				const lines = result.stdout.split("\n").filter((line) => line && !line.startsWith("[smoke]"));
+				expect(lines.filter((_, i) => i % 2 === 0).every((flag) => flag === "-u")).toBe(true);
+				expect(lines.filter((_, i) => i % 2 === 1)).toEqual([...CURSOR_SDK_CLEARED_ENV_NAMES]);
+				expect(readFileSync(join(targetHome, ".pi", "agent", "auth.json"), "utf8")).toContain('"cursor"');
+				expect(readFileSync(join(targetHome, ".pi", "agent", "models.json"), "utf8")).toContain('"models"');
+			} finally {
+				rmSync(tempDir, { recursive: true, force: true });
+			}
+		});
+	}
 
 	it("createScriptFail scrubs generic secrets before applying explicit secrets", () => {
 		const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);

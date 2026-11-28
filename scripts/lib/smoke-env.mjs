@@ -47,17 +47,19 @@ export const CURSOR_SDK_STALE_PUBLIC_ENV_NAMES = Object.freeze([
 	"PI_CURSOR_SDK_MODEL_CACHE_TTL_MS",
 ]);
 
+export const CURSOR_SDK_CLEARED_ENV_NAMES = Object.freeze([
+	...new Set([
+		...CURSOR_SDK_EVENT_DEBUG_ENV_NAMES,
+		...CURSOR_SDK_STALE_PUBLIC_ENV_NAMES,
+	]),
+]);
+
 export function sealedNodePath(nodePath = process.execPath, envPath = process.env.PATH ?? "") {
 	return [dirname(nodePath), envPath].filter(Boolean).join(delimiter);
 }
 
 export function clearCursorSdkEventDebugEnv(env) {
 	for (const name of CURSOR_SDK_EVENT_DEBUG_ENV_NAMES) delete env[name];
-	return env;
-}
-
-export function clearCursorSdkStalePublicEnv(env) {
-	for (const name of CURSOR_SDK_STALE_PUBLIC_ENV_NAMES) delete env[name];
 	return env;
 }
 
@@ -86,10 +88,6 @@ export function writeCursorSdkUserConfig(agentDir, patch = {}) {
 	}
 	writeFileSync(path, `${JSON.stringify(mergeConfig(current, patch), null, 2)}\n`);
 	return path;
-}
-
-export function writeCursorSdkEventDebugUserConfig(agentDir, sdkEvents = { enabled: true }) {
-	return writeCursorSdkUserConfig(agentDir, { debug: { sdkEvents } });
 }
 
 export function buildCursorSmokeUserConfig({
@@ -138,33 +136,14 @@ export function buildCursorSmokeUserConfig({
 export function buildCursorSmokeEnv({
 	baseEnv = process.env,
 	nodePath = process.execPath,
-	settingSources,
-	nativeDisplay,
-	bridge,
-	exposeBuiltinTools,
-	bridgeDebug,
-	bridgeDebugFile,
-	transport,
 	term,
-	eventDebugDir,
 	agentDir,
 } = {}) {
-	const env = clearCursorSdkStalePublicEnv(clearCursorSdkEventDebugEnv({ ...baseEnv }));
+	const env = { ...baseEnv };
+	for (const name of CURSOR_SDK_CLEARED_ENV_NAMES) delete env[name];
 	env.PATH = sealedNodePath(nodePath, baseEnv.PATH ?? "");
 	if (term !== undefined) env.TERM = term;
-	if (agentDir) {
-		writeCursorSdkUserConfig(agentDir, buildCursorSmokeUserConfig({
-			settingSources,
-			nativeDisplay,
-			bridge,
-			exposeBuiltinTools,
-			bridgeDebug,
-			bridgeDebugFile,
-			transport,
-			eventDebugDir,
-		}));
-		env.PI_CODING_AGENT_DIR = agentDir;
-	}
+	if (agentDir) env.PI_CODING_AGENT_DIR = agentDir;
 	return env;
 }
 
@@ -175,8 +154,16 @@ export function buildCursorSmokeEnvPlan(options = {}) {
 	return {
 		env,
 		sealedPath: env.PATH,
-		clearEnvNames: [...CURSOR_SDK_EVENT_DEBUG_ENV_NAMES, ...CURSOR_SDK_STALE_PUBLIC_ENV_NAMES],
+		clearEnvNames: [...CURSOR_SDK_CLEARED_ENV_NAMES],
 		envEntries,
 		userConfig: options.agentDir ? buildCursorSmokeUserConfig(options) : undefined,
 	};
+}
+
+export function prepareCursorSmokeEnv(options = {}) {
+	const plan = buildCursorSmokeEnvPlan(options);
+	if (options.agentDir) {
+		writeCursorSdkUserConfig(options.agentDir, plan.userConfig ?? {});
+	}
+	return plan.env;
 }

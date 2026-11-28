@@ -15,12 +15,7 @@ import {
 	parseArgv,
 	requireApiKey,
 } from "./lib/cli-args.mjs";
-import {
-	CHILD_PROCESS_TREE_SPAWN_OPTIONS,
-	parseJsonLines,
-	terminateChild,
-	waitForChildClose,
-} from "./lib/child-process.mjs";
+import { CHILD_PROCESS_TREE_SPAWN_OPTIONS, openJsonlRpcSession } from "./lib/child-process.mjs";
 import { scrubSensitiveText } from "../shared/sensitive-text.mjs";
 import { createScriptFail } from "./lib/script-fail.mjs";
 import { ensureBuilt } from "./lib/ensure-built.mjs";
@@ -128,12 +123,12 @@ export function buildDebugProviderEventsChildEnv(envInput, options) {
 	return env;
 }
 
-function readCaptureSummary(artifactDir, stderr) {
+function readCaptureSummary(artifactDir, stderrText) {
 	const summaryPath = join(artifactDir, SUMMARY_ARTIFACT);
 	try {
 		return JSON.parse(readFileSync(summaryPath, "utf8"));
 	} catch {
-		for (const line of stderr.split("\n").reverse()) {
+		for (const line of stderrText.split("\n").reverse()) {
 			const markerIndex = line.indexOf(SDK_EVENT_DEBUG_LOG_PREFIX);
 			if (markerIndex === -1) continue;
 			const payload = line.slice(markerIndex + SDK_EVENT_DEBUG_LOG_PREFIX.length).trim();
@@ -232,49 +227,23 @@ export async function runDebugProviderEvents(args, envInput = process.env) {
 		stdio: ["pipe", "pipe", "pipe"],
 		...CHILD_PROCESS_TREE_SPAWN_OPTIONS,
 	});
-	let closed = false;
-	let stdout = "";
-	let stderr = "";
-	child.stdout.on("data", (chunk) => {
-		stdout += chunk.toString();
-	});
-	child.stderr.on("data", (chunk) => {
-		stderr += chunk.toString();
-	});
-
-	const send = (obj) => {
-		if (!child.stdin.writable) fail("pi stdin closed before prompt could be sent");
-		child.stdin.write(`${JSON.stringify(obj)}\n`);
-	};
+	const rpc = openJsonlRpcSession(child, { secrets: [args.apiKey] });
 
 	try {
-		send({ type: "prompt", message: args.prompt });
-		await new Promise((resolve, reject) => {
-			const timeoutMs = Number(envInput.PI_PROVIDER_EVENT_DEBUG_TIMEOUT_MS ?? 600_000);
-			const start = Date.now();
-			const tick = () => {
-				const events = parseJsonLines(stdout);
-				if (events.some((event) => event.type === "agent_settled")) {
-					resolve(events);
-					return;
-				}
-				if (Date.now() - start > timeoutMs) {
-					reject(new Error(`timeout after ${timeoutMs}ms`));
-					return;
-				}
-				setTimeout(tick, 250);
-			};
-			tick();
-		});
-		child.stdin.end();
-		const exitCode = await waitForChildClose(child);
-		closed = true;
+		rpc.send({ type: "prompt", message: args.prompt });
+		const parsedTimeoutMs = Number(envInput.PI_PROVIDER_EVENT_DEBUG_TIMEOUT_MS);
+		const timeoutMs = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs > 0 ? parsedTimeoutMs : 600_000;
+		await rpc.waitFor(
+			(events) => events.some((event) => event.type === "agent_settled"),
+			{ timeoutMs, label: "agent_settled" },
+		);
+		const exitCode = await rpc.close({ label: "pi after agent_settled" });
 		if (exitCode !== 0) {
-			fail(`pi exited ${exitCode}\nstderr=${scrubSensitiveText(stderr.slice(-2000), args.apiKey)}`, [args.apiKey]);
+			fail(`pi exited ${exitCode}\nstderr=${scrubSensitiveText(rpc.stderr.slice(-2000), args.apiKey)}`, [args.apiKey]);
 		}
 
 		const captureSummary = assertCompleteCaptureSummary(
-			backfillPiSessionSnapshot(readCaptureSummary(artifactDir, stderr), artifactDir, sessionDir),
+			backfillPiSessionSnapshot(readCaptureSummary(artifactDir, rpc.stderr), artifactDir, sessionDir),
 			artifactDir,
 			args.apiKey,
 		);
@@ -292,7 +261,7 @@ export async function runDebugProviderEvents(args, envInput = process.env) {
 			waitResultRecorded: captureSummary.waitResultRecorded,
 		};
 	} finally {
-		if (!closed) await terminateChild(child);
+		await rpc.dispose();
 	}
 }
 

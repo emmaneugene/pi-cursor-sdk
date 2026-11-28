@@ -77,7 +77,7 @@ smoke_load_cursor_sdk_event_debug_env_names() {
 smoke_build_cursor_sdk_event_debug_unsets() {
 	local name
 	SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS=()
-	for name in "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}"; do
+	for name in ${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]+"${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}"}; do
 		SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS+=( -u "$name" )
 	done
 }
@@ -97,10 +97,16 @@ smoke_load_cursor_sdk_stale_public_env_names() {
 }
 
 smoke_build_cursor_sdk_cleared_env_unsets() {
-	local name
+	local name seen=$'\n'
 	smoke_build_cursor_sdk_event_debug_unsets
-	SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS=( "${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_UNSETS[@]}" )
-	for name in "${SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]}"; do
+	SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS=()
+	for name in \
+		${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]+"${SMOKE_CURSOR_SDK_EVENT_DEBUG_ENV_NAMES[@]}"} \
+		${SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]+"${SMOKE_CURSOR_SDK_STALE_PUBLIC_ENV_NAMES[@]}"}; do
+		case "$seen" in
+			*$'\n'"$name"$'\n'*) continue ;;
+		esac
+		seen+="$name"$'\n'
 		SMOKE_CURSOR_SDK_CLEARED_ENV_UNSETS+=( -u "$name" )
 	done
 }
@@ -206,19 +212,8 @@ smoke_run_with_timeout_or_fail() {
 
 smoke_seed_pi_agent_home() {
 	local home="$1"
-	local auth_json="${2:-${AUTH_JSON:-${REAL_HOME:-$HOME}/.pi/agent/auth.json}}"
-	local models_src="${3:-${PI_AGENT_DIR:-${REAL_HOME:-$HOME}/.pi/agent}/models.json}"
-	mkdir -p "$home/.pi/agent"
-	if [[ -f "$auth_json" ]]; then
-		cp "$auth_json" "$home/.pi/agent/auth.json"
-		chmod 600 "$home/.pi/agent/auth.json"
-		smoke_log "seeded $home/.pi/agent/auth.json"
-	else
-		smoke_log "WARN: no auth.json at $auth_json"
-	fi
-	if [[ -f "$models_src" ]]; then
-		cp "$models_src" "$home/.pi/agent/models.json"
-	fi
+	shift
+	smoke_seed_pi_agent_dir "$home/.pi/agent" ${1+"$@"}
 }
 
 smoke_has_auth_provider() {
