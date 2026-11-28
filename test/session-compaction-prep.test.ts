@@ -27,9 +27,9 @@ describe("prepareCursorSessionForCompaction", () => {
 			createAgent,
 		});
 
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has(scopeKey)).toBe(true);
+		expect(sessionAgentTestUtils.hasSessionAgent(scopeKey)).toBe(true);
 		await prepareCursorSessionForCompaction(scopeKey);
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has(scopeKey)).toBe(false);
+		expect(sessionAgentTestUtils.hasSessionAgent(scopeKey)).toBe(false);
 		expect(mockDispose).toHaveBeenCalledTimes(1);
 	});
 
@@ -62,9 +62,9 @@ describe("prepareCursorSessionForCompaction", () => {
 
 		await prepareCursorSessionForCompaction(scopeKey);
 
-		expect(liveRun.disposed).toBe(true);
+		expect(liveRun.status).toEqual({ kind: "disposed" });
 		expect(cursorProviderTestUtils.pendingCursorNativeRunCount()).toBe(0);
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has(scopeKey)).toBe(false);
+		expect(sessionAgentTestUtils.hasSessionAgent(scopeKey)).toBe(false);
 		expect(mockDispose).toHaveBeenCalledTimes(1);
 	});
 });

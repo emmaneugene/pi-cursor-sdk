@@ -8,18 +8,14 @@ import {
 	type CursorNormalizedToolName,
 	type CursorReplayActivityToolName,
 } from "./tool-presentation-registry.js";
-import { resolveCursorEditDiff } from "./display-text.js";
 import {
 	assembleCursorReplayActivityDetails,
 	assembleCursorReplayGenerateImageDetails,
 	CURSOR_REPLAY_UNREGISTERED_ACTIVITY_TOOL_NAME,
 	type CursorReplayToolDetails,
 } from "./replay-tool-details.js";
-import { asRecord, getNumber, getString } from "./record-utils.js";
 import {
 	firstNonEmptyLine,
-	formatDisplayPath,
-	formatDiffString,
 	formatError,
 	limitText,
 	truncateArg,
@@ -29,13 +25,10 @@ import {
 	type TranscriptOptions,
 } from "./transcript-utils.js";
 import {
-	buildCursorEditActivityDisplayArgs,
 	buildFindDisplayArgs,
 	buildGrepDisplayArgs,
-	buildNativeEditDisplayArgs,
 	buildReadDisplayArgs,
 	buildShellDisplayArgs,
-	buildWriteDisplayArgs,
 	formatDelete,
 	formatEdit,
 	formatFallback,
@@ -48,6 +41,8 @@ import {
 	formatWebSearch,
 	formatPlan,
 	formatRecordScreen,
+	formatResolvedEdit,
+	formatResolvedWrite,
 	formatSemSearch,
 	formatRead,
 	formatReadLints,
@@ -56,12 +51,13 @@ import {
 	formatTodos,
 	formatWrite,
 	formatNativeReadDisplayContent,
-	getCursorWriteArgContent,
 	getGlobBody,
 	getGrepBody,
 	getLsBody,
 	getShellOutput,
+	resolveEditDisplay,
 	resolveReadContent,
+	resolveWriteDisplay,
 } from "./transcript-tool-formatters.js";
 export interface ToolDisplayContext {
 	rawName: string;
@@ -190,11 +186,10 @@ function buildGenericPiToolDisplay(context: ToolDisplayContext): CursorPiToolDis
 
 function buildEditActivitySummary(
 	displayPath: string | undefined,
-	value: Record<string, unknown>,
+	linesAdded: number | undefined,
+	linesRemoved: number | undefined,
 ): string | undefined {
 	const path = displayPath ?? "replayed";
-	const linesAdded = getNumber(value, "linesAdded");
-	const linesRemoved = getNumber(value, "linesRemoved");
 	const parts = [
 		linesAdded ? `added ${linesAdded} line${linesAdded === 1 ? "" : "s"}` : undefined,
 		linesRemoved ? `removed ${linesRemoved} line${linesRemoved === 1 ? "" : "s"}` : undefined,
@@ -205,98 +200,94 @@ function buildEditActivitySummary(
 
 function buildEditPiToolDisplay(context: ToolDisplayContext): CursorPiToolDisplay {
 	const { rawName, args, result, options } = context;
-	const value = asRecord(result.value);
-	const rawDiff = resolveCursorEditDiff(value);
-	const normalizedDiff = formatDiffString(rawDiff, options);
-	const nativeEditArgs = buildNativeEditDisplayArgs(rawName, args, options);
-	const baseActivityArgs = buildCursorEditActivityDisplayArgs(args, options);
-	const displayPath = typeof baseActivityArgs.path === "string" ? baseActivityArgs.path : undefined;
-	const activityTitle = getCursorToolActivityTitle("edit");
-	const activityArgs = buildCursorActivityDisplayArgs(baseActivityArgs, activityTitle, displayPath);
-	const contentText = formatEdit(activityArgs, result, options);
-	const details: CursorReplayToolDetails = {
-		variant: "nativeEdit",
-		path: displayPath,
-		linesAdded: getNumber(value, "linesAdded"),
-		linesRemoved: getNumber(value, "linesRemoved"),
-		diffString: normalizedDiff,
-		diff: normalizedDiff,
-		firstChangedLine: getNumber(value, "firstChangedLine"),
-	};
-	if (nativeEditArgs) {
+	const resolved = resolveEditDisplay(rawName, args, result, options);
+	const contentText = formatResolvedEdit(resolved, result, options);
+	if (resolved.target === "native") {
+		const details: CursorReplayToolDetails = {
+			variant: "nativeEdit",
+			path: resolved.displayPath,
+			linesAdded: resolved.linesAdded,
+			linesRemoved: resolved.linesRemoved,
+			diffString: resolved.normalizedDiff,
+			diff: resolved.normalizedDiff,
+			firstChangedLine: resolved.firstChangedLine,
+		};
 		return {
 			toolName: "edit",
-			args: nativeEditArgs,
+			args: resolved.nativeArgs,
 			result: textToolResult(contentText, details),
-			isError: result.status === "error",
+			isError: resolved.isError,
 		};
 	}
+	const activityTitle = getCursorToolActivityTitle("edit");
+	const activityArgs = buildCursorActivityDisplayArgs(resolved.activityBaseArgs, activityTitle, resolved.displayPath);
+	const trimmedContent = contentText.trimEnd();
 	return buildReplaySummaryDisplay(
 		CURSOR_REPLAY_ACTIVITY_TOOL_NAME,
 		activityArgs,
 		result,
-		contentText.trimEnd(),
+		trimmedContent,
 		assembleCursorReplayActivityDetails(
 			"edit",
 			activityTitle,
 			{
-				path: displayPath,
-				summary: result.status === "error" ? undefined : buildEditActivitySummary(displayPath, value ?? {}),
-				expandedText: contentText.trimEnd(),
-				diffString: normalizedDiff,
-				diff: normalizedDiff,
-				linesAdded: getNumber(value, "linesAdded"),
-				linesRemoved: getNumber(value, "linesRemoved"),
+				path: resolved.displayPath,
+				summary: resolved.isError
+					? undefined
+					: buildEditActivitySummary(resolved.displayPath, resolved.linesAdded, resolved.linesRemoved),
+				expandedText: trimmedContent,
+				diffString: resolved.normalizedDiff,
+				diff: resolved.normalizedDiff,
+				linesAdded: resolved.linesAdded,
+				linesRemoved: resolved.linesRemoved,
 			},
-			contentText.trimEnd(),
-			result.status === "error",
-			displayPath,
+			trimmedContent,
+			resolved.isError,
+			resolved.displayPath,
 		),
 	);
 }
 
 function buildWritePiToolDisplay(context: ToolDisplayContext): CursorPiToolDisplay {
 	const { args, result, options } = context;
-	const value = asRecord(result.value);
-	const content = getCursorWriteArgContent(args);
-	const displayArgs = buildWriteDisplayArgs(args, options);
-	const displayPath = typeof args.path === "string" ? formatDisplayPath(args.path, options.cwd) : undefined;
-	const contentText = formatWrite(args, result, options).trimEnd();
-	const details: CursorReplayToolDetails = {
-		variant: "nativeWrite",
-		path: displayPath,
-		linesCreated: getNumber(value, "linesCreated"),
-		fileSize: getNumber(value, "fileSize"),
-		fileContentAfterWrite: getString(value, "fileContentAfterWrite"),
-		expandedText: contentText,
-	};
-	if (content === undefined) {
+	const resolved = resolveWriteDisplay(args, result, options);
+	const contentText = formatResolvedWrite(resolved, result, options).trimEnd();
+	if (resolved.target === "activity") {
 		const activityTitle = getCursorToolActivityTitle("write");
+		const fallbackSummary = resolved.displayPath ?? "file";
 		return buildReplaySummaryDisplay(
 			CURSOR_REPLAY_ACTIVITY_TOOL_NAME,
-			buildCursorActivityDisplayArgs(displayArgs, activityTitle, displayPath ?? "file"),
+			buildCursorActivityDisplayArgs(resolved.displayArgs, activityTitle, fallbackSummary),
 			result,
 			contentText,
 			assembleCursorReplayActivityDetails(
 				"write",
 				activityTitle,
 				{
-					path: displayPath,
-					summary: result.status === "error" ? undefined : displayPath ?? "wrote file",
+					path: resolved.displayPath,
+					summary: resolved.isError ? undefined : resolved.displayPath ?? "wrote file",
 					expandedText: contentText,
-					fileContentAfterWrite: getString(value, "fileContentAfterWrite"),
+					fileContentAfterWrite: resolved.fileContentAfterWrite,
 				},
 				contentText,
-				result.status === "error",
-				displayPath ?? "file",
+				resolved.isError,
+				fallbackSummary,
 			),
 		);
 	}
+	const details: CursorReplayToolDetails = {
+		variant: "nativeWrite",
+		path: resolved.displayPath,
+		linesCreated: resolved.linesCreated,
+		fileSize: resolved.fileSize,
+		fileContentAfterWrite: resolved.fileContentAfterWrite,
+		expandedText: contentText,
+	};
 	return {
 		toolName: "write",
-		args: displayArgs,
+		args: resolved.displayArgs,
 		result: textToolResult(contentText, details),
-		isError: result.status === "error",
+		isError: resolved.isError,
 	};
 }
 

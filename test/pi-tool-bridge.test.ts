@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Server as McpProtocolServer } from "@modelcontextprotocol/sdk/server/index.js";
 import type { McpServerConfig } from "@cursor/sdk";
 import type { Context } from "@earendil-works/pi-ai";
 import type { ExtensionHandler, SessionShutdownEvent, ToolInfo } from "@earendil-works/pi-coding-agent";
@@ -12,6 +13,7 @@ import {
 	getCursorPiBridgeMcpUrl,
 } from "./helpers/pi-harness.js";
 import { __testUtils as nativeToolDisplayTestUtils } from "../src/native-tool-display-state.js";
+import { CursorPiToolBridgeRunImpl } from "../src/pi-tool-bridge-run.js";
 import {
 	__testUtils,
 	buildCursorPiToolBridgeSnapshot,
@@ -1067,5 +1069,80 @@ describe("cursor pi tool bridge loopback MCP lifecycle", () => {
 		const snapshotB = buildCursorPiToolBridgeSnapshot(createBridgePiHarness({ active: ["sem_reindex"], tools: [createToolInfo("sem_reindex", "Reindex", schemaV2)] }));
 
 		expect(buildCursorPiToolBridgeSurfaceSignature(snapshotA)).not.toBe(buildCursorPiToolBridgeSurfaceSignature(snapshotB));
+	});
+
+	it("keeps hasLiveRuns false for disabled runs without disposing them", async () => {
+		const registry = __testUtils.createRegistry(
+			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
+			{ enabled: false, exposeBuiltins: true },
+		);
+		const run = await registry.createRun();
+		expect(run.enabled).toBe(false);
+		expect(registry.hasLiveRuns()).toBe(false);
+		expect(registry.getEndpointCount()).toBe(0);
+	});
+
+	it("rejects detached CallTool calls cleanly and keeps disposed runs disposed after setOnToolRequest", async () => {
+		const registry = __testUtils.createRegistry(
+			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read", "Read files", Type.Object({ path: Type.String() }))] }),
+			{ exposeBuiltins: true },
+		);
+		const run = (await registry.createRun({ onToolRequest: () => {} })) as CursorPiToolBridgeRunImpl;
+		run.setOnToolRequest(undefined);
+		const { client, transport } = await connectClient(getCursorPiBridgeMcpUrl(run));
+		try {
+			await expect(client.callTool({ name: "pi__read", arguments: { path: "README.md" } })).rejects.toThrow(/no active live run|MCP error/i);
+			expect(run.hasPendingCalls()).toBe(false);
+		} finally {
+			await client.close().catch(() => undefined);
+			await transport.close().catch(() => undefined);
+			await run.dispose();
+		}
+
+		const handler = vi.fn();
+		run.setOnToolRequest(handler);
+		await expect(run.start()).rejects.toThrow(/disposed during startup/i);
+		expect(registry.hasLiveRuns()).toBe(false);
+		expect(registry.getEndpointCount()).toBe(0);
+		expect(handler).not.toHaveBeenCalled();
+	});
+
+	it("disposes an in-flight createRun when disposeAll races with McpProtocolServer.connect", async () => {
+		const diagnostics = collectBridgeDiagnosticOutput();
+		const registry = __testUtils.createRegistry(
+			createBridgePiHarness({ active: ["read"], tools: [createToolInfo("read")] }),
+			{ debug: { stderr: true }, exposeBuiltins: true },
+		);
+		let releaseConnect!: () => void;
+		let markConnectStarted!: () => void;
+		const connectStarted = new Promise<void>((resolve) => { markConnectStarted = resolve; });
+		const connectGate = new Promise<void>((resolve) => { releaseConnect = resolve; });
+		const originalConnect = McpProtocolServer.prototype.connect;
+		const connectSpy = vi.spyOn(McpProtocolServer.prototype, "connect").mockImplementation(async function (this: McpProtocolServer, transport) {
+			markConnectStarted();
+			await connectGate;
+			return originalConnect.call(this, transport);
+		});
+
+		try {
+			const createPromise = registry.createRun();
+			await connectStarted;
+			expect(registry.hasLiveRuns()).toBe(true);
+			await registry.disposeAll("shutdown during createRun");
+			releaseConnect();
+			await expect(createPromise).rejects.toThrow(/disposed during startup/i);
+
+			expect(registry.hasLiveRuns()).toBe(false);
+			expect(registry.getEndpointCount()).toBe(0);
+			expect(registry.getHttpServerAddress()).toBeUndefined();
+			const events = diagnostics.records().map((record) => record.event);
+			expect(events).not.toContain("run_created");
+			expect(events).not.toContain("tools_exposed");
+		} finally {
+			releaseConnect();
+			connectSpy.mockRestore();
+			await registry.disposeAll();
+			diagnostics.restore();
+		}
 	});
 });

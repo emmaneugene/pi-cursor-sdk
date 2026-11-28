@@ -5,6 +5,7 @@ import {
 	resolveCursorToolManifestEnabled,
 } from "./tool-manifest.js";
 import {
+	__testUtils as http1TestUtils,
 	CURSOR_HTTP1_ENTRY_TYPE,
 	getStoredCursorHttp1Enabled,
 	isCursorHttp1EntryData,
@@ -25,28 +26,19 @@ import {
 	cursorFastDefaultsFromConfig,
 	getCursorSdkUserConfigPath,
 	loadCursorSdkUserConfig,
+	mergeCursorFastDefaultForUpdate,
 	mergeCursorSdkConfigForUpdate,
 	resolveCursorFastDefault,
 	updateCursorSdkConfig,
 	type CursorSdkConfig,
 } from "./config.js";
 import {
-	consumeCursorLocalForceOverride,
 	formatCursorStatus,
-	getCursorCliConfig,
-	getCursorSessionConfig,
 	registerCursorLocalRuntimeFlags,
 	resetCursorRuntimeStateForTests,
-	resolveCursorStatusRuntime,
-	resolveEffectiveCursorConfigForContext,
+	resolveEffectiveCursorConfig,
 	restoreCursorCliState,
 	type CursorRuntimeStateExtensionApi,
-} from "./runtime-state.js";
-
-export {
-	consumeCursorLocalForceOverride,
-	getCursorCliConfig,
-	getCursorSessionConfig,
 } from "./runtime-state.js";
 
 const FAST_ENTRY_TYPE = "cursor-fast-state";
@@ -121,19 +113,7 @@ function loadGlobalFastPreferences(): Map<string, boolean> {
 function saveGlobalFastPreference(modelId: string, fast: boolean): void {
 	updateCursorSdkConfig(
 		getConfigPath(),
-		(current) => {
-			const models = asRecord(current.models);
-			const fastDefaults = { ...asRecord(models?.fastDefaults), [modelId]: fast };
-			return {
-				...current,
-				models: {
-					...models,
-					fastDefaults: Object.fromEntries(
-						Object.entries(fastDefaults).sort(([a], [b]) => a.localeCompare(b)),
-					),
-				},
-			};
-		},
+		(current) => mergeCursorFastDefaultForUpdate(current, modelId, fast),
 		{ newFileMode: 0o600 },
 	);
 }
@@ -237,25 +217,19 @@ export function getCursorProviderAgentModeOrThrow(): AgentModeOption {
 	return resolution.mode;
 }
 
-type CursorStatusContext = Pick<ExtensionContext, "cwd"> & Partial<Pick<ExtensionContext, "isProjectTrusted">>;
-
-function updateCursorStatus(ctx: CursorStatusContext & Pick<ExtensionContext, "model" | "ui">, model = ctx.model): void {
+function updateCursorStatus(ctx: Pick<ExtensionContext, "model" | "ui">, model = ctx.model): void {
 	if (!model || !isCursorModel(model)) {
 		ctx.ui.setStatus("cursor", undefined);
 		return;
 	}
 	const metadata = getCursorModelMetadata(model.id);
-	const resolution = resolveCursorStatusRuntime(ctx);
+	const transport = resolveEffectiveCursorConfig().local.transport.value;
 	const modeResolution = resolveCursorAgentMode();
 	const mode = modeResolution.kind === "invalid" ? "invalid" : modeResolution.mode;
-	if (resolution.kind === "invalid") {
-		ctx.ui.setStatus("cursor", formatCursorStatus(undefined, "invalid"));
-		return;
-	}
 	const fast = metadata?.supportsFast ? getEffectiveFast(model.id) : undefined;
 	ctx.ui.setStatus(
 		"cursor",
-		formatCursorStatus(fast, mode, resolution.transport.value),
+		formatCursorStatus(fast, mode, transport),
 	);
 }
 
@@ -362,7 +336,7 @@ function persistCursorHttp1Preference(
 }
 
 function applyPersistedPreference(
-	ctx: CursorStatusContext & Pick<ExtensionContext, "model" | "ui">,
+	ctx: Pick<ExtensionContext, "model" | "ui">,
 	persist: () => unknown | undefined,
 	messages: { saveFailed: string; appendFailed: string; success: string },
 ): void {
@@ -444,14 +418,9 @@ export function formatCursorToolsDebugReport(
 
 function emitCursorToolsDebugReport(
 	pi: Pick<ExtensionAPI, "getActiveTools" | "getAllTools">,
-	ctx: Pick<ExtensionContext, "cwd" | "hasUI" | "ui">,
+	ctx: Pick<ExtensionContext, "hasUI" | "ui">,
 ): void {
-	let excludedToolNames: ReadonlySet<string> | undefined;
-	try {
-		excludedToolNames = buildCursorBridgeExcludeToolNames(resolveEffectiveCursorConfigForContext(ctx));
-	} catch {
-		// Config load failure must not break the debug report; fall back to the unfiltered snapshot.
-	}
+	const excludedToolNames = buildCursorBridgeExcludeToolNames(resolveEffectiveCursorConfig());
 	const report = formatCursorToolsDebugReport(pi, excludedToolNames);
 	if (ctx.hasUI) {
 		ctx.ui.notify(report, "info");
@@ -525,12 +494,7 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 		handler: async (args, ctx) => {
 			const usage = "Usage: /cursor-http [on|off|toggle]";
 			const normalized = args.trim().toLowerCase();
-			const resolution = resolveCursorStatusRuntime(ctx);
-			if (resolution.kind === "invalid") {
-				ctx.ui.notify(resolution.message, "error");
-				return;
-			}
-			const setting = resolution.transport;
+			const setting = resolveEffectiveCursorConfig().local.transport;
 			const enabled = setting.value === "http1";
 			if (!normalized) {
 				ctx.ui.notify(
@@ -648,13 +612,16 @@ export function registerCursorRuntimeControls(pi: CursorRuntimeControlsExtension
 }
 
 function resetCursorModeStateForTests(): void {
-	sessionCursorAgentMode = undefined;
-	setCursorHttp1GlobalPreferenceAuthoritative(false);
-	setStoredCursorHttp1Enabled(undefined);
-	cliCursorModeState = { kind: "unset" };
-	resetCursorRuntimeStateForTests();
-	invalidCursorModeNotifiedSessionScopeKeys.clear();
+	sessionFastPreferences.clear();
 	authoritativeGlobalFastPreferenceIds.clear();
+	globalFastPreferences = new Map();
+	cliForceFast = false;
+	cliForceNoFast = false;
+	sessionCursorAgentMode = undefined;
+	cliCursorModeState = { kind: "unset" };
+	invalidCursorModeNotifiedSessionScopeKeys.clear();
+	resetCursorRuntimeStateForTests();
+	http1TestUtils.reset();
 }
 
 export const __testUtils = {

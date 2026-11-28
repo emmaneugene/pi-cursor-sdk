@@ -458,14 +458,14 @@ describe("cursor-session-agent", () => {
 		const context = makeContext([{ role: "user", content: "Hello", timestamp: 1 }]);
 
 		lease.commitSend(context, true);
-		expect(lease.sendState.incrementalSendCount).toBe(0);
+		expect(lease.sendState).toMatchObject({ bootstrapped: true, incrementalSendCount: 0 });
 
 		lease.commitSend(context, false);
 		lease.commitSend(context, false);
-		expect(lease.sendState.incrementalSendCount).toBe(2);
+		expect(lease.sendState).toMatchObject({ bootstrapped: true, incrementalSendCount: 2 });
 
 		lease.commitSend(context, true);
-		expect(lease.sendState.incrementalSendCount).toBe(0);
+		expect(lease.sendState).toMatchObject({ bootstrapped: true, incrementalSendCount: 0 });
 	});
 
 	it("invalidates and recreates the session agent after compaction", async () => {
@@ -523,7 +523,7 @@ describe("cursor-session-agent", () => {
 		await expect(acquirePromise).rejects.toBeInstanceOf(sessionAgentTestUtils.SessionCursorAgentScopeClosedError);
 		expect(mockDisposeLate).toHaveBeenCalledTimes(1);
 		expect(createAgent).toHaveBeenCalledTimes(1);
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has("/tmp/sessions/test.jsonl")).toBe(false);
+		expect(sessionAgentTestUtils.hasSessionAgent("/tmp/sessions/test.jsonl")).toBe(false);
 		await expect(acquireSessionCursorAgent(params)).rejects.toBeInstanceOf(sessionAgentTestUtils.SessionCursorAgentScopeClosedError);
 	});
 
@@ -668,7 +668,7 @@ describe("cursor-session-agent", () => {
 
 	it("detects when a follow-up send should bootstrap after branch shrink", () => {
 		const sendState = {
-			bootstrapped: true,
+			bootstrapped: true as const,
 			contextFingerprint: computeCursorContextFingerprint({
 				messages: [
 					{ role: "user", content: "Hello", timestamp: 1 },
@@ -727,9 +727,9 @@ describe("cursor-session-agent", () => {
 			createAgent,
 		});
 
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has("/tmp/sessions/test.jsonl")).toBe(true);
+		expect(sessionAgentTestUtils.hasSessionAgent("/tmp/sessions/test.jsonl")).toBe(true);
 		await pi.runSessionShutdown({ reason: "quit" });
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has("/tmp/sessions/test.jsonl")).toBe(false);
+		expect(sessionAgentTestUtils.hasSessionAgent("/tmp/sessions/test.jsonl")).toBe(false);
 		expect(mockDispose).toHaveBeenCalledTimes(1);
 	});
 
@@ -886,7 +886,7 @@ describe("cursor-session-agent", () => {
 			}),
 		);
 
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has("/tmp/sessions/session-a.jsonl")).toBe(false);
+		expect(sessionAgentTestUtils.hasSessionAgent("/tmp/sessions/session-a.jsonl")).toBe(false);
 		expect(mockDispose).toHaveBeenCalledTimes(1);
 	});
 
@@ -933,9 +933,9 @@ describe("cursor-session-agent", () => {
 			createAgent,
 		});
 
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has("/tmp/sessions/test.jsonl")).toBe(true);
+		expect(sessionAgentTestUtils.hasSessionAgent("/tmp/sessions/test.jsonl")).toBe(true);
 		await pi.runSessionTree();
-		expect(sessionAgentTestUtils.sessionAgentsByScope.has("/tmp/sessions/test.jsonl")).toBe(false);
+		expect(sessionAgentTestUtils.hasSessionAgent("/tmp/sessions/test.jsonl")).toBe(false);
 		expect(mockDispose).toHaveBeenCalledTimes(1);
 	});
 
@@ -1059,5 +1059,53 @@ describe("cursor-session-agent", () => {
 
 		await expect(sessionAgentTestUtils.refreshSessionCursorAgentConfig("/tmp/sessions/test.jsonl")).resolves.toBe("busy");
 		expect(createAgent).toHaveBeenCalledTimes(1);
+	});
+
+	it("returns no-agent without reloading after lazy or dead-transport invalidation", async () => {
+		const reload = vi.fn().mockResolvedValue(undefined);
+		const createAgent = vi.fn().mockImplementation(async () => ({
+			agentId: `agent-${createAgent.mock.calls.length + 1}`,
+			reload,
+			[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
+		}));
+		const scopeKey = "/tmp/sessions/test.jsonl";
+		cursorSessionScopeTestUtils.set("/tmp/project", scopeKey);
+		const params = { apiKey: "test-key", agentMode: "agent" as const, cwd: "/tmp/project", modelSelection: { id: "composer-2.5" }, createAgent };
+
+		for (const opts of [undefined, { deadTransport: true }] as const) {
+			await acquireSessionCursorAgent(params);
+			sessionAgentTestUtils.invalidateSessionAgent(scopeKey, opts);
+			await expect(sessionAgentTestUtils.refreshSessionCursorAgentConfig(scopeKey)).resolves.toBe("no-agent");
+		}
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it("splits the pool key when an explicit nested bridge surface changes", async () => {
+		const scopeKey = "/tmp/sessions/nested-child.jsonl";
+		const createAgent = vi.fn().mockImplementation(async () => ({
+			agentId: `agent-${createAgent.mock.calls.length + 1}`,
+			[Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
+		}));
+		let surfaceSignature = "bridge:surface-v1";
+		const nestedBridge = {
+			getToolSurfaceSignature: vi.fn(() => surfaceSignature),
+			createRun: vi.fn(async () => ({ id: "bridge-run", enabled: false, snapshot: { tools: [] }, cancel: vi.fn(), dispose: vi.fn().mockResolvedValue(undefined), setOnToolRequest: vi.fn(), setDebugRecorder: vi.fn() })),
+		};
+		const params = {
+			apiKey: "test-key",
+			agentMode: "agent" as const,
+			cwd: "/tmp/project",
+			modelSelection: { id: "composer-2.5" },
+			runtimeScope: { scopeKey, sessionFile: scopeKey },
+			bridge: nestedBridge as unknown as Parameters<typeof acquireSessionCursorAgent>[0]["bridge"],
+			createAgent,
+		};
+
+		const first = await acquireSessionCursorAgent(params);
+		surfaceSignature = "bridge:surface-v2";
+		const second = await acquireSessionCursorAgent(params);
+		expect(second.created).toBe(true);
+		expect(second.agent).not.toBe(first.agent);
+		expect(createAgent).toHaveBeenCalledTimes(2);
 	});
 });

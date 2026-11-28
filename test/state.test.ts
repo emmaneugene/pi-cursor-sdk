@@ -754,6 +754,23 @@ describe("Cursor runtime state", () => {
 		}
 	});
 
+	it("clears CLI fast flags, session fast preferences, and global fast defaults on reset", async () => {
+		writeFileSync(__testUtils.getConfigPath(), JSON.stringify({ models: { fastDefaults: { "gpt-5.5": true } } }));
+		const { pi, ctx } = createCursorRuntimeHarness({
+			modelId: "composer-2",
+			cursorFastFlag: true,
+			branch: [{ type: "custom", id: "fast-1", parentId: null, timestamp: new Date(0).toISOString(), customType: __testUtils.FAST_ENTRY_TYPE, data: { modelId: "composer-2", fast: false } }],
+		});
+		await pi.invokeEventWithContext("session_start", { type: "session_start", reason: "startup" }, ctx);
+		expect(getEffectiveFastForModelId("gpt-5.5")).toBe(true);
+		expect(__testUtils.sessionFastPreferences.get("composer-2")).toBe(false);
+
+		__testUtils.resetCursorModeStateForTests();
+		expect(__testUtils.sessionFastPreferences.size).toBe(0);
+		expect(getEffectiveFastForModelId("composer-2")).toBe(true);
+		expect(getEffectiveFastForModelId("gpt-5.5")).toBe(false);
+	});
+
 	it("logs /cursor-tools to stdout when UI is unavailable", async () => {
 		const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 		try {

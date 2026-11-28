@@ -1,43 +1,46 @@
-import type { ExtensionHandler, SessionShutdownEvent } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionHandler,
+	ProviderModelConfig,
+	SessionShutdownEvent,
+} from "@earendil-works/pi-coding-agent";
 
-/**
- * First factory invocation in this process owns Cursor's process-global
- * registrars (bridge, session scope, pooled SDK agent). Pi child sessions call
- * `createAgentSession` + `bindExtensions` in the same process, which re-invokes
- * this factory against a new ExtensionAPI while the parent Cursor run is still
- * live. A nested factory must not re-register.
- *
- * Ownership ends after the owner's shutdown handlers finish. Pi then reloads
- * the extension for `new`, `resume`, `fork`, and explicit reload operations.
- */
+type CursorExtensionFactoryOwnerState =
+	| { kind: "unowned" }
+	| { kind: "initializing"; token: symbol }
+	| { kind: "ready"; token: symbol; models: ProviderModelConfig[] };
+
 export type CursorExtensionFactoryClaim =
 	| { kind: "owner"; token: symbol }
-	| { kind: "nested" };
+	| { kind: "nested"; models: ProviderModelConfig[] }
+	| { kind: "nested-initializing" };
 
 export interface CursorExtensionFactoryGuardApi {
 	on(event: "session_shutdown", handler: ExtensionHandler<SessionShutdownEvent>): void;
 }
 
-let factoryOwnerToken: symbol | undefined;
+let ownerState: CursorExtensionFactoryOwnerState = { kind: "unowned" };
 
 export function claimCursorExtensionFactory(): CursorExtensionFactoryClaim {
-	if (factoryOwnerToken) return { kind: "nested" };
+	if (ownerState.kind === "ready") return { kind: "nested", models: ownerState.models };
+	if (ownerState.kind === "initializing") return { kind: "nested-initializing" };
 	const token = Symbol("cursor-extension-factory-owner");
-	factoryOwnerToken = token;
+	ownerState = { kind: "initializing", token };
 	return { kind: "owner", token };
 }
 
+export function setCursorExtensionOwnerModels(token: symbol, models: ProviderModelConfig[]): boolean {
+	if (ownerState.kind === "unowned" || ownerState.token !== token) return false;
+	ownerState = { kind: "ready", token, models };
+	return true;
+}
+
 export function releaseCursorExtensionFactory(token: symbol): void {
-	if (factoryOwnerToken === token) {
-		factoryOwnerToken = undefined;
+	if (ownerState.kind !== "unowned" && ownerState.token === token) {
+		ownerState = { kind: "unowned" };
 	}
 }
 
-/**
- * Install the owner's release handler after all other factory registration
- * succeeds. The final handler keeps ownership until earlier shutdown cleanup
- * has finished.
- */
+// Register last so ownership stays held until earlier shutdown handlers finish.
 export function registerCursorExtensionFactoryRelease(
 	pi: CursorExtensionFactoryGuardApi,
 	claim: Extract<CursorExtensionFactoryClaim, { kind: "owner" }>,
@@ -49,9 +52,9 @@ export function registerCursorExtensionFactoryRelease(
 
 export const __testUtils = {
 	isInstalled(): boolean {
-		return factoryOwnerToken !== undefined;
+		return ownerState.kind !== "unowned";
 	},
 	reset(): void {
-		factoryOwnerToken = undefined;
+		ownerState = { kind: "unowned" };
 	},
 };

@@ -107,7 +107,6 @@ function isToolCallBlock(block: { type: string }): block is ToolCall {
 }
 
 function extractLatestImages(messages: Message[]): SDKImage[] {
-	// Find the last user message and extract images only from it
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const msg = messages[i];
 		if (msg.role !== "user") continue;
@@ -144,8 +143,7 @@ function formatToolCall(toolCall: ToolCall): string {
 function sanitizeSystemPromptForCursor(systemPrompt: string): string {
 	let sanitized = systemPrompt;
 
-	// Pi 0.86+ structures built-in prompt sections as tags. Keep project and skill
-	// sections, but replace Pi-only callable surfaces and generic harness guidance.
+	// Keep project and skill sections; replace pi-only tool/rule/doc sections (tagged and legacy plain formats).
 	sanitized = sanitized.replace(
 		/<tools>[\s\S]*?<\/tools>\n*/g,
 		"<tools>\nPi tool catalog omitted: Cursor can call only Cursor SDK tools exposed in this run.\n</tools>\n",
@@ -156,7 +154,6 @@ function sanitizeSystemPromptForCursor(systemPrompt: string): string {
 	);
 	sanitized = sanitized.replace(/<docs>[\s\S]*?<\/docs>\n*/g, "");
 
-	// Keep compatibility with unstructured prompts from older Pi versions.
 	sanitized = sanitized.replace(
 		/Available tools:\n[\s\S]*?\n\nIn addition to the tools above, you may have access to other custom tools depending on the project\.\n\n/g,
 		"Pi tool catalog omitted: Cursor can call only Cursor SDK tools exposed in this run.\n\n",
@@ -186,7 +183,6 @@ function formatMessage(msg: Message): string | undefined {
 				} else if (isToolCallBlock(block)) {
 					textParts.push(formatToolCall(block));
 				}
-				// Omit thinking content from transcript
 			}
 			return textParts.length > 0 ? `Assistant: ${textParts.join("\n")}` : undefined;
 		}
@@ -275,10 +271,13 @@ export function estimateCursorContextTokens(context: Context, options: CursorPro
 	return estimateCursorPromptTokens(buildCursorPrompt(context, options), options);
 }
 
-interface CursorContextFingerprintPayload {
-	systemHash: string;
-	toolsHash: string;
-	messageHashes: string[];
+export interface CursorContextFingerprint {
+	readonly systemHash: string;
+	readonly toolsHash: string;
+	readonly messages: ReadonlyArray<{
+		readonly hash: string;
+		readonly summaryBoundary: boolean;
+	}>;
 }
 
 function hashCursorContextValue(value: string): string {
@@ -347,57 +346,44 @@ function serializeRawPiMessageForFingerprint(message: Context["messages"][number
 	}
 }
 
-function parseCursorContextFingerprint(fingerprint: string): CursorContextFingerprintPayload | undefined {
-	try {
-		const parsed = JSON.parse(fingerprint) as CursorContextFingerprintPayload;
-		if (
-			!parsed ||
-			typeof parsed.systemHash !== "string" ||
-			typeof parsed.toolsHash !== "string" ||
-			!Array.isArray(parsed.messageHashes)
-		) return undefined;
-		if (!parsed.messageHashes.every((entry) => typeof entry === "string")) return undefined;
-		return parsed;
-	} catch {
-		return undefined;
-	}
-}
-
-export function computeCursorContextFingerprint(context: Context): string {
+export function computeCursorContextFingerprint(context: Context): CursorContextFingerprint {
 	const transcript = normalizeContext(context);
-	const payload: CursorContextFingerprintPayload = {
+	const messages: Array<{ readonly hash: string; readonly summaryBoundary: boolean }> = [];
+	for (const message of transcript.messages) {
+		if (message.role === "system") continue;
+		const index = messages.length;
+		const role = (message as { role?: string }).role;
+		messages.push({
+			hash: serializeRawPiMessageForFingerprint(message, index),
+			summaryBoundary: role === "branchSummary" || role === "compactionSummary",
+		});
+	}
+	return {
 		systemHash: hashCursorContextValue(getCurrentSystemPrompt(transcript.messages)),
 		toolsHash: hashCursorContextValue(
 			JSON.stringify(getCurrentTools(transcript.messages).map(toToolDeclaration)),
 		),
-		messageHashes: transcript.messages
-			.filter((message) => message.role !== "system")
-			.map((message, index) => serializeRawPiMessageForFingerprint(message, index)),
+		messages,
 	};
-	return JSON.stringify(payload);
 }
 
 export function shouldBootstrapCursorContext(
-	sendState: { bootstrapped: boolean; contextFingerprint: string },
+	sendState:
+		| { readonly bootstrapped: false }
+		| { readonly bootstrapped: true; readonly contextFingerprint: CursorContextFingerprint },
 	context: Context,
 ): boolean {
 	if (!sendState.bootstrapped) return true;
-	const previous = parseCursorContextFingerprint(sendState.contextFingerprint);
-	if (!previous) return true;
-	const current = parseCursorContextFingerprint(computeCursorContextFingerprint(context));
-	if (!current) return true;
+	const previous = sendState.contextFingerprint;
+	const current = computeCursorContextFingerprint(context);
 	if (current.systemHash !== previous.systemHash) return true;
 	if (current.toolsHash !== previous.toolsHash) return true;
-	if (current.messageHashes.length < previous.messageHashes.length) return true;
-	if (current.messageHashes.length > previous.messageHashes.length) {
-		const conversation = context.messages.filter((message) => message.role !== "system");
-		for (let index = previous.messageHashes.length; index < conversation.length; index += 1) {
-			const role = (conversation[index] as { role?: string }).role;
-			if (role === "branchSummary" || role === "compactionSummary") return true;
-		}
+	if (current.messages.length < previous.messages.length) return true;
+	for (let index = previous.messages.length; index < current.messages.length; index += 1) {
+		if (current.messages[index]?.summaryBoundary) return true;
 	}
-	for (let index = 0; index < previous.messageHashes.length; index += 1) {
-		if (current.messageHashes[index] !== previous.messageHashes[index]) return true;
+	for (let index = 0; index < previous.messages.length; index += 1) {
+		if (current.messages[index]?.hash !== previous.messages[index]?.hash) return true;
 	}
 	return false;
 }

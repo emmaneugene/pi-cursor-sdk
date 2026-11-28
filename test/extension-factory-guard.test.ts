@@ -4,8 +4,10 @@ import {
 	claimCursorExtensionFactory,
 	registerCursorExtensionFactoryRelease,
 	releaseCursorExtensionFactory,
+	setCursorExtensionOwnerModels,
 	__testUtils,
 } from "../src/extension-factory-guard.js";
+import { makeProviderModelConfig } from "./helpers/pi-harness.js";
 
 function createShutdownHarness() {
 	const shutdownHandlers: Array<ExtensionHandler<SessionShutdownEvent>> = [];
@@ -34,34 +36,50 @@ function expectOwnerClaim() {
 describe("cursor extension factory guard", () => {
 	beforeEach(() => __testUtils.reset());
 
-	it("gives the first claim ownership and treats later claims as nested", () => {
+	it("transitions unowned -> initializing -> ready and exposes active models to nested claims", () => {
+		const initialModels = [makeProviderModelConfig("composer-2")];
+		const refreshedModels = [makeProviderModelConfig("grok-4.6")];
 		const owner = expectOwnerClaim();
 		expect(__testUtils.isInstalled()).toBe(true);
-		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested" });
-		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested" });
+		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested-initializing" });
+
+		expect(setCursorExtensionOwnerModels(owner.token, initialModels)).toBe(true);
+		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested", models: initialModels });
+
+		expect(setCursorExtensionOwnerModels(owner.token, refreshedModels)).toBe(true);
+		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested", models: refreshedModels });
+
 		releaseCursorExtensionFactory(owner.token);
 		expect(__testUtils.isInstalled()).toBe(false);
 		expectOwnerClaim();
+		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested-initializing" });
 	});
 
-	it.each(["new", "resume", "fork", "reload", "quit"] as const)("releases ownership when the owner runtime shuts down for %s", async (reason) => {
+	it.each(["new", "resume", "fork", "reload", "quit"] as const)("releases ownership and clears models when the owner runtime shuts down for %s", async (reason) => {
 		const harness = createShutdownHarness();
 		const owner = expectOwnerClaim();
+		setCursorExtensionOwnerModels(owner.token, [makeProviderModelConfig("composer-2")]);
 		registerCursorExtensionFactoryRelease(harness.pi, owner);
 
 		await harness.shutdown(reason);
 
 		expect(__testUtils.isInstalled()).toBe(false);
 		expectOwnerClaim();
+		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested-initializing" });
 	});
 
-	it("does not let a stale owner release a newer claim", () => {
+	it("does not let a stale owner release or update models after replacement", () => {
+		const staleModels = [makeProviderModelConfig("stale-model")];
+		const currentModels = [makeProviderModelConfig("current-model")];
 		const staleOwner = expectOwnerClaim();
 		releaseCursorExtensionFactory(staleOwner.token);
+
 		const currentOwner = expectOwnerClaim();
+		expect(setCursorExtensionOwnerModels(currentOwner.token, currentModels)).toBe(true);
+		expect(setCursorExtensionOwnerModels(staleOwner.token, staleModels)).toBe(false);
+		expect(claimCursorExtensionFactory()).toEqual({ kind: "nested", models: currentModels });
 
 		releaseCursorExtensionFactory(staleOwner.token);
-
 		expect(__testUtils.isInstalled()).toBe(true);
 		releaseCursorExtensionFactory(currentOwner.token);
 		expect(__testUtils.isInstalled()).toBe(false);

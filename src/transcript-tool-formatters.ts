@@ -107,17 +107,6 @@ export function buildReadDisplayArgs(
 	return localReadPreview ? { ...displayArgs, localReadPreview: true } : displayArgs;
 }
 
-function buildPathDisplayArgs(args: Record<string, unknown>, options: TranscriptOptions): Record<string, unknown> {
-	const rawPath = typeof args.path === "string" ? args.path : undefined;
-	return rawPath ? { ...args, path: formatDisplayPath(rawPath, options.cwd) } : args;
-}
-
-export function buildWriteDisplayArgs(args: Record<string, unknown>, options: TranscriptOptions): Record<string, unknown> {
-	const displayArgs = buildPathDisplayArgs(args, options);
-	const content = getCursorWriteArgContent(args);
-	return content === undefined ? displayArgs : { ...displayArgs, content };
-}
-
 type NativeEditReplacement = { oldText: string; newText: string };
 type NativeEditDisplayArgs = { path: string; edits: NativeEditReplacement[] };
 
@@ -149,10 +138,12 @@ function isNotebookPath(path: string | undefined): boolean {
 	return path?.toLowerCase().endsWith(".ipynb") === true;
 }
 
-function isCursorNotebookEditActivity(rawToolName: string, args: Record<string, unknown>): boolean {
-	if (isCursorNotebookEditToolName(rawToolName)) return true;
-	if (hasAnyKey(args, CURSOR_NOTEBOOK_EDIT_ARG_KEYS)) return true;
-	return !isCursorStrReplaceToolName(rawToolName) && isNotebookPath(getCursorEditPathArg(args));
+function isCursorNotebookEditActivity(rawToolName: string, args: Record<string, unknown>, rawPath: string | undefined): boolean {
+	return (
+		isCursorNotebookEditToolName(rawToolName) ||
+		hasAnyKey(args, CURSOR_NOTEBOOK_EDIT_ARG_KEYS) ||
+		(!isCursorStrReplaceToolName(rawToolName) && isNotebookPath(rawPath))
+	);
 }
 
 function asNativeEditReplacement(value: unknown): NativeEditReplacement | undefined {
@@ -171,17 +162,71 @@ function getNativeEditReplacementsFromArgs(args: Record<string, unknown>): Nativ
 	return singleEdit ? [singleEdit] : undefined;
 }
 
-export function buildNativeEditDisplayArgs(rawToolName: string, args: Record<string, unknown>, options: TranscriptOptions): NativeEditDisplayArgs | undefined {
-	if (isCursorNotebookEditActivity(rawToolName, args)) return undefined;
+export type ResolvedEditDisplay = {
+	displayPath: string | undefined;
+	isError: boolean;
+	normalizedDiff: string | undefined;
+	linesAdded: number | undefined;
+	linesRemoved: number | undefined;
+	firstChangedLine: number | undefined;
+} & (
+	| { target: "native"; nativeArgs: NativeEditDisplayArgs }
+	| { target: "activity"; activityBaseArgs: Record<string, unknown> }
+);
+
+export function resolveEditDisplay(rawName: string, args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): ResolvedEditDisplay {
 	const rawPath = getCursorEditPathArg(args);
-	const edits = getNativeEditReplacementsFromArgs(args);
-	if (!rawPath || !edits) return undefined;
-	return { path: formatDisplayPath(rawPath, options.cwd), edits };
+	const displayPath = rawPath ? formatDisplayPath(rawPath, options.cwd) : undefined;
+	const edits = displayPath !== undefined && !isCursorNotebookEditActivity(rawName, args, rawPath)
+		? getNativeEditReplacementsFromArgs(args)
+		: undefined;
+	const isError = result.status === "error";
+	const value = isError ? undefined : asRecord(result.value);
+	const base = {
+		displayPath,
+		isError,
+		normalizedDiff: value ? formatDiffString(resolveCursorEditDiff(value), options) : undefined,
+		linesAdded: getNumber(value, "linesAdded"),
+		linesRemoved: getNumber(value, "linesRemoved"),
+		firstChangedLine: getNumber(value, "firstChangedLine"),
+	};
+	return displayPath !== undefined && edits
+		? { ...base, target: "native", nativeArgs: { path: displayPath, edits } }
+		: { ...base, target: "activity", activityBaseArgs: displayPath !== undefined ? { ...args, path: displayPath } : args };
 }
 
-export function buildCursorEditActivityDisplayArgs(args: Record<string, unknown>, options: TranscriptOptions): Record<string, unknown> {
-	const rawPath = getCursorEditPathArg(args);
-	return rawPath ? { ...args, path: formatDisplayPath(rawPath, options.cwd) } : args;
+export interface ResolvedWriteDisplay {
+	displayPath: string | undefined;
+	displayArgs: Record<string, unknown>;
+	target: "native" | "activity";
+	isError: boolean;
+	linesCreated: number | undefined;
+	fileSize: number | undefined;
+	fileContentAfterWrite: string | undefined;
+	recordedContent: string | undefined;
+}
+
+function getCursorWriteArgContent(args: Record<string, unknown>): string | undefined {
+	return getString(args, "content") ?? getString(args, "fileContent") ?? getString(args, "contents");
+}
+
+export function resolveWriteDisplay(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): ResolvedWriteDisplay {
+	const displayPath = formatPathArg(args, options);
+	const argContent = getCursorWriteArgContent(args);
+	const baseArgs = displayPath !== undefined ? { ...args, path: displayPath } : args;
+	const isError = result.status === "error";
+	const value = isError ? undefined : asRecord(result.value);
+	const fileContentAfterWrite = getString(value, "fileContentAfterWrite");
+	return {
+		displayPath,
+		displayArgs: argContent !== undefined ? { ...baseArgs, content: argContent } : baseArgs,
+		target: argContent !== undefined ? "native" : "activity",
+		isError,
+		linesCreated: getNumber(value, "linesCreated"),
+		fileSize: getNumber(value, "fileSize"),
+		fileContentAfterWrite,
+		recordedContent: argContent ?? fileContentAfterWrite,
+	};
 }
 
 export function formatNativeReadDisplayContent(resolved: ResolvedReadContent, options: TranscriptOptions): string {
@@ -416,44 +461,34 @@ export function formatGrep(args: Record<string, unknown>, result: NormalizedResu
 	return joinSections(header, getGrepBody(result, options));
 }
 
-export function getCursorWriteArgContent(args: Record<string, unknown>): string | undefined {
-	return getString(args, "content") ?? getString(args, "fileContent") ?? getString(args, "contents");
-}
-
-function getCursorWriteRecordedContent(args: Record<string, unknown>, resultValue: Record<string, unknown> | undefined): string | undefined {
-	return getCursorWriteArgContent(args) ?? getString(resultValue, "fileContentAfterWrite");
-}
-
-export function formatWrite(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {
-	const path = formatPathArg(args, options) ?? "unknown";
-	if (result.status === "error") return joinSections(`write ${path}`, formatError(result.error));
-
-	const value = asRecord(result.value);
-	const linesCreated = getNumber(value, "linesCreated");
-	const fileSize = getNumber(value, "fileSize");
-	const fileContentAfterWrite = getCursorWriteRecordedContent(args, value);
+export function formatResolvedWrite(resolved: ResolvedWriteDisplay, result: NormalizedResult, options: TranscriptOptions): string {
+	const path = resolved.displayPath ?? "unknown";
+	if (resolved.isError) return joinSections(`write ${path}`, formatError(result.error));
 	const parts = [
-		linesCreated !== undefined ? `Created ${linesCreated} lines` : undefined,
-		fileSize !== undefined ? `File size: ${fileSize} bytes` : undefined,
-		fileContentAfterWrite ? limitText(fileContentAfterWrite, options) : undefined,
+		resolved.linesCreated !== undefined ? `Created ${resolved.linesCreated} lines` : undefined,
+		resolved.fileSize !== undefined ? `File size: ${resolved.fileSize} bytes` : undefined,
+		resolved.recordedContent ? limitText(resolved.recordedContent, options) : undefined,
 	].filter((part): part is string => Boolean(part));
 	return joinSections(`write ${path}`, parts.join("\n\n") || stringifyUnknown(result.value));
 }
 
-export function formatEdit(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {
-	const path = formatPathArg(args, options) ?? "unknown";
-	if (result.status === "error") return joinSections(`edit ${path}`, formatError(result.error));
+export function formatWrite(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {
+	return formatResolvedWrite(resolveWriteDisplay(args, result, options), result, options);
+}
 
-	const value = asRecord(result.value);
-	const diff = formatDiffString(resolveCursorEditDiff(value), options);
-	const linesAdded = getNumber(value, "linesAdded");
-	const linesRemoved = getNumber(value, "linesRemoved");
+export function formatResolvedEdit(resolved: ResolvedEditDisplay, result: NormalizedResult, options: TranscriptOptions): string {
+	const path = resolved.displayPath ?? "unknown";
+	if (resolved.isError) return joinSections(`edit ${path}`, formatError(result.error));
 	const stats = [
-		linesAdded !== undefined ? `+${linesAdded}` : undefined,
-		linesRemoved !== undefined ? `-${linesRemoved}` : undefined,
+		resolved.linesAdded !== undefined ? `+${resolved.linesAdded}` : undefined,
+		resolved.linesRemoved !== undefined ? `-${resolved.linesRemoved}` : undefined,
 	].filter(Boolean).join(" ");
-	const body = [stats, diff ? limitText(diff, options) : undefined].filter((part): part is string => Boolean(part)).join("\n\n");
+	const body = [stats, resolved.normalizedDiff ? limitText(resolved.normalizedDiff, options) : undefined].filter((part): part is string => Boolean(part)).join("\n\n");
 	return joinSections(`edit ${path}`, body || stringifyUnknown(result.value));
+}
+
+export function formatEdit(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {
+	return formatResolvedEdit(resolveEditDisplay("edit", args, result, options), result, options);
 }
 
 export function formatDelete(args: Record<string, unknown>, result: NormalizedResult, options: TranscriptOptions): string {

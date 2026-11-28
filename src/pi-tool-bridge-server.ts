@@ -18,18 +18,49 @@ import type { CursorPiToolBridgeConfig } from "./pi-tool-bridge-config.js";
 export const LOOPBACK_HOST = "127.0.0.1";
 const HTTP_SERVER_CLOSE_GRACE_MS = 250;
 
+type LoopbackHttpServerState =
+	| { kind: "stopped" }
+	| { kind: "starting"; server: HttpServer; ready: Promise<AddressInfo> }
+	| { kind: "listening"; server: HttpServer; address: AddressInfo }
+	| { kind: "closing"; done: Promise<void> };
+
+function readLoopbackAddressInfo(server: HttpServer): AddressInfo | undefined {
+	const addr = asRecord(server.address());
+	return typeof addr?.port === "number"
+		? {
+			address: typeof addr.address === "string" ? addr.address : LOOPBACK_HOST,
+			family: typeof addr.family === "string" ? addr.family : "IPv4",
+			port: addr.port,
+		}
+		: undefined;
+}
+
+function closeNodeHttpServer(server: HttpServer): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		let settled = false;
+		const settle = (error?: Error | null) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(closeTimer);
+			if (error) reject(error);
+			else resolve();
+		};
+		const closeTimer = setTimeout(() => settle(), HTTP_SERVER_CLOSE_GRACE_MS);
+		closeTimer.unref?.();
+		server.close(settle);
+		server.closeIdleConnections();
+		server.closeAllConnections();
+	});
+}
+
 export class CursorPiToolBridgeRegistry implements CursorPiToolBridge {
 	private readonly pi: CursorPiToolBridgeSnapshotApi;
 	private readonly config: CursorPiToolBridgeConfig;
-	private readonly runs = new Set<CursorPiToolBridgeRunImpl>();
 	private readonly routes = new Map<string, CursorPiToolBridgeRunImpl>();
-	private httpServer?: HttpServer;
-	private listenPromise?: Promise<void>;
+	private readonly startingRuns = new Set<CursorPiToolBridgeRunImpl>();
+	private serverState: LoopbackHttpServerState = { kind: "stopped" };
 
-	constructor(
-		pi: CursorPiToolBridgeSnapshotApi,
-		config: CursorPiToolBridgeConfig,
-	) {
+	constructor(pi: CursorPiToolBridgeSnapshotApi, config: CursorPiToolBridgeConfig) {
 		this.pi = pi;
 		this.config = config;
 	}
@@ -57,45 +88,55 @@ export class CursorPiToolBridgeRegistry implements CursorPiToolBridge {
 			: createEmptySnapshot();
 		const { CursorPiToolBridgeRunImpl } = await import("./pi-tool-bridge-run.js");
 		const run = new CursorPiToolBridgeRunImpl(this, this.config, snapshot, bridgeEnabled && snapshot.tools.length > 0, options);
-		this.runs.add(run);
-		await run.start();
+		if (run.enabled) this.startingRuns.add(run);
+		try {
+			await run.start();
+		} catch (error) {
+			await run.dispose().catch(() => undefined);
+			throw error;
+		} finally {
+			this.startingRuns.delete(run);
+		}
 		run.emitStartDiagnostics(bridgeEnabled);
 		return run;
 	}
 
 	hasLiveRuns(): boolean {
-		return this.runs.size > 0;
+		return this.routes.size > 0 || this.startingRuns.size > 0;
 	}
 
 	async disposeAll(reason = "Cursor pi tool bridge disposed"): Promise<void> {
-		await Promise.all([...this.runs].map(async (run) => {
+		const runs = new Set([...this.startingRuns, ...this.routes.values()]);
+		await Promise.all([...runs].map(async (run) => {
 			run.cancel(reason);
 			await run.dispose();
 		}));
+		await this.closeHttpServer();
 	}
 
 	async registerRun(pathname: string, run: CursorPiToolBridgeRunImpl): Promise<string> {
-		await this.ensureHttpServer();
+		// Reserve route before startup so a concurrent unregister cannot close the server mid-start.
 		this.routes.set(pathname, run);
-		const address = this.getHttpServerAddress();
-		if (!address) throw new Error("Cursor pi tool bridge HTTP server is not listening");
-		return `http://${LOOPBACK_HOST}:${address.port}${pathname}`;
+		try {
+			const address = await this.ensureHttpServer();
+			if (this.routes.get(pathname) !== run) {
+				throw new Error("Cursor pi tool bridge run was unregistered during startup");
+			}
+			return `http://${LOOPBACK_HOST}:${address.port}${pathname}`;
+		} catch (error) {
+			if (this.routes.get(pathname) === run) this.routes.delete(pathname);
+			if (this.routes.size === 0) await this.closeHttpServer().catch(() => undefined);
+			throw error;
+		}
 	}
 
 	async unregisterRun(pathname: string, run: CursorPiToolBridgeRunImpl): Promise<void> {
 		if (this.routes.get(pathname) === run) this.routes.delete(pathname);
-		this.runs.delete(run);
 		if (this.routes.size === 0) await this.closeHttpServer();
 	}
 
 	getHttpServerAddress(): AddressInfo | undefined {
-		const address = asRecord(this.httpServer?.address());
-		if (typeof address?.port !== "number") return undefined;
-		return {
-			address: typeof address.address === "string" ? address.address : LOOPBACK_HOST,
-			family: typeof address.family === "string" ? address.family : "IPv4",
-			port: address.port,
-		};
+		return this.serverState.kind === "listening" ? this.serverState.address : undefined;
 	}
 
 	getEndpointCount(): number {
@@ -103,70 +144,80 @@ export class CursorPiToolBridgeRegistry implements CursorPiToolBridge {
 	}
 
 	hasPendingPiToolCallId(piToolCallId: string): boolean {
-		for (const run of this.runs) {
+		for (const run of this.routes.values()) {
 			if (run.hasPendingPiToolCallId(piToolCallId)) return true;
 		}
 		return false;
 	}
 
 	cancelPendingPiToolCallId(piToolCallId: string, reason: string): boolean {
-		for (const run of this.runs) {
+		for (const run of this.routes.values()) {
 			if (run.cancelPendingPiToolCallId(piToolCallId, reason)) return true;
 		}
 		return false;
 	}
 
-	private async ensureHttpServer(): Promise<void> {
-		if (this.httpServer) {
-			await this.listenPromise;
-			return;
-		}
+	private async ensureHttpServer(): Promise<AddressInfo> {
+		while (true) {
+			const state = this.serverState;
+			if (state.kind === "listening") return state.address;
+			if (state.kind === "starting") { await state.ready; continue; }
+			if (state.kind === "closing") { await state.done; continue; }
 
-		const server = createServer((req, res) => {
-			void this.handleHttpRequest(req, res);
-		});
-		this.httpServer = server;
-		this.listenPromise = new Promise<void>((resolve, reject) => {
+			const server = createServer((req, res) => { void this.handleHttpRequest(req, res); });
+			let resolveReady!: (address: AddressInfo) => void;
+			let rejectReady!: (error: Error) => void;
+			const ready = new Promise<AddressInfo>((resolve, reject) => {
+				resolveReady = resolve;
+				rejectReady = reject;
+			});
+			ready.catch(() => undefined);
+			this.serverState = { kind: "starting", server, ready };
+
 			const onError = (error: Error) => {
 				server.off("listening", onListening);
-				reject(error);
+				this.serverState = { kind: "stopped" };
+				rejectReady(error);
 			};
 			const onListening = () => {
 				server.off("error", onError);
-				resolve();
+				const address = readLoopbackAddressInfo(server);
+				if (!address) {
+					this.serverState = { kind: "stopped" };
+					server.close();
+					rejectReady(new Error("Cursor pi tool bridge HTTP server is not listening"));
+					return;
+				}
+				this.serverState = { kind: "listening", server, address };
+				resolveReady(address);
 			};
 			server.once("error", onError);
 			server.once("listening", onListening);
 			server.listen(0, LOOPBACK_HOST);
-		});
-		await this.listenPromise;
+			return await ready;
+		}
 	}
 
 	private async closeHttpServer(): Promise<void> {
-		const server = this.httpServer;
-		if (!server) return;
-		this.httpServer = undefined;
-		this.listenPromise = undefined;
-		await new Promise<void>((resolve, reject) => {
-			let settled = false;
-			let closeTimer: ReturnType<typeof setTimeout> | undefined;
-			const settle = (error?: Error): void => {
-				if (settled) return;
-				settled = true;
-				if (closeTimer) clearTimeout(closeTimer);
-				if (error) reject(error);
-				else resolve();
-			};
+		while (this.routes.size === 0) {
+			const state = this.serverState;
+			if (state.kind === "stopped") return;
+			if (state.kind === "closing") { await state.done; continue; }
+			if (state.kind === "starting") { await state.ready.catch(() => undefined); continue; }
 
-			closeTimer = setTimeout(() => settle(), HTTP_SERVER_CLOSE_GRACE_MS);
-			closeTimer.unref?.();
-
-			server.close((error) => {
-				settle(error ?? undefined);
-			});
-			server.closeIdleConnections();
-			server.closeAllConnections();
-		});
+			let resolveDone!: () => void;
+			const done = new Promise<void>((resolve) => { resolveDone = resolve; });
+			this.serverState = { kind: "closing", done };
+			try {
+				await closeNodeHttpServer(state.server);
+			} finally {
+				if (this.serverState.kind === "closing" && this.serverState.done === done) {
+					this.serverState = { kind: "stopped" };
+				}
+				resolveDone();
+			}
+			return;
+		}
 	}
 
 	private async handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {

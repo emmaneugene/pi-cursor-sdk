@@ -7,7 +7,7 @@ import { makeAssistantMessage } from "./helpers/pi-harness.js";
 
 describe("CursorToolLifecycleEmitter", () => {
 	const started = new Set<string>();
-	const skips: Array<{ reason?: string; callId?: string }> = [];
+	const skips: Array<{ reason?: string; callId?: string; ownerCallId?: string }> = [];
 
 	beforeEach(() => {
 		vi.useFakeTimers();
@@ -31,7 +31,9 @@ describe("CursorToolLifecycleEmitter", () => {
 				debugRecorder: {
 					recordCoordinatorEvent(phase: string, payload: unknown) {
 						if (phase !== "tool_lifecycle_skip") return;
-						const record = payload && typeof payload === "object" ? payload as { reason?: string; callId?: string } : {};
+						const record = payload && typeof payload === "object"
+							? payload as { reason?: string; callId?: string; ownerCallId?: string }
+							: {};
 						skips.push(record);
 					},
 				} as never,
@@ -84,5 +86,26 @@ describe("CursorToolLifecycleEmitter", () => {
 		vi.advanceTimersByTime(CURSOR_TOOL_LIFECYCLE_DEFER_MS);
 		expect(skips).toEqual([]);
 		expect(thinking).toHaveBeenCalledTimes(1);
+	});
+
+	it("dedups active progressText at emit time so cancelling an earlier call does not starve a pending duplicate", () => {
+		const { emitter, thinking } = createEmitter();
+		for (const id of ["call-a", "call-b", "call-c"]) started.add(id);
+		emitter.maybeSchedule("call-a", { name: "shell", args: { command: "npm test", workingDirectory: "/tmp/a" } });
+		emitter.maybeSchedule("call-b", { name: "shell", args: { command: "npm test", workingDirectory: "/tmp/b" } });
+
+		vi.advanceTimersByTime(10);
+		emitter.cancel("call-a");
+		emitter.maybeSchedule("call-c", { name: "shell", args: { command: "npm test", workingDirectory: "/tmp/c" } });
+
+		vi.advanceTimersByTime(CURSOR_TOOL_LIFECYCLE_DEFER_MS - 10);
+		expect(thinking).toHaveBeenCalledTimes(1);
+		expect(skips).toEqual([]);
+
+		vi.advanceTimersByTime(10);
+		expect(thinking).toHaveBeenCalledTimes(1);
+		expect(skips).toEqual([
+			expect.objectContaining({ reason: "duplicate-active-progress-text", callId: "call-c", ownerCallId: "call-b" }),
+		]);
 	});
 });

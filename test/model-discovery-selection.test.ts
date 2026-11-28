@@ -121,8 +121,19 @@ describe("buildCursorModelSelection", () => {
 			{ id: "fast", value: "false" },
 		]);
 		metadata!.defaultParams[0].value = "mutated";
-		metadata!.thinkingLevelMap!.medium = "mutated";
-		expect(getCursorModelMetadata("gpt-5.4")?.defaultParams[0].value).toBe("1m");
-		expect(getCursorModelMetadata("gpt-5.4")?.thinkingLevelMap?.medium).toBe("medium");
+		expect(metadata?.thinking?.kind).toBe("level");
+		if (metadata?.thinking?.kind !== "level" || metadata.thinking.offMode.kind !== "same-param") {
+			throw new Error("expected level thinking control with same-param offMode");
+		}
+		metadata.thinking.thinkingLevelMap.medium = "mutated";
+		metadata.thinking.offMode.value = "mutated";
+
+		const stored = getCursorModelMetadata("gpt-5.4");
+		expect(stored?.defaultParams[0].value).toBe("1m");
+		expect(stored?.thinking?.thinkingLevelMap.medium).toBe("medium");
+		expect(stored?.thinking?.kind === "level" ? stored.thinking.offMode : undefined).toEqual({
+			kind: "same-param",
+			value: "none",
+		});
 	});
 });

@@ -41,7 +41,7 @@ function makeRouter(options: {
 }
 
 function stubLiveRun(): CursorLiveRun {
-	return { disposed: false, pendingEvents: [] } as unknown as CursorLiveRun;
+	return { status: { kind: "running" }, pendingEvents: [] } as unknown as CursorLiveRun;
 }
 
 function fakeRecorder() {

@@ -21,6 +21,7 @@ import {
 	claimCursorExtensionFactory,
 	registerCursorExtensionFactoryRelease,
 	releaseCursorExtensionFactory,
+	setCursorExtensionOwnerModels,
 } from "./extension-factory-guard.js";
 
 type CursorExtensionApi =
@@ -37,8 +38,6 @@ type CursorExtensionApi =
 	& Parameters<typeof registerCursorOverflowNormalization>[0]
 	& Parameters<typeof registerCursorSdkSessionProcessErrorGuard>[0]
 	& Parameters<typeof registerCursorExtensionFactoryRelease>[0];
-
-let activeCursorProviderModels: ProviderModelConfig[] | undefined;
 
 function createCursorProviderConfig(
 	models: ProviderModelConfig[],
@@ -92,11 +91,11 @@ function registerNestedCursorProvider(pi: CursorExtensionApi, models: ProviderMo
 
 export default async function (pi: CursorExtensionApi) {
 	const factoryClaim = claimCursorExtensionFactory();
+	if (factoryClaim.kind === "nested-initializing") {
+		throw new Error("Nested Cursor provider loaded before the owner model catalog was ready");
+	}
 	if (factoryClaim.kind === "nested") {
-		if (!activeCursorProviderModels) {
-			throw new Error("Nested Cursor provider loaded before the owner model catalog was ready");
-		}
-		registerNestedCursorProvider(pi, activeCursorProviderModels);
+		registerNestedCursorProvider(pi, factoryClaim.models);
 		return;
 	}
 
@@ -109,7 +108,6 @@ export default async function (pi: CursorExtensionApi) {
 				fallbackIssue = issue;
 			},
 		});
-		activeCursorProviderModels = models;
 
 		// Session cwd must register before other session_start listeners that depend on it.
 		registerCursorSessionScope(pi);
@@ -138,7 +136,7 @@ export default async function (pi: CursorExtensionApi) {
 						refreshFallbackIssue = issue;
 					},
 				});
-				activeCursorProviderModels = refreshedModels;
+				if (!setCursorExtensionOwnerModels(factoryClaim.token, refreshedModels)) return;
 				registerCursorProvider(pi, refreshedModels);
 				if (!ctx.hasUI) return;
 				if (refreshFallbackIssue) {
@@ -156,6 +154,7 @@ export default async function (pi: CursorExtensionApi) {
 		// Register last so ownership remains protected until all other Cursor
 		// session_shutdown handlers finish.
 		registerCursorExtensionFactoryRelease(pi, factoryClaim);
+		setCursorExtensionOwnerModels(factoryClaim.token, models);
 	} catch (error) {
 		releaseCursorExtensionFactory(factoryClaim.token);
 		throw error;

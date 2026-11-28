@@ -3,6 +3,7 @@ import {
 	consumeCursorLocalForceOverride,
 	getCursorCliConfig,
 	resetCursorRuntimeStateForTests,
+	resolveEffectiveCursorConfig,
 	restoreCursorCliState,
 } from "../src/runtime-state.js";
 
@@ -16,6 +17,18 @@ describe("Cursor local force consumption", () => {
 	it("does not force local sends by default", () => {
 		restoreCursorCliState(flags({}));
 		expect(consumeCursorLocalForceOverride({ value: false, source: "builtin" })).toBe(false);
+	});
+
+	it("reports local.force source as builtin when unset, cli when armed, and builtin after consumption", () => {
+		restoreCursorCliState(flags({}));
+		expect(resolveEffectiveCursorConfig().local.force).toEqual({ value: false, source: "builtin" });
+
+		restoreCursorCliState(flags({ "cursor-local-force": true }));
+		const armed = resolveEffectiveCursorConfig().local.force;
+		expect(armed).toEqual({ value: true, source: "cli" });
+
+		expect(consumeCursorLocalForceOverride(armed)).toBe(true);
+		expect(resolveEffectiveCursorConfig().local.force).toEqual({ value: false, source: "builtin" });
 	});
 
 	it("consumes CLI local force once", () => {
@@ -33,6 +46,6 @@ describe("Cursor local force consumption", () => {
 
 	it("keeps force outside the persisted CLI config schema", () => {
 		restoreCursorCliState(flags({ "cursor-local-force": true, "cursor-sandbox": true }));
-		expect(getCursorCliConfig()).toEqual({ local: { sandbox: true } });
+		expect(getCursorCliConfig()).toEqual({ sandbox: true });
 	});
 });

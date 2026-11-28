@@ -677,7 +677,7 @@ describe("cursor session prompt assembly", () => {
 			systemPrompt: "Be helpful.",
 			messages: [{ role: "user", content: "Hello", timestamp: 1 }],
 		};
-		const sendState = { bootstrapped: false, contextFingerprint: "", incrementalSendCount: 0 };
+		const sendState = { bootstrapped: false as const };
 		const plan = planCursorSessionSend(sendState, context);
 		const prompt = buildCursorSessionSendPrompt(context, {}, plan);
 
@@ -699,7 +699,7 @@ describe("cursor session prompt assembly", () => {
 			messages: [...priorContext.messages, { role: "user", content: "Follow up", timestamp: 3 }],
 		};
 		const sendState = {
-			bootstrapped: true,
+			bootstrapped: true as const,
 			contextFingerprint: computeCursorContextFingerprint(priorContext),
 			incrementalSendCount: 1,
 		};
@@ -720,7 +720,7 @@ describe("cursor session prompt assembly", () => {
 			messages: [{ role: "user", content: "Hello", timestamp: 1 }],
 		};
 		const sendState = {
-			bootstrapped: true,
+			bootstrapped: true as const,
 			contextFingerprint: computeCursorContextFingerprint({
 				messages: [
 					{ role: "user", content: "Hello", timestamp: 1 },
@@ -742,7 +742,7 @@ describe("cursor session prompt assembly", () => {
 			messages: [{ role: "user", content: "Hello edited", timestamp: 1 }],
 		};
 		const sendState = {
-			bootstrapped: true,
+			bootstrapped: true as const,
 			contextFingerprint: computeCursorContextFingerprint(priorContext),
 			incrementalSendCount: 0,
 		};
@@ -761,7 +761,7 @@ describe("cursor session prompt assembly", () => {
 			messages: priorContext.messages,
 		};
 		const sendState = {
-			bootstrapped: true,
+			bootstrapped: true as const,
 			contextFingerprint: computeCursorContextFingerprint(priorContext),
 			incrementalSendCount: 0,
 		};
@@ -796,7 +796,7 @@ describe("cursor session prompt assembly", () => {
 			timestamp: 2,
 		});
 		const sendState = {
-			bootstrapped: true,
+			bootstrapped: true as const,
 			contextFingerprint: computeCursorContextFingerprint(prior),
 			incrementalSendCount: 0,
 		};
@@ -806,21 +806,6 @@ describe("cursor session prompt assembly", () => {
 			mode: "bootstrap",
 			reason: "context_divergence",
 		});
-	});
-
-	it("rebootstraps once from a pre-0.86 fingerprint without a tools hash", () => {
-		const context: Context = {
-			messages: [{ role: "user", content: "Hello", timestamp: 1 }],
-		};
-		const legacyFingerprint = JSON.stringify({
-			systemHash: "legacy",
-			messageHashes: [],
-		});
-
-		expect(shouldBootstrapCursorContext({
-			bootstrapped: true,
-			contextFingerprint: legacyFingerprint,
-		}, context)).toBe(true);
 	});
 
 	it("omits invariant bootstrap instructions from incremental prompts", () => {
@@ -899,13 +884,45 @@ describe("cursor session prompt assembly", () => {
 			],
 		};
 		const sendState = {
-			bootstrapped: true,
+			bootstrapped: true as const,
 			contextFingerprint: computeCursorContextFingerprint(priorContext),
 			incrementalSendCount: 0,
 		};
 
 		expect(shouldBootstrapCursorContext(sendState, treeContext)).toBe(true);
 		expect(planCursorSessionSend(sendState, treeContext).mode).toBe("bootstrap");
+	});
+
+	it("rebootstraps when a compaction summary is appended via typed CursorContextFingerprint", () => {
+		const priorContext: Context = {
+			messages: [{ role: "user", content: "Hello", timestamp: 1 }],
+		};
+		const compactedContext: Context = {
+			messages: [
+				{ role: "user", content: "Hello", timestamp: 1 },
+				{
+					role: "compactionSummary",
+					summary: "Earlier work covered auth setup.",
+					tokensBefore: 12000,
+					timestamp: 2,
+				} as unknown as Context["messages"][number],
+			],
+		};
+		const fingerprint = computeCursorContextFingerprint(compactedContext);
+		expect(fingerprint.messages.map((entry) => entry.summaryBoundary)).toEqual([false, true]);
+
+		const sendState = {
+			bootstrapped: true as const,
+			contextFingerprint: computeCursorContextFingerprint(priorContext),
+			incrementalSendCount: 0,
+		};
+
+		expect(shouldBootstrapCursorContext(sendState, compactedContext)).toBe(true);
+		expect(planCursorSessionSend(sendState, compactedContext)).toEqual({
+			mode: "bootstrap",
+			resetAgent: true,
+			reason: "context_divergence",
+		});
 	});
 
 	it("includes compaction summaries in bootstrap prompts", () => {

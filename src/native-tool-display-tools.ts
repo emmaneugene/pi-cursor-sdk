@@ -9,18 +9,21 @@ import {
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import type { TSchema } from "typebox";
+import { Type, type TSchema } from "typebox";
 import { getCursorSessionCwd } from "./session-scope.js";
 import {
 	isCursorReplayToolName,
 	type BuiltinNativeCursorToolName,
+	type CursorReplayToolName,
 	type NativeCursorToolName,
 } from "./tool-presentation-registry.js";
 import {
-	createCursorReplayOnlyToolDefinition,
 	isCursorReplayNativeEditDetails,
 	isCursorReplayNativeWriteDetails,
 	parseCursorReplayToolDetails,
+} from "./replay-tool-details.js";
+import {
+	renderCursorReplayCall,
 	renderCursorReplayResult,
 	renderNativeLookingCursorFileMutationCall,
 	renderNativeLookingCursorReadReplayResult,
@@ -30,6 +33,7 @@ import {
 	isCursorReplayToolCallId,
 } from "./native-tool-display-state.js";
 
+export const cursorReplayToolSchema = Type.Object({}, { additionalProperties: true });
 
 type AnyToolDefinition = ToolDefinition<TSchema, unknown, unknown>;
 type RenderCall = NonNullable<AnyToolDefinition["renderCall"]>;
@@ -74,53 +78,22 @@ function renderReadReplayCall(
 	return new Text(labeled, 0, 0);
 }
 
-function renderReadReplayResult(
-	result: Parameters<RenderResult>[0],
-	options: Parameters<RenderResult>[1],
-	theme: Parameters<RenderResult>[2],
-	context: Parameters<RenderResult>[3],
-	renderBase: () => ReturnType<RenderResult>,
-): ReturnType<RenderResult> {
-	return renderNativeLookingCursorReadReplayResult(
-		result,
-		options,
-		theme,
-		context as Parameters<typeof renderNativeLookingCursorReadReplayResult>[3],
-		renderBase,
-	);
-}
-
-function renderEditReplayResult(
-	result: Parameters<RenderResult>[0],
-	options: Parameters<RenderResult>[1],
-	theme: Parameters<RenderResult>[2],
-	context: Parameters<RenderResult>[3],
-	renderBase: () => ReturnType<RenderResult>,
-): ReturnType<RenderResult> {
-	const details = parseCursorReplayToolDetails(result.details);
-	return details && isCursorReplayNativeEditDetails(details)
-		? renderCursorReplayResult(result, options, theme, context as Parameters<typeof renderCursorReplayResult>[3], context.isError)
-		: renderBase();
-}
-
-function renderWriteReplayResult(
-	result: Parameters<RenderResult>[0],
-	options: Parameters<RenderResult>[1],
-	theme: Parameters<RenderResult>[2],
-	context: Parameters<RenderResult>[3],
-	renderBase: () => ReturnType<RenderResult>,
-): ReturnType<RenderResult> {
-	const details = parseCursorReplayToolDetails(result.details);
-	return details && isCursorReplayNativeWriteDetails(details)
-		? renderCursorReplayResult(result, options, theme, context as Parameters<typeof renderCursorReplayResult>[3], context.isError)
-		: renderBase();
+function renderFileMutationReplayResult(
+	matches: (details: NonNullable<ReturnType<typeof parseCursorReplayToolDetails>>) => boolean,
+): NonNullable<NativeReplayStrategy["renderReplayResult"]> {
+	return (result, options, theme, context, renderBase) => {
+		const details = parseCursorReplayToolDetails(result.details);
+		return details && matches(details)
+			? renderCursorReplayResult(result, options, theme, context, context.isError, details)
+			: renderBase();
+	};
 }
 
 const NATIVE_CURSOR_TOOL_STRATEGIES: Record<BuiltinNativeCursorToolName, NativeReplayStrategy> = {
 	read: {
 		createDefinition: (cwd) => createReadToolDefinition(cwd) as AnyToolDefinition,
 		renderReplayCall: renderReadReplayCall,
-		renderReplayResult: renderReadReplayResult,
+		renderReplayResult: renderNativeLookingCursorReadReplayResult,
 	},
 	bash: { createDefinition: (cwd) => createBashToolDefinition(cwd) as AnyToolDefinition },
 	edit: {
@@ -128,27 +101,25 @@ const NATIVE_CURSOR_TOOL_STRATEGIES: Record<BuiltinNativeCursorToolName, NativeR
 		missingReplayPolicy: "block-file-mutation",
 		renderReplayCall: (args, theme, context) =>
 			renderNativeLookingCursorFileMutationCall("edit", args as Record<string, unknown>, theme, context.isPartial),
-		renderReplayResult: renderEditReplayResult,
+		renderReplayResult: renderFileMutationReplayResult(isCursorReplayNativeEditDetails),
 	},
 	write: {
 		createDefinition: (cwd) => createWriteToolDefinition(cwd) as AnyToolDefinition,
 		missingReplayPolicy: "block-file-mutation",
 		renderReplayCall: (args, theme, context) =>
 			renderNativeLookingCursorFileMutationCall("write", args as Record<string, unknown>, theme, context.isPartial),
-		renderReplayResult: renderWriteReplayResult,
+		renderReplayResult: renderFileMutationReplayResult(isCursorReplayNativeWriteDetails),
 	},
 	grep: { createDefinition: (cwd) => createGrepToolDefinition(cwd) as AnyToolDefinition },
 	find: { createDefinition: (cwd) => createFindToolDefinition(cwd) as AnyToolDefinition },
 	ls: { createDefinition: (cwd) => createLsToolDefinition(cwd) as AnyToolDefinition },
 };
 
-
 function getNativeReplayStrategy(toolName: string): NativeReplayStrategy | undefined {
 	return Object.hasOwn(NATIVE_CURSOR_TOOL_STRATEGIES, toolName)
 		? NATIVE_CURSOR_TOOL_STRATEGIES[toolName as BuiltinNativeCursorToolName]
 		: undefined;
 }
-
 
 export function wrapNativeCursorTool<TParams extends TSchema, TDetails, TState>(
 	definition: ToolDefinition<TParams, TDetails, TState>,
@@ -199,10 +170,30 @@ export function wrapNativeCursorTool<TParams extends TSchema, TDetails, TState>(
 	};
 }
 
-export function createNativeCursorToolDefinition(toolName: NativeCursorToolName, cwd: string): ToolDefinition<TSchema, unknown, unknown> {
+export function createCursorReplayOnlyToolDefinition(
+	toolName: CursorReplayToolName,
+): ToolDefinition<typeof cursorReplayToolSchema, unknown> {
+	return {
+		name: toolName,
+		label: "Cursor activity",
+		description: "Display recorded Cursor SDK tool activity. This tool only returns recorded Cursor results and never executes work directly.",
+		parameters: cursorReplayToolSchema,
+		async execute() {
+			throw new Error("No recorded Cursor activity result was available. This replay-only tool does not execute work directly.");
+		},
+		renderCall(args, theme, context) {
+			return renderCursorReplayCall(toolName, args as Record<string, unknown>, theme, context.isPartial);
+		},
+		renderResult(result, options, theme, context) {
+			return renderCursorReplayResult(result, options, theme, context, context.isError);
+		},
+	};
+}
+
+export function createNativeCursorToolDefinition(toolName: NativeCursorToolName, cwd: string): AnyToolDefinition {
 	const strategy = getNativeReplayStrategy(toolName);
 	if (strategy) return strategy.createDefinition(cwd);
-	if (isCursorReplayToolName(toolName)) return createCursorReplayOnlyToolDefinition(toolName) as ToolDefinition<TSchema, unknown, unknown>;
+	if (isCursorReplayToolName(toolName)) return createCursorReplayOnlyToolDefinition(toolName) as AnyToolDefinition;
 	throw new Error(`Unsupported Cursor native replay tool: ${toolName}`);
 }
 
@@ -210,6 +201,19 @@ export function registerNativeCursorTool(
 	pi: Pick<import("@earendil-works/pi-coding-agent").ExtensionAPI, "registerTool">,
 	toolName: NativeCursorToolName,
 ): void {
-	const definition = createNativeCursorToolDefinition(toolName, getCursorSessionCwd());
-	pi.registerTool(wrapNativeCursorTool(definition, () => createNativeCursorToolDefinition(toolName, getCursorSessionCwd())));
+	if (isCursorReplayToolName(toolName)) {
+		const definition = createCursorReplayOnlyToolDefinition(toolName) as AnyToolDefinition;
+		pi.registerTool(wrapNativeCursorTool(definition, () => definition));
+		return;
+	}
+	let cachedCwd = getCursorSessionCwd();
+	let cachedDefinition = createNativeCursorToolDefinition(toolName, cachedCwd);
+	pi.registerTool(wrapNativeCursorTool(cachedDefinition, () => {
+		const nextCwd = getCursorSessionCwd();
+		if (nextCwd !== cachedCwd) {
+			cachedCwd = nextCwd;
+			cachedDefinition = createNativeCursorToolDefinition(toolName, nextCwd);
+		}
+		return cachedDefinition;
+	}));
 }

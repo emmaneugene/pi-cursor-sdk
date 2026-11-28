@@ -34,6 +34,13 @@ export interface CursorLiveSdkRun {
 	cancel(): Promise<void>;
 }
 
+export type CursorLiveRunStatus =
+	| { kind: "running" }
+	| { kind: "finished"; finalText: string }
+	| { kind: "cancelled"; abortMessage?: string }
+	| { kind: "error"; errorMessage: string }
+	| { kind: "disposed" };
+
 export interface CursorLiveRun {
 	id: string;
 	agent: SDKAgent;
@@ -45,16 +52,9 @@ export interface CursorLiveRun {
 	accounting: CursorLiveRunAccountingState;
 	billedTurnUsage?: CursorSdkTurnUsage;
 	pendingEvents: CursorLiveQueuedEvent[];
-	textDeltas: string[];
 	emittedText: string;
 	recordedToolDisplayIds: string[];
-	finalText?: string;
-	done: boolean;
-	cancelled: boolean;
-	disposed: boolean;
-	errorMessage?: string;
-	abortMessage?: string;
-	chainUserInputAfterCompletion: boolean;
+	status: CursorLiveRunStatus;
 	debugRecorder?: CursorSdkEventDebugRecorder;
 }
 
@@ -65,7 +65,6 @@ export interface CursorLiveRunCreateParams {
 	sessionBridgeRun?: CursorPiToolBridgeRun;
 	sessionAgentScopeKey?: string;
 	promptInputTokens: number;
-	textDeltas?: string[];
 	debugRecorder?: CursorSdkEventDebugRecorder;
 }
 
@@ -117,7 +116,7 @@ function hasPendingBridgeCalls(run: CursorLiveRun): boolean {
 
 export interface CursorLiveRunRecord {
 	id: string;
-	disposed: boolean;
+	status: CursorLiveRunStatus;
 	bridgeRun?: CursorLiveBridgeMatcher;
 	sessionAgentScopeKey?: string;
 }
@@ -186,7 +185,7 @@ export function matchesCursorLiveRunToolResult(
 }
 
 function isSuccessfulCursorLiveRun(run: CursorLiveRun): boolean {
-	return run.done && !run.cancelled && !run.errorMessage;
+	return run.status.kind === "finished";
 }
 
 export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDeps): CursorLiveRunCoordinator {
@@ -212,7 +211,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 	function getUndisposed(runId: string | undefined): CursorLiveRun | undefined {
 		if (!runId) return undefined;
 		const run = pendingRuns.get(runId);
-		if (!run || run.disposed) return undefined;
+		if (!run || run.status.kind === "disposed") return undefined;
 		return run;
 	}
 
@@ -248,7 +247,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 			return;
 		}
 		state.leased = false;
-		if (state.idleDisposeRequested && !run.disposed) {
+		if (state.idleDisposeRequested && run.status.kind !== "disposed") {
 			coordinator.requestIdleDispose(run);
 		}
 	}
@@ -296,13 +295,9 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 				sessionAgentScopeKey,
 				accounting: createCursorLiveRunAccountingState(params.promptInputTokens),
 				pendingEvents: [],
-				textDeltas: params.textDeltas ?? [],
 				emittedText: "",
 				recordedToolDisplayIds: [],
-				done: false,
-				cancelled: false,
-				disposed: false,
-				chainUserInputAfterCompletion: false,
+				status: { kind: "running" },
 				debugRecorder: params.debugRecorder,
 			};
 			privateStates.set(run, {
@@ -317,38 +312,33 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 		},
 
 		attachSdkRun(run, sdkRun): void {
-			if (run.disposed) return;
+			if (run.status.kind === "disposed") return;
 			run.sdkRun = sdkRun;
 		},
 
 		markFinished(run, finalText): void {
-			if (run.disposed) return;
-			run.finalText = finalText;
-			run.cancelled = false;
-			run.done = true;
+			if (run.status.kind !== "running") return;
+			run.status = { kind: "finished", finalText };
 			notifyProgress(run);
 			coordinator.requestIdleDispose(run);
 		},
 
 		markCancelled(run, abortMessage): void {
-			if (run.disposed) return;
-			run.cancelled = true;
-			run.abortMessage = abortMessage;
-			run.done = true;
+			if (run.status.kind !== "running") return;
+			run.status = { kind: "cancelled", abortMessage };
 			notifyProgress(run);
 			coordinator.requestIdleDispose(run);
 		},
 
 		markError(run, errorMessage): void {
-			if (run.disposed) return;
-			run.errorMessage = errorMessage;
-			run.done = true;
+			if (run.status.kind !== "running") return;
+			run.status = { kind: "error", errorMessage };
 			notifyProgress(run);
 			coordinator.requestIdleDispose(run);
 		},
 
 		recordSdkTurnEnded(run, usage): void {
-			if (run.disposed) return;
+			if (run.status.kind === "disposed") return;
 			if (run.ignoreFutureSdkTurnUsage) {
 				run.accounting = { ...run.accounting, sdkTurnEnded: false, sdkTurnUsage: undefined };
 				notifyProgress(run);
@@ -359,7 +349,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 		},
 
 		ignoreFutureSdkTurnUsage(run): void {
-			if (!run.disposed) run.ignoreFutureSdkTurnUsage = true;
+			if (run.status.kind !== "disposed") run.ignoreFutureSdkTurnUsage = true;
 		},
 
 		hasSdkTurnEnded(run): boolean {
@@ -367,7 +357,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 		},
 
 		queueEvent(run, event): void {
-			if (run.disposed) return;
+			if (run.status.kind === "disposed") return;
 			run.pendingEvents.push(event);
 			run.debugRecorder?.recordLiveRunEvent(event);
 			notifyProgress(run);
@@ -436,7 +426,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 					if (replayRun) return replayRun;
 				}
 				for (const run of pendingRuns.values()) {
-					if (run.disposed) continue;
+					if (run.status.kind === "disposed") continue;
 					if (run.bridgeRun?.hasPendingPiToolCallId(message.toolCallId)) return run;
 				}
 			}
@@ -448,7 +438,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 		},
 
 		isReady(run): boolean {
-			return run.disposed || run.pendingEvents.length > 0 || run.done || run.cancelled || run.errorMessage !== undefined;
+			return run.status.kind !== "running" || run.pendingEvents.length > 0;
 		},
 
 		async waitForProgress(run, signal): Promise<void> {
@@ -491,7 +481,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 		},
 
 		requestIdleDispose(run): void {
-			if (run.disposed) return;
+			if (run.status.kind === "disposed") return;
 			const state = getPrivateState(run);
 			clearIdleDisposeTimer(run);
 			state.idleDisposeRequested = true;
@@ -515,9 +505,11 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 			const state = getPrivateState(run);
 			if (state.releasing) return state.releasing;
 			state.releasing = (async () => {
-				if (run.disposed) return;
+				const prev = run.status;
+				if (prev.kind === "disposed") return;
 				const abandoned = !isSuccessfulCursorLiveRun(run);
-				run.disposed = true;
+				const needsCancel = prev.kind === "running";
+				run.status = { kind: "disposed" };
 				unregister(run);
 				clearIdleDisposeTimer(run);
 				state.idleDisposeRequested = false;
@@ -536,7 +528,7 @@ export function createCursorLiveRunCoordinator(deps: CursorLiveRunCoordinatorDep
 					}
 				}
 				if (abandoned) {
-					if (!run.done) {
+					if (needsCancel) {
 						try {
 							await cancelCursorLiveSdkRun(run);
 						} catch {

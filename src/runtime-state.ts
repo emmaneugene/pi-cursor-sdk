@@ -1,62 +1,39 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
-	loadCursorSdkConfig,
+	loadCursorSdkUserConfig,
 	resolveCursorSdkConfig,
-	type CursorExplicitSdkConfig,
+	type CursorCliConfigInputs,
 	type CursorResolvedSdkConfig,
-	type CursorResolvedSetting,
-	type CursorSdkConfig,
 } from "./config.js";
 import { getResolvedSessionCursorHttp1Enabled } from "./http1.js";
 
 export type CursorRuntimeStateExtensionApi = Pick<ExtensionAPI, "getFlag" | "registerFlag">;
 
-type CursorRuntimeContext = Pick<ExtensionContext, "cwd">;
+type CursorCliLocalConfig = Omit<CursorCliConfigInputs, "force">;
 
 interface CursorCliConfigSnapshot {
-	config: CursorExplicitSdkConfig;
+	config: CursorCliLocalConfig;
 	localForce: boolean;
 }
 
 let cliCursorSnapshot: CursorCliConfigSnapshot = { config: {}, localForce: false };
 let cliLocalForceConsumed = false;
 
-export function getCursorCliConfig(): CursorExplicitSdkConfig {
-	return structuredClone(cliCursorSnapshot.config);
-}
-
-export function getCursorSessionConfig(): CursorSdkConfig {
-	const http1Enabled = getResolvedSessionCursorHttp1Enabled();
-	return http1Enabled === undefined
-		? {}
-		: { local: { transport: http1Enabled ? "http1" : "default" } };
+export function getCursorCliConfig(): CursorCliLocalConfig {
+	return { ...cliCursorSnapshot.config };
 }
 
 export function resolveEffectiveCursorConfig(): CursorResolvedSdkConfig {
-	const loadedConfig = loadCursorSdkConfig();
+	const http1Enabled = getResolvedSessionCursorHttp1Enabled();
 	return resolveCursorSdkConfig({
-		cli: getCursorCliConfig(),
-		cliForce: cliCursorSnapshot.localForce,
-		session: getCursorSessionConfig(),
-		user: loadedConfig.user,
+		cli: {
+			autoReview: cliCursorSnapshot.config.autoReview,
+			sandbox: cliCursorSnapshot.config.sandbox,
+			force: cliCursorSnapshot.localForce ? true : undefined,
+		},
+		sessionTransport: http1Enabled === undefined ? undefined : (http1Enabled ? "http1" : "default"),
+		user: loadCursorSdkUserConfig(),
 	});
-}
-
-export function resolveEffectiveCursorConfigForContext(_ctx: CursorRuntimeContext): CursorResolvedSdkConfig {
-	return resolveEffectiveCursorConfig();
-}
-
-export type CursorRuntimeResolution =
-	| { kind: "valid"; transport: CursorResolvedSetting<"default" | "http1"> }
-	| { kind: "invalid"; message: string };
-
-export function resolveCursorStatusRuntime(ctx: CursorRuntimeContext): CursorRuntimeResolution {
-	try {
-		const config = resolveEffectiveCursorConfigForContext(ctx);
-		return { kind: "valid", transport: config.local.transport };
-	} catch (error) {
-		return { kind: "invalid", message: error instanceof Error ? error.message : String(error) };
-	}
 }
 
 export function formatCursorStatus(
@@ -79,12 +56,11 @@ export function consumeCursorLocalForceOverride(resolved: { value: boolean; sour
 }
 
 export function restoreCursorCliState(pi: Pick<ExtensionAPI, "getFlag">): void {
-	const local: NonNullable<CursorExplicitSdkConfig["local"]> = {
-		...(pi.getFlag("cursor-auto-review") === true ? { autoReview: true } : {}),
-		...(pi.getFlag("cursor-sandbox") === true ? { sandbox: true } : {}),
-	};
 	cliCursorSnapshot = {
-		config: Object.keys(local).length ? { local } : {},
+		config: {
+			...(pi.getFlag("cursor-auto-review") === true ? { autoReview: true } : {}),
+			...(pi.getFlag("cursor-sandbox") === true ? { sandbox: true } : {}),
+		},
 		localForce: !cliLocalForceConsumed && pi.getFlag("cursor-local-force") === true,
 	};
 }

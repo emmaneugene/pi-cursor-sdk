@@ -19,11 +19,11 @@ export interface CursorToolLifecycleEmitterOptions {
 	isBridgeMcpToolCall: (toolCall: unknown) => boolean;
 }
 
-interface PendingLifecycleCall {
-	fingerprint: string;
-	progressText: string;
-	timer?: ReturnType<typeof setTimeout>;
-}
+type LifecycleCallState =
+	| { status: "scheduled"; fingerprint: string; progressText: string; timer: ReturnType<typeof setTimeout> }
+	| { status: "emitted"; fingerprint: string; progressText: string }
+	| { status: "suppressed"; fingerprint: string; progressText: string }
+	| { status: "closed" };
 
 export class CursorToolLifecycleEmitter {
 	private readonly liveRun?: CursorLiveRun;
@@ -32,10 +32,7 @@ export class CursorToolLifecycleEmitter {
 	private readonly debugRecorder?: CursorSdkEventDebugRecorder;
 	private readonly hasStartedToolCall: (callId: string) => boolean;
 	private readonly isBridgeMcpToolCall: (toolCall: unknown) => boolean;
-	private readonly emittedLifecycleCallIds = new Set<string>();
-	private readonly lifecycleByCallId = new Map<string, PendingLifecycleCall>();
-	private readonly fingerprintOwners = new Map<string, string>();
-	private readonly progressTextOwners = new Map<string, string>();
+	private readonly calls = new Map<string, LifecycleCallState>();
 
 	constructor(options: CursorToolLifecycleEmitterOptions) {
 		this.liveRun = options.liveRun;
@@ -47,7 +44,9 @@ export class CursorToolLifecycleEmitter {
 	}
 
 	maybeSchedule(callId: unknown, toolCall: unknown): void {
-		if (typeof callId !== "string" || this.emittedLifecycleCallIds.has(callId)) return;
+		if (typeof callId !== "string") return;
+		const existing = this.calls.get(callId);
+		if (existing?.status === "emitted" || existing?.status === "closed") return;
 		if (this.isBridgeMcpToolCall(toolCall)) return;
 		if (!isCursorToolLifecycleEligible(toolCall)) return;
 
@@ -55,77 +54,78 @@ export class CursorToolLifecycleEmitter {
 		if (!progressText) return;
 
 		const fingerprint = getStartedToolCallFingerprint(toolCall);
-		const existingOwner = this.fingerprintOwners.get(fingerprint);
-		if (existingOwner && existingOwner !== callId) {
-			this.debugRecorder?.recordCoordinatorEvent("tool_lifecycle_skip", {
-				callId,
-				ownerCallId: existingOwner,
-				toolName: getNormalizedCursorToolName(toolCall),
-				reason: "duplicate-active-fingerprint",
-			});
+		const existingOwner = this.findActiveFingerprintOwner(callId, fingerprint);
+		if (existingOwner) {
+			this.recordSkip(callId, existingOwner, toolCall, "duplicate-active-fingerprint");
 			return;
 		}
 
-		this.cancel(callId);
-		this.fingerprintOwners.set(fingerprint, callId);
-		if (!this.progressTextOwners.has(progressText)) {
-			this.progressTextOwners.set(progressText, callId);
-		}
-		const pending: PendingLifecycleCall = { fingerprint, progressText };
+		if (existing?.status === "scheduled") clearTimeout(existing.timer);
 		const timer = setTimeout(() => {
-			delete pending.timer;
+			const current = this.calls.get(callId);
+			if (current?.status !== "scheduled" || current.timer !== timer) return;
 			if (!this.hasStartedToolCall(callId)) {
-				this.clearLifecycleIdentity(callId);
+				this.calls.delete(callId);
 				return;
 			}
-			if (this.emittedLifecycleCallIds.has(callId)) return;
-			const progressOwner = this.progressTextOwners.get(progressText);
-			if (progressOwner && progressOwner !== callId && this.hasStartedToolCall(progressOwner)) {
-				this.debugRecorder?.recordCoordinatorEvent("tool_lifecycle_skip", {
-					callId,
-					ownerCallId: progressOwner,
-					toolName: getNormalizedCursorToolName(toolCall),
-					reason: "duplicate-active-progress-text",
-				});
+			const progressOwner = this.findActiveProgressTextOwner(callId, progressText);
+			if (progressOwner) {
+				this.calls.set(callId, { status: "suppressed", fingerprint, progressText });
+				this.recordSkip(callId, progressOwner, toolCall, "duplicate-active-progress-text");
 				return;
 			}
-			this.progressTextOwners.set(progressText, callId);
+			this.calls.set(callId, { status: "emitted", fingerprint, progressText });
 			this.emit(callId, toolCall, progressText);
 		}, CURSOR_TOOL_LIFECYCLE_DEFER_MS);
 		timer.unref?.();
-		pending.timer = timer;
-		this.lifecycleByCallId.set(callId, pending);
+		this.calls.set(callId, { status: "scheduled", fingerprint, progressText, timer });
 	}
 
 	cancel(callId: string): void {
-		const pending = this.lifecycleByCallId.get(callId);
-		if (pending?.timer) clearTimeout(pending.timer);
-		this.clearLifecycleIdentity(callId);
+		const state = this.calls.get(callId);
+		if (!state || state.status === "closed") return;
+		if (state.status === "scheduled") clearTimeout(state.timer);
+		if (state.status === "emitted") {
+			// Retain a tombstone so late updates for this callId cannot re-emit after releasing its keys.
+			this.calls.set(callId, { status: "closed" });
+		} else {
+			this.calls.delete(callId);
+		}
 	}
 
 	clear(): void {
-		this.emittedLifecycleCallIds.clear();
-		for (const pending of this.lifecycleByCallId.values()) {
-			if (pending.timer) clearTimeout(pending.timer);
+		for (const state of this.calls.values()) {
+			if (state.status === "scheduled") clearTimeout(state.timer);
 		}
-		this.lifecycleByCallId.clear();
-		this.fingerprintOwners.clear();
-		this.progressTextOwners.clear();
+		this.calls.clear();
 	}
 
-	private clearLifecycleIdentity(callId: string): void {
-		const pending = this.lifecycleByCallId.get(callId);
-		this.lifecycleByCallId.delete(callId);
-		if (pending?.fingerprint && this.fingerprintOwners.get(pending.fingerprint) === callId) {
-			this.fingerprintOwners.delete(pending.fingerprint);
+	private recordSkip(callId: string, ownerCallId: string, toolCall: unknown, reason: string): void {
+		this.debugRecorder?.recordCoordinatorEvent("tool_lifecycle_skip", {
+			callId,
+			ownerCallId,
+			toolName: getNormalizedCursorToolName(toolCall),
+			reason,
+		});
+	}
+
+	private findActiveFingerprintOwner(callId: string, fingerprint: string): string | undefined {
+		for (const [otherCallId, state] of this.calls) {
+			if (otherCallId !== callId && state.status !== "closed" && state.fingerprint === fingerprint) return otherCallId;
 		}
-		if (pending?.progressText && this.progressTextOwners.get(pending.progressText) === callId) {
-			this.progressTextOwners.delete(pending.progressText);
+		return undefined;
+	}
+
+	private findActiveProgressTextOwner(callId: string, progressText: string): string | undefined {
+		for (const [otherCallId, state] of this.calls) {
+			if (otherCallId !== callId && state.status === "emitted" && state.progressText === progressText && this.hasStartedToolCall(otherCallId)) {
+				return otherCallId;
+			}
 		}
+		return undefined;
 	}
 
 	private emit(callId: string, toolCall: unknown, progressText: string): void {
-		this.emittedLifecycleCallIds.add(callId);
 		this.debugRecorder?.recordCoordinatorEvent("tool_lifecycle", {
 			callId,
 			toolName: getNormalizedCursorToolName(toolCall),

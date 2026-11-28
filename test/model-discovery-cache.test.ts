@@ -76,13 +76,22 @@ describe("discoverModels model-list cache", () => {
 			},
 		]);
 		await discoverModels();
-		expect(getCursorModelMetadata("claude-opus-4-8")?.parameterIds).toEqual({
-			context: false,
-			reasoning: false,
-			reasoningEffort: false,
-			effort: true,
-			thinking: true,
-			fast: false,
+		const metadata = getCursorModelMetadata("claude-opus-4-8");
+		expect(metadata?.supportsFast).toBe(false);
+		expect(metadata?.thinking).toEqual({
+			kind: "level",
+			paramId: "effort",
+			thinkingLevelMap: {
+				off: "false",
+				minimal: null,
+				low: "low",
+				medium: null,
+				high: "high",
+				xhigh: null,
+				max: null,
+			},
+			offMode: { kind: "disable-thinking", falseValue: "false" },
+			companionThinkingTrueValue: "true",
 		});
 		expect(buildCursorModelSelection("claude-opus-4-8", "low")).toEqual({
 			id: "claude-opus-4-8",

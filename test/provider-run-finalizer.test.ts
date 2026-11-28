@@ -50,7 +50,7 @@ describe("CursorRunFinalizer", () => {
 				agent: { agentId: "agent-1" } as SDKAgent,
 				store: {} as LocalAgentStore,
 				storeIdentity: { version: 1, stateRoot: "/tmp/store" },
-				sendState: { bootstrapped: false, contextFingerprint: "", incrementalSendCount: 0 },
+				sendState: { bootstrapped: false },
 				created: false,
 				commitSend: () => {},
 				trackRunCompletion,
@@ -70,13 +70,9 @@ describe("CursorRunFinalizer", () => {
 					sessionAgentScopeKey: "scope-1",
 					accounting: createCursorLiveRunAccountingState(0),
 					pendingEvents: [],
-					textDeltas,
 					emittedText: "",
 					recordedToolDisplayIds: [],
-					done: false,
-					cancelled: false,
-					disposed: false,
-					chainUserInputAfterCompletion: false,
+					status: { kind: "running" },
 				},
 				turnCoordinator: new CursorSdkTurnCoordinator({
 					stream: createAssistantMessageEventStream(),
@@ -124,11 +120,10 @@ describe("CursorRunFinalizer", () => {
 		});
 
 		await finalizer.cleanup(prepared, undefined, liveCompletion);
-		expect(prepared.runtime.liveRun.textDeltas).toBe(prepared.runtime.turnCoordinator.textDeltas);
 		expect(mockAwaitFinalizeCursorRunOutcome).toHaveBeenCalledTimes(1);
 		expect(trackRunCompletion).toHaveBeenCalledTimes(1);
 		await expect(trackRunCompletion.mock.calls[0]?.[0]).resolves.toBeUndefined();
-		expect(prepared.runtime.liveRun).toMatchObject({ done: true, errorMessage: "run wait failed" });
+		expect(prepared.runtime.liveRun.status).toEqual({ kind: "error", errorMessage: "run wait failed" });
 		expect(captureRunArtifacts).not.toHaveBeenCalled();
 		await vi.waitFor(() => expect(disposeLifecycle).toHaveBeenCalledOnce());
 		sdkProcessErrorGuard.dispose();
@@ -170,7 +165,7 @@ describe("CursorRunFinalizer", () => {
 				agent: { agentId: "agent-1" } as SDKAgent,
 				store: {} as LocalAgentStore,
 				storeIdentity: { version: 1, stateRoot: "/tmp/store" },
-				sendState: { bootstrapped: false, contextFingerprint: "", incrementalSendCount: 0 },
+				sendState: { bootstrapped: false },
 				created: true,
 				commitSend: () => {
 					throw new Error("commit failed before terminal event");
@@ -272,7 +267,7 @@ describe("CursorRunFinalizer", () => {
 				agent: { agentId: "agent-1" } as SDKAgent,
 				store: {} as LocalAgentStore,
 				storeIdentity: { version: 1, stateRoot: "/tmp/store" },
-				sendState: { bootstrapped: false, contextFingerprint: "", incrementalSendCount: 0 },
+				sendState: { bootstrapped: false },
 				created: true,
 				commitSend: () => {},
 				trackRunCompletion: () => {},

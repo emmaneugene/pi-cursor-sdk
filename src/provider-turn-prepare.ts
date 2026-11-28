@@ -130,7 +130,7 @@ async function prepareCursorLocalProviderTurn(
 			bridgeExcludeToolNames,
 			debugRecorder: sdkEventDebug,
 			onBridgeToolRequest: (request: CursorPiBridgeToolRequest) => {
-				if (liveRunForBridgeQueue && !liveRunForBridgeQueue.disposed) {
+				if (liveRunForBridgeQueue && liveRunForBridgeQueue.status.kind !== "disposed") {
 					cursorLiveRuns.queueEvent(liveRunForBridgeQueue, { type: "bridge-tool", request });
 				} else {
 					queuedBridgeRequestsBeforeLiveRun.push(request);
@@ -164,8 +164,6 @@ async function prepareCursorLocalProviderTurn(
 			};
 		};
 		let sendPlan = planCursorSessionSend(sessionAgentLease.sendState, context);
-		let promptOptions = buildPromptOptions(sendPlan);
-		let prompt = buildCursorSessionSendPrompt(context, promptOptions, sendPlan);
 		if (sendPlan.resetAgent) {
 			await resetSessionCursorAgent(sessionAgentScopeKey);
 			sessionAgentLease = await acquireSessionCursorAgent(sessionAgentAcquireParams);
@@ -173,9 +171,9 @@ async function prepareCursorLocalProviderTurn(
 			bridgeToolNames = new Set(sessionAgentLease.bridgeRun?.snapshot.tools.map((tool) => tool.mcpToolName) ?? []);
 			includePiBridgeGuidance = bridgeToolNames.size > 0;
 			sendPlan = planCursorSessionSend(sessionAgentLease.sendState, context);
-			promptOptions = buildPromptOptions(sendPlan);
-			prompt = buildCursorSessionSendPrompt(context, promptOptions, sendPlan);
 		}
+		const promptOptions = buildPromptOptions(sendPlan);
+		const prompt = buildCursorSessionSendPrompt(context, promptOptions, sendPlan);
 		const bootstrap = sendPlan.mode === "bootstrap";
 		const agent = sessionAgentLease.agent;
 		const bridgeRun = sessionAgentLease.bridgeRun;
@@ -218,7 +216,6 @@ async function prepareCursorLocalProviderTurn(
 					sessionBridgeRun,
 					sessionAgentScopeKey,
 					promptInputTokens,
-					textDeltas,
 					debugRecorder: sdkEventDebug,
 				})
 			: undefined;
@@ -270,7 +267,7 @@ async function prepareCursorLocalProviderTurn(
 		};
 	} finally {
 		if (!completed) {
-			if (liveRun && !liveRun.disposed) {
+			if (liveRun && liveRun.status.kind !== "disposed") {
 				await cursorLiveRuns
 					.release(liveRun)
 					.catch(() => abandonSessionCursorAgent(sessionAgentScopeKey).catch(() => {}));

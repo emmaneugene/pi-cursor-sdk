@@ -34,7 +34,6 @@ export async function emitCursorLiveTurn(emitParams: EmitCursorLiveTurnParams): 
 			await settleCursorLiveToolBatch(liveRun);
 			turnCoordinator.closeTraceBlock();
 			await drainCursorLiveRunTurn(params.stream, params.partial, model, params.context, liveRun, 0, {
-				mode: "emit",
 				signal: options?.signal,
 				debugRecorder: sdkEventDebug,
 			});

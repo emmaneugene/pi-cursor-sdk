@@ -36,7 +36,7 @@ function applyLiveRunOutcome(
 	prepared: CursorProviderTurnPrepareResult & { runtime: LiveCursorProviderTurnRuntime },
 	context: CursorProviderTurnRunnerParams["context"],
 ): void {
-	if (prepared.runtime.liveRun.disposed) return;
+	if (prepared.runtime.liveRun.status.kind === "disposed") return;
 	const { liveRun } = prepared.runtime;
 	switch (outcome.kind) {
 		case "finished":
@@ -99,7 +99,7 @@ export class CursorRunFinalizer {
 			})
 			.catch((error: unknown) => {
 				this.safeCleanup(() => discardIncompleteTools({ status: "error" }));
-				if (!liveRun.disposed) {
+				if (liveRun.status.kind !== "disposed") {
 					cursorLiveRuns.markError(
 						liveRun,
 						sanitizeCursorProviderError(error, this.params.resolvedApiKey() ?? runnerParams.options?.apiKey),
@@ -188,7 +188,7 @@ export class CursorRunFinalizer {
 			}),
 		));
 		const activeLiveRun = prepared?.runtime.liveRun;
-		if (activeLiveRun && !activeLiveRun.disposed) {
+		if (activeLiveRun && activeLiveRun.status.kind !== "disposed") {
 			await cursorLiveRuns.release(activeLiveRun);
 		} else {
 			await prepared?.lifecycle.abandon();

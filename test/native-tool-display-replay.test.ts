@@ -246,4 +246,31 @@ describe("cursor native replay rendering", () => {
 		expect(rendered).toContain("Cursor delete .debug/delete-me.txt");
 		expect(rendered).not.toContain("cursor_");
 	});
+
+	it("respects options.expanded when rendering nativeWrite replay previews", () => {
+		const lines = Array.from({ length: 15 }, (_, index) => `line ${index + 1}`);
+		const result = {
+			content: [{ type: "text" as const, text: `write notes.txt\n\n${lines.join("\n")}` }],
+			details: {
+				variant: "nativeWrite",
+				path: "notes.txt",
+				linesCreated: 15,
+				fileContentAfterWrite: `${lines.join("\n")}\n`,
+			},
+		};
+		const context = createRenderContext({ isError: false, showImages: false });
+
+		const collapsed = renderCursorReplayResult(result, { expanded: false, isPartial: false }, taggedTheme, context, false)
+			.render(240)
+			.join("\n");
+		const expanded = renderCursorReplayResult(result, { expanded: true, isPartial: false }, taggedTheme, context, false)
+			.render(240)
+			.join("\n");
+
+		expect(collapsed).toContain("line 8");
+		expect(collapsed).not.toContain("line 9");
+		expect(collapsed).toContain("7 more lines");
+		expect(expanded).toContain("line 15");
+		expect(expanded).not.toContain("more lines");
+	});
 });

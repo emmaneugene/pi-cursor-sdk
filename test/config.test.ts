@@ -6,17 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	cursorFastDefaultsFromConfig,
 	getCursorSdkUserConfigPath,
-	loadCursorSdkConfig,
 	loadCursorSdkConfigForUpdate,
 	loadCursorSdkUserConfig,
-	mergeCursorSdkConfig,
+	mergeCursorFastDefaultForUpdate,
 	mergeCursorSdkConfigForUpdate,
 	parseCursorSdkConfig,
 	resolveCursorFastDefault,
 	resolveCursorSdkConfig,
-	saveCursorSdkUserConfig,
 	updateCursorSdkConfig,
-	withCursorFastDefaults,
 } from "../src/config.js";
 
 function runConfigWriter(path: string, gatePath: string, key: string): Promise<{ code: number | null; output: string }> {
@@ -62,10 +59,10 @@ describe("Cursor SDK user config", () => {
 		expect(resolveCursorSdkConfig({ user }).local).toMatchObject({
 			autoReview: { value: true, source: "user" }, sandboxEnabled: { value: true, source: "user" }, force: { value: false, source: "builtin" }, transport: { value: "http1", source: "user" },
 		});
-		expect(resolveCursorSdkConfig({ cli: { local: { autoReview: false, sandbox: false } }, cliForce: true, user }).local).toMatchObject({
+		expect(resolveCursorSdkConfig({ cli: { autoReview: false, sandbox: false, force: true }, user }).local).toMatchObject({
 			autoReview: { value: false, source: "cli" }, sandboxEnabled: { value: false, source: "cli" }, force: { value: true, source: "cli" },
 		});
-		expect(resolveCursorSdkConfig({ session: { local: { transport: "default" } }, user }).local.transport).toEqual({ value: "default", source: "session" });
+		expect(resolveCursorSdkConfig({ sessionTransport: "default", user }).local.transport).toEqual({ value: "default", source: "session" });
 		expect(resolveCursorSdkConfig({ user }).tools.bridge.exclude).toEqual({ value: ["bash"], source: "user" });
 		expect(resolveCursorSdkConfig().tools.bridge.exclude).toEqual({ value: [], source: "builtin" });
 	});
@@ -74,7 +71,7 @@ describe("Cursor SDK user config", () => {
 		const path = getCursorSdkUserConfigPath(agentDir);
 		mkdirSync(agentDir, { recursive: true });
 		writeFileSync(path, JSON.stringify({ local: { resume: false, sandbox: true } }));
-		expect(loadCursorSdkConfig({ agentDir })).toEqual({ user: { local: { sandbox: true } } });
+		expect(loadCursorSdkUserConfig(path)).toEqual({ local: { sandbox: true } });
 	});
 
 	it("updates models.fastDefaults and writes new user config as 0600", () => {
@@ -84,7 +81,11 @@ describe("Cursor SDK user config", () => {
 		const config = loadCursorSdkUserConfig(path);
 		expect(cursorFastDefaultsFromConfig(config)).toEqual(new Map([["composer-2", false]]));
 		const savedPath = join(agentDir, "saved-cursor-sdk.json");
-		saveCursorSdkUserConfig(withCursorFastDefaults(config, new Map([["composer-2", true]])), savedPath);
+		updateCursorSdkConfig(
+			savedPath,
+			(current) => mergeCursorFastDefaultForUpdate(current, "composer-2", true),
+			{ newFileMode: 0o600 },
+		);
 		expect(JSON.parse(readFileSync(savedPath, "utf8"))).toEqual({ models: { fastDefaults: { "composer-2": true } } });
 		if (process.platform !== "win32") expect(statSync(savedPath).mode & 0o777).toBe(0o600);
 	});

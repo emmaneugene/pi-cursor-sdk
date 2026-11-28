@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CURSOR_REPLAY_ACTIVITY_TOOL_NAME } from "../src/tool-presentation-registry.js";
-import { buildCursorPiToolDisplay } from "../src/tool-transcript.js";
+import { buildCursorPiToolDisplay, formatCursorToolTranscript } from "../src/tool-transcript.js";
 
 
 describe("formatCursorToolTranscript edit and write", () => {
@@ -397,5 +397,37 @@ describe("formatCursorToolTranscript edit and write", () => {
 			expect(taskDisplay.result.content[0].text).toContain("Found two auth risks.");
 		} finally {
 		}
+	});
+
+	it("agrees between formatCursorToolTranscript and buildCursorPiToolDisplay for filePath and file_path edit args", () => {
+		for (const [args, expectedPath] of [
+			[{ filePath: "/repo/src/alpha.ts", oldText: "a\n", newText: "b\n" }, "src/alpha.ts"],
+			[{ file_path: "/repo/src/beta.ts", oldText: "a\n", newText: "b\n" }, "src/beta.ts"],
+		] as const) {
+			const call = { name: "edit", args, result: { status: "success", value: { linesAdded: 1, linesRemoved: 1 } } };
+			const transcript = formatCursorToolTranscript(call, { cwd: "/repo" });
+			const display = buildCursorPiToolDisplay(call, { cwd: "/repo" });
+			expect(transcript).toContain(`edit ${expectedPath}`);
+			expect(display.args).toMatchObject({ path: expectedPath });
+			expect(display.result.content[0].text).toBe(transcript);
+		}
+	});
+
+	it("does not leak result.value diff or content fields into edit/write details on error", () => {
+		const editError = buildCursorPiToolDisplay({
+			name: "edit",
+			args: { path: "src/a.ts", oldText: "a", newText: "b" },
+			result: { status: "error", error: "oldText not found", value: { diffString: "--- a\n+++ b", linesAdded: 1, linesRemoved: 1 } },
+		});
+		const writeError = buildCursorPiToolDisplay({
+			name: "write",
+			args: { path: "src/out.ts", content: "secret\n" },
+			result: { status: "error", error: "permission denied", value: { linesCreated: 1, fileSize: 7, fileContentAfterWrite: "leaked\n" } },
+		});
+
+		expect(editError.isError).toBe(true);
+		expect(editError.result.details).toMatchObject({ variant: "nativeEdit", diffString: undefined, diff: undefined, linesAdded: undefined, linesRemoved: undefined });
+		expect(writeError.isError).toBe(true);
+		expect(writeError.result.details).toMatchObject({ variant: "nativeWrite", linesCreated: undefined, fileSize: undefined, fileContentAfterWrite: undefined });
 	});
 });

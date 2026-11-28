@@ -3,23 +3,30 @@ import {
 	buildCursorIncrementalPrompt,
 	buildCursorPrompt,
 	shouldBootstrapCursorContext,
+	type CursorContextFingerprint,
 	type CursorPrompt,
 	type CursorPromptOptions,
 } from "./context.js";
-import type { SessionCursorAgentSendState } from "./session-agent.js";
 
 // Long-lived SDK session agents can drift tool-call behavior; recreate the agent after this many successful incremental sends.
 export const MAX_COMPLETED_INCREMENTAL_SENDS_BEFORE_REBOOTSTRAP = 20;
 
-export type CursorSessionSendMode = "bootstrap" | "incremental";
+export type SessionCursorAgentSendState =
+	| { readonly bootstrapped: false }
+	| {
+			readonly bootstrapped: true;
+			readonly contextFingerprint: CursorContextFingerprint;
+			readonly incrementalSendCount: number;
+	  };
 
-export type CursorSessionSendReason = "initial" | "context_divergence" | "incremental_threshold" | "incremental";
+export type CursorSessionSendPlan =
+	| { mode: "bootstrap"; resetAgent: false; reason: "initial" }
+	| { mode: "bootstrap"; resetAgent: true; reason: "incremental_threshold" | "context_divergence" }
+	| { mode: "incremental"; resetAgent: false; reason: "incremental" };
 
-export interface CursorSessionSendPlan {
-	mode: CursorSessionSendMode;
-	resetAgent: boolean;
-	reason: CursorSessionSendReason;
-}
+export type CursorSessionSendMode = CursorSessionSendPlan["mode"];
+
+export type CursorSessionSendReason = CursorSessionSendPlan["reason"];
 
 export function planCursorSessionSend(sendState: SessionCursorAgentSendState, context: Context): CursorSessionSendPlan {
 	if (!sendState.bootstrapped) {

@@ -48,7 +48,22 @@ async function getDiscoveryApiKey(apiKey?: string): Promise<string | undefined> 
 	return resolveCursorApiKey(apiKey) ?? resolveCursorRuntimeApiKey();
 }
 
-export type CursorThinkingParameterId = "effort" | "reasoning_effort" | "reasoning" | "thinking";
+export type CursorEffortParameterId = "effort" | "reasoning_effort" | "reasoning";
+
+export type CursorThinkingOffMode =
+	| { kind: "unsupported" }
+	| { kind: "same-param"; value: string }
+	| { kind: "disable-thinking"; falseValue: string };
+
+export type CursorThinkingControl =
+	| { kind: "boolean"; thinkingLevelMap: ThinkingLevelMap }
+	| {
+		kind: "level";
+		paramId: CursorEffortParameterId;
+		thinkingLevelMap: ThinkingLevelMap;
+		offMode: CursorThinkingOffMode;
+		companionThinkingTrueValue?: string;
+	};
 
 export interface CursorModelMetadata {
 	piModelId: string;
@@ -57,26 +72,7 @@ export interface CursorModelMetadata {
 	contextWindow: number;
 	supportsFast: boolean;
 	defaultFast: boolean;
-	supportsReasoning: boolean;
-	thinkingLevelMap?: ThinkingLevelMap;
-	thinkingLevelParamId?: CursorThinkingParameterId;
-	offParamId?: CursorThinkingParameterId;
-	thinkingTrueValue?: string;
-	parameterIds: {
-		context: boolean;
-		reasoning: boolean;
-		reasoningEffort: boolean;
-		effort: boolean;
-		thinking: boolean;
-		fast: boolean;
-	};
-}
-
-interface ResolvedThinkingMapping {
-	thinkingLevelMap: ThinkingLevelMap;
-	thinkingLevelParamId: CursorThinkingParameterId;
-	offParamId?: CursorThinkingParameterId;
-	thinkingTrueValue?: string;
+	thinking?: CursorThinkingControl;
 }
 
 const metadataByPiModelId = new Map<string, CursorModelMetadata>();
@@ -85,8 +81,12 @@ function cloneParams(params: ModelParameterValue[]): ModelParameterValue[] {
 	return params.map((param) => ({ ...param }));
 }
 
-function getParameter(item: ModelListItem, id: string): ModelParameterDefinition | undefined {
-	return item.parameters?.find((parameter) => parameter.id === id);
+function indexParameters(item: ModelListItem): Map<string, ModelParameterDefinition> {
+	const parametersById = new Map<string, ModelParameterDefinition>();
+	for (const parameter of item.parameters ?? []) {
+		if (!parametersById.has(parameter.id)) parametersById.set(parameter.id, parameter);
+	}
+	return parametersById;
 }
 
 function hasBooleanValues(parameter: ModelParameterDefinition | undefined): boolean {
@@ -120,45 +120,38 @@ function mapComparableLevel(
 	return getParameterValue(parameter, level);
 }
 
-function resolveThinkingMapping(item: ModelListItem): ResolvedThinkingMapping | undefined {
-	const reasoningParameter = getParameter(item, "reasoning");
-	const reasoningEffortParameter = getParameter(item, "reasoning_effort");
-	const effortParameter = getParameter(item, "effort");
-	const thinkingParameter = getParameter(item, "thinking");
-	const valueParameter = effortParameter ?? reasoningEffortParameter ?? reasoningParameter ?? thinkingParameter;
-	if (!valueParameter) return undefined;
+const EFFORT_PARAMETER_IDS: readonly CursorEffortParameterId[] = ["effort", "reasoning_effort", "reasoning"];
 
-	const thinkingLevelParamId = valueParameter.id as CursorThinkingParameterId;
-	const thinkingTrueValue = getParameterValue(thinkingParameter, "true") ?? undefined;
-
-	if (thinkingLevelParamId === "thinking") {
-		if (!hasBooleanValues(valueParameter)) return undefined;
-		const offValue = getParameterValue(valueParameter, "false");
-		const highValue = getParameterValue(valueParameter, "true");
-		return {
-			thinkingLevelParamId: "thinking",
-			...(offValue !== null ? { offParamId: "thinking" as const } : {}),
-			...(thinkingTrueValue ? { thinkingTrueValue } : {}),
-			thinkingLevelMap: {
-				off: offValue,
-				minimal: null,
-				low: null,
-				medium: null,
-				high: highValue,
-				xhigh: null,
-				max: null,
-			},
+function resolveThinkingMapping(parametersById: ReadonlyMap<string, ModelParameterDefinition>): CursorThinkingControl | undefined {
+	const thinkingParameter = parametersById.get("thinking");
+	const paramId = EFFORT_PARAMETER_IDS.find((id) => parametersById.has(id));
+	if (!paramId) {
+		if (!thinkingParameter || !hasBooleanValues(thinkingParameter)) return undefined;
+		const thinkingLevelMap: ThinkingLevelMap = {
+			off: getParameterValue(thinkingParameter, "false"),
+			minimal: null,
+			low: null,
+			medium: null,
+			high: getParameterValue(thinkingParameter, "true"),
+			xhigh: null,
+			max: null,
 		};
+		return Object.values(thinkingLevelMap).every((value) => value === null)
+			? undefined
+			: { kind: "boolean", thinkingLevelMap };
 	}
 
+	const valueParameter = parametersById.get(paramId)!;
 	const valueOff = getPreferredParameterValue(valueParameter, ["none", "off"]);
 	const thinkingOff = valueOff === null ? getParameterValue(thinkingParameter, "false") : null;
-	const offValue = valueOff ?? thinkingOff;
-	const offParamId: CursorThinkingParameterId | undefined =
-		valueOff !== null ? thinkingLevelParamId : thinkingOff !== null ? "thinking" : undefined;
-
+	const offMode: CursorThinkingOffMode =
+		valueOff !== null
+			? { kind: "same-param", value: valueOff }
+			: thinkingOff !== null
+				? { kind: "disable-thinking", falseValue: thinkingOff }
+				: { kind: "unsupported" };
 	const thinkingLevelMap: ThinkingLevelMap = {
-		off: offValue,
+		off: valueOff ?? thinkingOff,
 		minimal: mapComparableLevel(valueParameter, "minimal"),
 		low: mapComparableLevel(valueParameter, "low"),
 		medium: mapComparableLevel(valueParameter, "medium"),
@@ -166,16 +159,15 @@ function resolveThinkingMapping(item: ModelListItem): ResolvedThinkingMapping | 
 		xhigh: mapComparableLevel(valueParameter, "xhigh"),
 		max: mapComparableLevel(valueParameter, "max"),
 	};
+	if (Object.values(thinkingLevelMap).every((value) => value === null)) return undefined;
 
-	if (Object.values(thinkingLevelMap).every((value) => value === null)) {
-		return undefined;
-	}
-
+	const companionThinkingTrueValue = getParameterValue(thinkingParameter, "true") ?? undefined;
 	return {
+		kind: "level",
+		paramId,
 		thinkingLevelMap,
-		thinkingLevelParamId,
-		...(offParamId ? { offParamId } : {}),
-		...(thinkingTrueValue ? { thinkingTrueValue } : {}),
+		offMode,
+		...(companionThinkingTrueValue ? { companionThinkingTrueValue } : {}),
 	};
 }
 
@@ -220,32 +212,17 @@ function toMetadata(
 	contextWindowCache: Map<string, number>,
 	contextWindowKey: string,
 ): CursorModelMetadata {
-	const thinking = resolveThinkingMapping(item);
+	const parametersById = indexParameters(item);
+	const thinking = resolveThinkingMapping(parametersById);
 	const fastValue = getParamValue(defaultParams, "fast")?.toLowerCase();
 	return {
 		piModelId: item.id,
 		displayName: item.displayName || item.id,
 		defaultParams: cloneParams(defaultParams),
 		contextWindow: getContextWindow(contextWindowCache, item.id, defaultContext, contextWindowKey),
-		supportsFast: getParameter(item, "fast") !== undefined,
+		supportsFast: parametersById.has("fast"),
 		defaultFast: fastValue === "true",
-		supportsReasoning: thinking !== undefined,
-		...(thinking
-			? {
-					thinkingLevelMap: thinking.thinkingLevelMap,
-					thinkingLevelParamId: thinking.thinkingLevelParamId,
-					...(thinking.offParamId ? { offParamId: thinking.offParamId } : {}),
-					...(thinking.thinkingTrueValue ? { thinkingTrueValue: thinking.thinkingTrueValue } : {}),
-				}
-			: {}),
-		parameterIds: {
-			context: getParameter(item, "context") !== undefined,
-			reasoning: getParameter(item, "reasoning") !== undefined,
-			reasoningEffort: getParameter(item, "reasoning_effort") !== undefined,
-			effort: getParameter(item, "effort") !== undefined,
-			thinking: getParameter(item, "thinking") !== undefined,
-			fast: getParameter(item, "fast") !== undefined,
-		},
+		...(thinking ? { thinking } : {}),
 	};
 }
 
@@ -253,8 +230,8 @@ function toModelConfig(metadata: CursorModelMetadata, name: string): CursorProvi
 	return {
 		id: metadata.piModelId,
 		name,
-		reasoning: metadata.supportsReasoning,
-		...(metadata.thinkingLevelMap ? { thinkingLevelMap: metadata.thinkingLevelMap } : {}),
+		reasoning: metadata.thinking !== undefined,
+		...(metadata.thinking ? { thinkingLevelMap: metadata.thinking.thinkingLevelMap } : {}),
 		input: [...TEXT_AND_IMAGE_INPUT],
 		cost: { ...ZERO_COST },
 		contextWindow: metadata.contextWindow,
@@ -282,12 +259,17 @@ export function getCursorModelMetadata(modelId: string): CursorModelMetadata | u
 	return metadataByPiModelId.get(modelId);
 }
 
+function cloneThinkingControl(thinking: CursorThinkingControl): CursorThinkingControl {
+	return thinking.kind === "boolean"
+		? { kind: "boolean", thinkingLevelMap: { ...thinking.thinkingLevelMap } }
+		: { ...thinking, thinkingLevelMap: { ...thinking.thinkingLevelMap }, offMode: { ...thinking.offMode } };
+}
+
 export function getCursorModelMetadataEntries(): CursorModelMetadata[] {
 	return [...metadataByPiModelId.values()].map((metadata) => ({
 		...metadata,
 		defaultParams: cloneParams(metadata.defaultParams),
-		...(metadata.thinkingLevelMap ? { thinkingLevelMap: { ...metadata.thinkingLevelMap } } : {}),
-		parameterIds: { ...metadata.parameterIds },
+		...(metadata.thinking ? { thinking: cloneThinkingControl(metadata.thinking) } : {}),
 	}));
 }
 
@@ -305,35 +287,26 @@ function deleteParam(params: ModelParameterValue[], id: string): void {
 	if (index >= 0) params.splice(index, 1);
 }
 
-function applyThinkingLevel(
-	metadata: CursorModelMetadata,
-	params: ModelParameterValue[],
-	level: ModelThinkingLevel,
-): void {
-	const mapped = metadata.thinkingLevelMap?.[level];
-	if (mapped === undefined || mapped === null) return;
-
-	if (level === "off") {
-		const targetParamId = metadata.offParamId;
-		if (!targetParamId) return;
-		setParam(params, targetParamId, mapped);
-		if (
-			targetParamId === "thinking" &&
-			mapped.toLowerCase() === "false" &&
-			metadata.thinkingLevelParamId &&
-			metadata.thinkingLevelParamId !== "thinking"
-		) {
-			deleteParam(params, metadata.thinkingLevelParamId);
-		}
+function applyThinkingLevel(metadata: CursorModelMetadata, params: ModelParameterValue[], level: ModelThinkingLevel): void {
+	const { thinking } = metadata;
+	const mapped = thinking?.thinkingLevelMap[level];
+	if (!thinking || mapped === undefined || mapped === null) return;
+	if (thinking.kind === "boolean") {
+		setParam(params, "thinking", mapped);
 		return;
 	}
-
-	const targetParamId = metadata.thinkingLevelParamId;
-	if (!targetParamId) return;
-	if (targetParamId !== "thinking" && metadata.thinkingTrueValue) {
-		setParam(params, "thinking", metadata.thinkingTrueValue);
+	if (level === "off") {
+		switch (thinking.offMode.kind) {
+			case "unsupported": return;
+			case "same-param": setParam(params, thinking.paramId, thinking.offMode.value); return;
+			case "disable-thinking":
+				setParam(params, "thinking", thinking.offMode.falseValue);
+				deleteParam(params, thinking.paramId);
+				return;
+		}
 	}
-	setParam(params, targetParamId, mapped);
+	if (thinking.companionThinkingTrueValue) setParam(params, "thinking", thinking.companionThinkingTrueValue);
+	setParam(params, thinking.paramId, mapped);
 }
 
 export function buildCursorModelSelection(

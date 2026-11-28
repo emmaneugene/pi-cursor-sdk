@@ -67,25 +67,16 @@ export interface CursorResolvedSdkConfig {
 	};
 }
 
-type WidenLiterals<T> = T extends string
-	? string
-	: T extends readonly (infer U)[]
-		? WidenLiterals<U>[]
-		: T extends object
-			? { [K in keyof T]: WidenLiterals<T[K]> }
-			: T;
-
-export type CursorExplicitSdkConfig = WidenLiterals<CursorSdkConfig>;
-
-export interface ResolveCursorSdkConfigOptions {
-	cli?: CursorExplicitSdkConfig;
-	cliForce?: boolean;
-	session?: CursorSdkConfig;
-	user?: CursorSdkConfig;
+export interface CursorCliConfigInputs {
+	autoReview?: boolean;
+	sandbox?: boolean;
+	force?: boolean;
 }
 
-export interface LoadCursorSdkConfigOptions {
-	agentDir?: string;
+export interface ResolveCursorSdkConfigOptions {
+	cli?: CursorCliConfigInputs;
+	sessionTransport?: "default" | "http1";
+	user?: CursorSdkConfig;
 }
 
 function parseNonEmptyString(value: unknown): string | undefined {
@@ -221,10 +212,6 @@ export function loadCursorSdkUserConfig(path = getCursorSdkUserConfigPath()): Cu
 	return readCursorSdkConfigFile(path);
 }
 
-export function loadCursorSdkConfig(options: LoadCursorSdkConfigOptions = {}): { user: CursorSdkConfig } {
-	return { user: loadCursorSdkUserConfig(getCursorSdkUserConfigPath(options.agentDir)) };
-}
-
 const CONFIG_LOCK_RETRY_MS = 20;
 const CONFIG_LOCK_TIMEOUT_MS = 5_000;
 const configLockWaitBuffer = new Int32Array(new SharedArrayBuffer(4));
@@ -281,10 +268,6 @@ export function updateCursorSdkConfig(path: string, update: (current: Record<str
 	});
 }
 
-export function saveCursorSdkUserConfig(config: CursorSdkConfig, path = getCursorSdkUserConfigPath()): void {
-	updateCursorSdkConfig(path, () => ({ ...config }), { newFileMode: 0o600 });
-}
-
 function mergeRecords(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
 	return Object.fromEntries(Object.keys({ ...base, ...patch }).map((key) => {
 		const baseValue = base[key];
@@ -295,24 +278,30 @@ function mergeRecords(base: Record<string, unknown>, patch: Record<string, unkno
 	}));
 }
 
-export function mergeCursorSdkConfig(base: CursorSdkConfig, patch: CursorSdkConfig): CursorSdkConfig {
-	return mergeCursorSdkConfigForUpdate(base as Record<string, unknown>, patch) as CursorSdkConfig;
-}
-
 export function mergeCursorSdkConfigForUpdate(base: Record<string, unknown>, patch: CursorSdkConfig): Record<string, unknown> {
 	return mergeRecords(base, patch as Record<string, unknown>);
 }
 
-export function cursorFastDefaultsFromConfig(config: CursorSdkConfig | undefined): Map<string, boolean> {
-	return new Map(Object.entries(config?.models?.fastDefaults ?? {}));
+export function mergeCursorFastDefaultForUpdate(
+	current: Record<string, unknown>,
+	modelId: string,
+	fast: boolean,
+): Record<string, unknown> {
+	const models = asRecord(current.models);
+	const fastDefaults = { ...asRecord(models?.fastDefaults), [modelId]: fast };
+	return {
+		...current,
+		models: {
+			...models,
+			fastDefaults: Object.fromEntries(
+				Object.entries(fastDefaults).sort(([a], [b]) => a.localeCompare(b)),
+			),
+		},
+	};
 }
 
-export function withCursorFastDefaults<T extends object>(config: T, fastDefaults: Map<string, boolean>): T & { models: { fastDefaults: Record<string, boolean> } } {
-	const models = asRecord((config as Record<string, unknown>).models);
-	return {
-		...config,
-		models: { ...models, fastDefaults: Object.fromEntries([...fastDefaults.entries()].sort(([a], [b]) => a.localeCompare(b))) },
-	} as T & { models: { fastDefaults: Record<string, boolean> } };
+export function cursorFastDefaultsFromConfig(config: CursorSdkConfig | undefined): Map<string, boolean> {
+	return new Map(Object.entries(config?.models?.fastDefaults ?? {}));
 }
 
 function resolved<T>(source: CursorConfigSource, value: T): CursorResolvedSetting<T> {
@@ -330,15 +319,13 @@ function valueFrom<T>(source: CursorConfigSource, value: T | undefined): CursorR
 }
 
 export function resolveCursorSdkConfig(options: ResolveCursorSdkConfigOptions = {}): CursorResolvedSdkConfig {
-	const cli = options.cli;
-	const session = options.session;
-	const user = options.user;
+	const { cli, sessionTransport, user } = options;
 	return {
 		local: {
-			autoReview: resolveField([valueFrom("cli", cli?.local?.autoReview), valueFrom("user", user?.local?.autoReview), resolved("builtin", false)]),
-			sandboxEnabled: resolveField([valueFrom("cli", cli?.local?.sandbox), valueFrom("user", user?.local?.sandbox), resolved("builtin", false)]),
-			force: resolveField([valueFrom("cli", options.cliForce), resolved("builtin", false)]),
-			transport: resolveField([valueFrom("session", session?.local?.transport), valueFrom("user", user?.local?.transport), resolved("builtin", "default")]),
+			autoReview: resolveField([valueFrom("cli", cli?.autoReview), valueFrom("user", user?.local?.autoReview), resolved("builtin", false)]),
+			sandboxEnabled: resolveField([valueFrom("cli", cli?.sandbox), valueFrom("user", user?.local?.sandbox), resolved("builtin", false)]),
+			force: resolveField([valueFrom("cli", cli?.force), resolved("builtin", false)]),
+			transport: resolveField([valueFrom("session", sessionTransport), valueFrom("user", user?.local?.transport), resolved("builtin", "default")]),
 		},
 		tools: {
 			bridge: {

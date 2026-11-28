@@ -141,6 +141,43 @@ describe("extension factory nested-session guard", () => {
 		expect(nextPi.registerProvider).toHaveBeenCalledOnce();
 	});
 
+	it("ignores stale refresh completion and serves owner's refreshed model catalog to nested child", async () => {
+		const initialModels = [makeProviderModelConfig("initial-model")];
+		const staleRefreshedModels = [makeProviderModelConfig("stale-refreshed-model")];
+		const replacementModels = [makeProviderModelConfig("replacement-model")];
+		const refreshedModels = [makeProviderModelConfig("refreshed-model")];
+		let resolveStaleRefresh!: (models: typeof staleRefreshedModels) => void;
+
+		mockedDiscover
+			.mockResolvedValueOnce(initialModels)
+			.mockImplementationOnce(() => new Promise((resolve) => { resolveStaleRefresh = resolve; }))
+			.mockResolvedValueOnce(replacementModels)
+			.mockResolvedValueOnce(refreshedModels);
+
+		const cmdCtx = createExtensionCommandContext({
+			hasUI: false,
+			model: undefined,
+			modelRegistry: { getApiKeyForProvider: async () => undefined } as never,
+		});
+
+		const parentPi = createExtensionPi();
+		await extensionFactory(parentPi);
+		const staleRefresh = parentPi.runCommand("cursor-refresh-models", "", cmdCtx);
+		await parentPi.runSessionShutdown({ reason: "reload" });
+
+		const replacementPi = createExtensionPi();
+		await extensionFactory(replacementPi);
+		await replacementPi.runCommand("cursor-refresh-models", "", cmdCtx);
+
+		resolveStaleRefresh(staleRefreshedModels);
+		await staleRefresh;
+
+		expect(parentPi.registerProvider).toHaveBeenCalledTimes(1);
+		const childPi = createExtensionPi();
+		await extensionFactory(childPi);
+		expect(childPi._registered[0]?.config.models).toEqual(refreshedModels);
+	});
+
 	it("does not dispose a live parent bridge run when a child factory loads", async () => {
 		writeIndexTestUserConfig({ tools: { bridge: { exposeBuiltins: true } } });
 		mockedDiscover.mockResolvedValue([]);

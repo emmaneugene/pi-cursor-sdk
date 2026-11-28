@@ -76,7 +76,7 @@ describe("awaitFinalizeCursorRunOutcome", () => {
 				agent: { agentId: "lease-agent" } as SDKAgent,
 				store: {} as LocalAgentStore,
 				storeIdentity: { version: 1, stateRoot: "/tmp/store" },
-				sendState: { bootstrapped: false, contextFingerprint: "", incrementalSendCount: 0 },
+				sendState: { bootstrapped: false },
 				created: true,
 				commitSend: () => {},
 				trackRunCompletion: () => {},

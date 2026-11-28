@@ -7,6 +7,10 @@ import {
 	hasTrailingUserMessagesAfterToolResults,
 	type CursorLiveRun,
 } from "../src/live-run-coordinator.js";
+import {
+	consumeCursorNativeToolDisplay,
+	__testUtils as nativeToolDisplayTestUtils,
+} from "../src/native-tool-display-state.js";
 import type { CursorPiToolBridgeRun } from "../src/pi-tool-bridge.js";
 import {
 	cursorLiveRuns,
@@ -157,7 +161,6 @@ describe("cursor live run coordinator", () => {
 			makeContext(),
 			run,
 			0,
-			{ mode: "emit" },
 		);
 
 		expect(outcome).toBe("stop");
@@ -362,5 +365,74 @@ describe("cursor live run coordinator", () => {
 		]);
 
 		expect(coordinator.getPendingFromContext(context, replayIdFromToolCallId)).toBe(run);
+	});
+
+	it("enforces one-way terminal status transitions", async () => {
+		const { coordinator } = makeCoordinator();
+		const finishedRun = startRun(coordinator, { id: "finished-run", scopeKey: "scope-finished" });
+		coordinator.markFinished(finishedRun, "first");
+		coordinator.markError(finishedRun, "late error");
+		coordinator.markCancelled(finishedRun, "late cancel");
+		expect(finishedRun.status).toEqual({ kind: "finished", finalText: "first" });
+
+		await coordinator.release(finishedRun);
+		coordinator.markFinished(finishedRun, "after release");
+		expect(finishedRun.status).toEqual({ kind: "disposed" });
+	});
+
+	it("does not terminate a queued native tool-use turn when the run errors, surfacing the error on the next drain", async () => {
+		nativeToolDisplayTestUtils.registerNativeToolNameForTests("read");
+		const run = cursorLiveRuns.start({
+			id: "cursor-replay-999-1",
+			agent: makeAgent(),
+			sessionAgentScopeKey: "errored-native-tool-drain-scope",
+			promptInputTokens: 1,
+		});
+		cursorLiveRuns.queueEvent(run, {
+			type: "tool",
+			tool: {
+				id: "cursor-replay-999-1-tool-1",
+				toolName: "read",
+				args: { path: "README.md" },
+				result: { content: [{ type: "text", text: "# readme" }] },
+				isError: false,
+			},
+		});
+		cursorLiveRuns.markError(run, "Cursor backend failed");
+
+		try {
+			const firstStream = createAssistantMessageEventStream();
+			const firstOutcome = await drainCursorLiveRunTurn(
+				firstStream,
+				makeAssistantMessage(""),
+				makeModel(),
+				makeContext(),
+				run,
+				0,
+			);
+
+			expect(firstOutcome).toBe("tool_use");
+			expect(consumeCursorNativeToolDisplay("cursor-replay-999-1-tool-1")?.terminate).toBe(false);
+
+			const secondStream = createAssistantMessageEventStream();
+			const secondPartial = makeAssistantMessage("");
+			const secondPush = vi.spyOn(secondStream, "push");
+			const secondOutcome = await drainCursorLiveRunTurn(
+				secondStream,
+				secondPartial,
+				makeModel(),
+				makeContext(),
+				run,
+				0,
+			);
+
+			expect(secondOutcome).toBe("error");
+			expect(secondPartial.stopReason).toBe("error");
+			expect(secondPartial.errorMessage).toBe("Cursor backend failed");
+			expect(secondPush).toHaveBeenCalledWith({ type: "error", reason: "error", error: secondPartial });
+		} finally {
+			await cursorLiveRuns.release(run);
+			nativeToolDisplayTestUtils.reset();
+		}
 	});
 });

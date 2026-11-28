@@ -41,6 +41,13 @@ export interface CursorPiToolBridgeRunHost {
 }
 
 const MCP_SERVER_VERSION = "0.1.0";
+const DISPOSED_DURING_STARTUP_ERROR = "Cursor pi tool bridge run disposed during startup";
+
+type RunDispatchState =
+	| { kind: "buffering"; queued: CursorPiBridgeToolRequest[] }
+	| { kind: "bound"; handler: (request: CursorPiBridgeToolRequest) => void }
+	| { kind: "detached" }
+	| { kind: "disposed" };
 
 interface PendingBridgeCall {
 	request: CursorPiBridgeToolRequest;
@@ -64,15 +71,11 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 	private readonly callTimeoutMs: number;
 	private readonly knownMcpToolNames: ReadonlySet<string>;
 	private readonly knownCursorMcpCallIds = new Set<string>();
-	private readonly queuedRequests: CursorPiBridgeToolRequest[] = [];
 	private readonly pendingByPiToolCallId = new Map<string, PendingBridgeCall>();
-	private onToolRequest?: (request: CursorPiBridgeToolRequest) => void;
+	private dispatchState: RunDispatchState;
 	private debugRecorder: CursorPiToolBridgeRunOptions["debugRecorder"];
-	private liveRunHandlerDetached = false;
-	private mcpServer?: McpProtocolServer;
-	private mcpTransport?: StreamableHTTPServerTransport;
+	private mcpEndpoint?: { server: McpProtocolServer; transport: StreamableHTTPServerTransport };
 	private toolCallCounter = 0;
-	private disposed = false;
 
 	constructor(
 		registry: CursorPiToolBridgeRunHost,
@@ -85,7 +88,9 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 		this.config = config;
 		this.snapshot = snapshot;
 		this.enabled = enabled;
-		this.onToolRequest = options.onToolRequest;
+		this.dispatchState = options.onToolRequest
+			? { kind: "bound", handler: options.onToolRequest }
+			: { kind: "buffering", queued: [] };
 		this.debugRecorder = options.debugRecorder;
 		this.id = `cursor-pi-bridge-run-${randomUUID()}`;
 		this.endpointPath = `${MCP_ENDPOINT_ROOT}/${randomUUID()}/mcp`;
@@ -95,12 +100,25 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 
 	async start(): Promise<void> {
 		if (!this.enabled) return;
+		if (this.isDisposed()) throw new Error(DISPOSED_DURING_STARTUP_ERROR);
 		await this.createMcpServer();
-		const endpointUrl = await this.registry.registerRun(this.endpointPath, this);
+		let endpointUrl: string;
+		try {
+			endpointUrl = await this.registry.registerRun(this.endpointPath, this);
+		} catch (error) {
+			await this.closeMcpEndpoint();
+			throw error;
+		}
+		if (this.isDisposed()) {
+			await this.closeMcpEndpoint();
+			await this.registry.unregisterRun(this.endpointPath, this).catch(() => undefined);
+			throw new Error(DISPOSED_DURING_STARTUP_ERROR);
+		}
 		this.mcpServers = { [MCP_SERVER_NAME]: { type: "http", url: endpointUrl } };
 	}
 
 	emitStartDiagnostics(bridgeEnabled: boolean): void {
+		if (this.isDisposed()) return;
 		const base = this.lifecycleDiagnosticFields();
 		this.emitDiagnostic({ event: "run_created", ...base });
 		if (!this.enabled) {
@@ -122,31 +140,38 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 	}
 
 	async handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-		if (this.disposed || !this.mcpTransport) {
+		if (this.isDisposed() || !this.mcpEndpoint) {
 			res.writeHead(410, { "content-type": "application/json" }).end(JSON.stringify({ error: "Cursor pi tool bridge run is disposed" }));
 			return;
 		}
-		await this.mcpTransport.handleRequest(req, res);
+		await this.mcpEndpoint.transport.handleRequest(req, res);
 	}
 
 	takeQueuedToolRequests(): CursorPiBridgeToolRequest[] {
-		return this.queuedRequests.splice(0);
+		return this.dispatchState.kind === "buffering" ? this.dispatchState.queued.splice(0) : [];
 	}
 
 	setOnToolRequest(handler?: (request: CursorPiBridgeToolRequest) => void): void {
+		if (this.isDisposed()) return;
+		const queued = this.takeQueuedToolRequests();
 		if (!handler) {
-			this.liveRunHandlerDetached = true;
-			this.rejectQueuedToolRequestsWithoutHandler("Cursor pi tool bridge has no active live run");
-		} else {
-			this.liveRunHandlerDetached = false;
-		}
-		this.onToolRequest = handler;
-		if (handler) {
-			for (const request of this.queuedRequests.splice(0)) {
+			this.dispatchState = { kind: "detached" };
+			for (const request of queued) {
 				const pending = this.pendingByPiToolCallId.get(request.piToolCallId);
-				if (pending) this.dispatchPendingToolRequest(pending, handler);
+				if (pending) this.rejectPending(pending, new Error("Cursor pi tool bridge has no active live run"), "cancelled");
 			}
+			return;
 		}
+
+		this.dispatchState = { kind: "bound", handler };
+		for (const request of queued) {
+			const pending = this.pendingByPiToolCallId.get(request.piToolCallId);
+			if (pending) this.dispatchPendingToolRequest(pending, handler);
+		}
+	}
+
+	private isDisposed(): boolean {
+		return this.dispatchState.kind === "disposed";
 	}
 
 	setDebugRecorder(recorder?: CursorPiToolBridgeRunOptions["debugRecorder"]): void {
@@ -212,9 +237,23 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 	}
 
 	cancel(reason: string): void {
+		this.cancelWithQueuedCount(reason, this.takeQueuedToolRequests().length);
+	}
+
+	async dispose(): Promise<void> {
+		if (this.isDisposed()) return;
+		const queuedCount = this.takeQueuedToolRequests().length;
+		this.dispatchState = { kind: "disposed" };
+		this.cancelWithQueuedCount("Cursor pi tool bridge run disposed", queuedCount);
+		await waitForProtocolFlush();
+		await this.closeMcpEndpoint();
+		await this.registry.unregisterRun(this.endpointPath, this);
+		this.emitDiagnostic({ event: "run_disposed", ...this.lifecycleDiagnosticFields() });
+	}
+
+	private cancelWithQueuedCount(reason: string, queuedCount: number): void {
 		const error = new Error(reason);
 		const pendingCount = this.pendingCount();
-		const queuedCount = this.queuedRequests.length;
 		if (pendingCount > 0 || queuedCount > 0) {
 			this.emitDiagnostic({
 				event: "run_cancelled",
@@ -223,26 +262,9 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 				cancelledRequestCount: pendingCount,
 			});
 		}
-		this.queuedRequests.splice(0);
 		for (const pending of [...this.pendingByPiToolCallId.values()]) {
 			this.rejectAndAbortPending(pending, error, "cancelled");
 		}
-	}
-
-	async dispose(): Promise<void> {
-		if (this.disposed) return;
-		this.disposed = true;
-		this.cancel("Cursor pi tool bridge run disposed");
-		await waitForProtocolFlush();
-		await Promise.allSettled([
-			this.mcpTransport?.close(),
-			this.mcpServer?.close(),
-		]);
-		await this.registry.unregisterRun(this.endpointPath, this);
-		this.emitDiagnostic({
-			event: "run_disposed",
-			...this.lifecycleDiagnosticFields(),
-		});
 	}
 
 	private async createMcpServer(): Promise<void> {
@@ -250,20 +272,30 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 			{ name: "pi-cursor-sdk-tool-bridge", version: MCP_SERVER_VERSION },
 			{ capabilities: { tools: {} } },
 		);
-		const transport = new StreamableHTTPServerTransport({
-			sessionIdGenerator: randomUUID,
-		});
-
+		const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: randomUUID });
 		server.setRequestHandler(ListToolsRequestSchema, async () => ({
 			tools: this.snapshot.tools.map(snapshotToolToMcpTool),
 		}));
-		server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-			return this.enqueueToolRequest(request.params.name, request.params.arguments, String(extra.requestId), extra.signal);
-		});
+		server.setRequestHandler(CallToolRequestSchema, async (request, extra) =>
+			this.enqueueToolRequest(request.params.name, request.params.arguments, String(extra.requestId), extra.signal),
+		);
+		try {
+			await server.connect(transport);
+		} catch (error) {
+			await this.closeMcpEndpoint({ server, transport });
+			throw error;
+		}
+		if (this.isDisposed()) {
+			await this.closeMcpEndpoint({ server, transport });
+			throw new Error(DISPOSED_DURING_STARTUP_ERROR);
+		}
+		this.mcpEndpoint = { server, transport };
+	}
 
-		this.mcpServer = server;
-		this.mcpTransport = transport;
-		await server.connect(transport);
+	private async closeMcpEndpoint(endpoint = this.mcpEndpoint): Promise<void> {
+		if (!endpoint) return;
+		if (this.mcpEndpoint === endpoint) this.mcpEndpoint = undefined;
+		await Promise.allSettled([endpoint.transport.close(), endpoint.server.close()]);
 	}
 
 	private enqueueToolRequest(mcpToolName: string, argsValue: unknown, cursorMcpCallId: string, signal?: AbortSignal): Promise<CallToolResult> {
@@ -274,19 +306,26 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 				isError: true,
 			});
 		}
-		if (this.disposed) return Promise.reject(new Error("Cursor pi tool bridge run is disposed"));
-
-		this.toolCallCounter += 1;
-		const bridgeCallId = `${this.id}-bridge-${this.toolCallCounter}`;
+		if (this.dispatchState.kind === "disposed") {
+			return Promise.reject(new Error("Cursor pi tool bridge run is disposed"));
+		}
+		const callNumber = ++this.toolCallCounter;
 		const request: CursorPiBridgeToolRequest = {
 			runId: this.id,
-			bridgeCallId,
+			bridgeCallId: `${this.id}-bridge-${callNumber}`,
 			cursorMcpCallId,
-			piToolCallId: `${this.id}-tool-${this.toolCallCounter}`,
+			piToolCallId: `${this.id}-tool-${callNumber}`,
 			piToolName,
 			mcpToolName,
 			args: normalizeMcpArgs(argsValue),
 		};
+		if (this.dispatchState.kind === "detached") {
+			const error = new Error("Cursor pi tool bridge has no active live run");
+			this.recordRejectedRequest(request, error, "cancelled");
+			return Promise.reject(error);
+		}
+
+		const dispatchState = this.dispatchState;
 
 		return new Promise<CallToolResult>((resolve, reject) => {
 			const pending: PendingBridgeCall = {
@@ -311,19 +350,10 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 				this.rejectAndAbortPending(pending, new Error(reason));
 			}, this.callTimeoutMs);
 			pending.timeout.unref?.();
-			if (!this.onToolRequest) {
-				if (this.liveRunHandlerDetached) {
-					this.rejectPending(pending, new Error("Cursor pi tool bridge has no active live run"), "cancelled");
-					return;
-				}
-				this.queuedRequests.push(request);
-				this.emitRequestQueuedDiagnostic(request);
-				this.recordBridgeRaw({ kind: "queued", request });
-				return;
-			}
+			if (dispatchState.kind === "buffering") dispatchState.queued.push(request);
 			this.emitRequestQueuedDiagnostic(request);
 			this.recordBridgeRaw({ kind: "queued", request });
-			this.dispatchPendingToolRequest(pending, this.onToolRequest);
+			if (dispatchState.kind === "bound") this.dispatchPendingToolRequest(pending, dispatchState.handler);
 		});
 	}
 
@@ -338,14 +368,6 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 		}
 	}
 
-	private rejectQueuedToolRequestsWithoutHandler(reason: string): void {
-		while (this.queuedRequests.length > 0) {
-			const request = this.queuedRequests.shift()!;
-			const pending = this.pendingByPiToolCallId.get(request.piToolCallId);
-			if (pending) this.rejectPending(pending, new Error(reason), "cancelled");
-		}
-	}
-
 	private resolvePending(pending: PendingBridgeCall, result: CallToolResult): void {
 		if (pending.settled) return;
 		pending.settled = true;
@@ -355,17 +377,16 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 		pending.resolve(result);
 	}
 
+	private recordRejectedRequest(request: CursorPiBridgeToolRequest, error: Error, rejectionKind: CursorPiToolBridgeRejectionKind): void {
+		this.emitRequestRejectedDiagnostic(request, rejectionKind);
+		this.recordBridgeRaw({ kind: "rejected", request, error: error.message, rejectionKind });
+	}
+
 	private rejectPending(pending: PendingBridgeCall, error: Error, kind: "cancelled" | "error" = "error"): boolean {
 		if (pending.settled) return false;
 		pending.settled = true;
 		this.removePending(pending);
-		this.emitRequestRejectedDiagnostic(pending.request, kind);
-		this.recordBridgeRaw({
-			kind: "rejected",
-			request: pending.request,
-			error: error.message,
-			rejectionKind: kind,
-		});
+		this.recordRejectedRequest(pending.request, error, kind);
 		pending.reject(error);
 		return true;
 	}
@@ -425,7 +446,9 @@ export class CursorPiToolBridgeRunImpl implements CursorPiToolBridgeRun {
 		if (pending.onAbort) pending.signal?.removeEventListener("abort", pending.onAbort);
 		if (pending.timeout) clearTimeout(pending.timeout);
 		this.pendingByPiToolCallId.delete(pending.request.piToolCallId);
-		const queuedIndex = this.queuedRequests.findIndex((request) => request.bridgeCallId === pending.request.bridgeCallId);
-		if (queuedIndex >= 0) this.queuedRequests.splice(queuedIndex, 1);
+		if (this.dispatchState.kind === "buffering") {
+			const queuedIndex = this.dispatchState.queued.findIndex((request) => request.bridgeCallId === pending.request.bridgeCallId);
+			if (queuedIndex >= 0) this.dispatchState.queued.splice(queuedIndex, 1);
+		}
 	}
 }
