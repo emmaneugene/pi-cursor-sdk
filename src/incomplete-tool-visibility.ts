@@ -45,21 +45,10 @@ export function buildIncompleteCursorToolRunOutcome(
 	};
 }
 
-/**
- * Policy: on a successful text-producing run, started calls with no completion
- * are debug-only for all tools. Verified against installed @cursor/sdk 1.0.30
- * (`beforeShellExecution` deny-hook reproduction): a tool call denied by a
- * permission policy or hook emits `tool-call-started` and then nothing on any
- * public SDK surface — no `tool-call-completed` delta, no `toolCall` step, no
- * conversation entry — while the model's own reply shows it observed the
- * denial. Those runs previously ended with red "did not complete" cards for
- * failures that never happened. The SDK gives no way to distinguish a denial
- * from a genuinely lost completion, so suppressing on successful runs is a
- * deliberate trade-off: a lost completion would be hidden from the TUI too,
- * but every discard is still recorded as
- * `discarded-incomplete-started-tool-call` in debug artifacts. Failed,
- * aborted, and no-text runs keep visible incomplete cards.
- */
+// Policy/hook-denied SDK tool calls (verified via a `beforeShellExecution` deny-hook reproduction) emit
+// `tool-call-started` with no completion event, indistinguishable from dropped completions; keep them debug-only on
+// successful text runs (every discard is still recorded as `discarded-incomplete-started-tool-call` in debug artifacts)
+// and visible on failed/aborted/empty runs.
 export function resolveIncompleteCursorToolVisibility(
 	outcome: IncompleteCursorToolRunOutcome,
 ): IncompleteCursorToolVisibilityDecision {

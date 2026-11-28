@@ -54,14 +54,8 @@ function isCursorSdkWriteIterableClosedError(error: unknown): boolean {
 	);
 }
 
-// The Cursor SDK aborts an in-flight controlled-exec turn via its internal
-// `AbortController.abort()` (user interrupt or stall-detector cancellation),
-// which surfaces as a raw `DOMException [AbortError]` rather than a
-// `ConnectError`. `classifyCursorConnectError` returns undefined for it, so it
-// otherwise falls through the emit patch and terminates the process. A
-// DOMException is not `instanceof Error`, so match structurally on the
-// `AbortError` name plus the same `@cursor/sdk/dist` stack provenance the
-// WriteIterableClosedError recognizer uses, keeping unrelated AbortErrors fatal.
+// SDK AbortError surfaces as a raw DOMException (not `instanceof Error`);
+// match structurally with `@cursor/sdk/dist` stack provenance so unrelated AbortErrors stay fatal.
 function isCursorSdkAbortError(error: unknown): boolean {
 	if (typeof error !== "object" || error === null) return false;
 	const { name, stack } = error as { name?: unknown; stack?: unknown };
@@ -72,15 +66,8 @@ function isCursorSdkAbortError(error: unknown): boolean {
 	);
 }
 
-// The exact observed incident: the Cursor SDK 1.0.23 local shell executor writes a
-// spawned child's stdin without a stream 'error' listener, so a child exiting while
-// a write is in flight surfaces a raw `write EPIPE` uncaught exception whose stack
-// is exactly the single async pipe-write completion frame. Installed 1.0.30+ (verified
-// in 1.5.2) attaches a no-op `error` listener before that write; keep this guard as defense in depth.
-// Pi's own piped-stdout or dead-terminal EPIPE normally surfaces through the
-// synchronous write-dispatch path with multiple frames (afterWriteDispatched /
-// Socket._writeGeneric) and must stay fatal per Unix convention, so anything beyond
-// this one-frame contract is rejected.
+// Match only the single async pipe-write completion frame from a closed child stdin; multi-frame synchronous
+// stdout/terminal EPIPE must stay fatal. `@cursor/sdk` 1.0.30+ attaches a stdin `error` listener, so this is defence in depth.
 const OBSERVED_CLOSED_PIPE_STACK_FRAME =
 	/^\s+at WriteWrap\.onWriteComplete \[as oncomplete\] \(node:internal\/stream_base_commons:\d+:\d+\)$/;
 

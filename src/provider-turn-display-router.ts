@@ -69,9 +69,6 @@ export class CursorTurnDisplayRouter {
 		const planText = getCursorCreatePlanText(toolCall);
 		if (planText) this.planTextCandidate = scrubSensitiveText(planText, this.resolvedApiKey);
 
-		// The caller builds the display once for fingerprinting; reuse it here.
-		// Format the transcript lazily: the replay path only needs it for debug
-		// records, and the inactive-trace path never needs it at all.
 		let transcript: string | undefined;
 		const getTranscript = (): string =>
 			(transcript ??= scrubSensitiveText(formatCursorToolTranscript(toolCall, { cwd: this.cwd }), this.resolvedApiKey));

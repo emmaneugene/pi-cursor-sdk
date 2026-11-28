@@ -3,10 +3,8 @@ import { readStoredCredential } from "@earendil-works/pi-coding-agent";
 export const CURSOR_API_KEY_ENV_VAR = "CURSOR_API_KEY";
 const CURSOR_PROVIDER_ID = "cursor";
 
-// Non-secret literal sentinel for pi's provider registry. Pi 0.77 treats `$ENV_VAR`
-// values as unconfigured when the env var is absent, which hides fallback models
-// before `/login`. Keep the provider available and resolve the real key in the
-// Cursor provider turn path from pi auth or CURSOR_API_KEY.
+// Non-secret sentinel for pi's provider registry: pi treats `$ENV_VAR` as unconfigured when
+// unset (hiding fallback models before `/login`), so real keys resolve at turn time.
 export const CURSOR_API_KEY_CONFIG_VALUE = "pi-cursor-sdk-cursor-api-key-placeholder";
 
 const CURSOR_API_KEY_PLACEHOLDERS = new Set([

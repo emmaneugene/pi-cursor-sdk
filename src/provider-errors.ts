@@ -118,11 +118,7 @@ function isCursorSdkStallAbortNetworkError(code: unknown, evidence: string, stac
 	);
 }
 
-/**
- * @cursor/sdk@1.0.30+ (verified in 1.5.2) throws internal RetriableError (name/kind "RetriableError") with message
- * "Connection stalled" or "Connection stalled repeatedly" after fetchWithRetry exhausts stalls.
- * The ConnectError is only the cause; the top-level error is not a ConnectError.
- */
+// SDK stall exhaustion throws top-level `RetriableError` (not `ConnectError`, which is only its cause).
 export function isCursorSdkConnectionStalledError(error: unknown): boolean {
 	const record = asRecord(error);
 	if (!record) return false;
@@ -135,9 +131,7 @@ export function isCursorSdkConnectionStalledError(error: unknown): boolean {
 }
 
 function isCursorExtensionConnectStack(stack: string): boolean {
-	// Retain compatibility with external @connectrpc/connect-node stacks nested under pi-cursor-sdk;
-	// @cursor/sdk@1.5.2 bundles connect-node into @cursor/sdk/dist/esm/*.js (handled by cursor-sdk-stack).
-	// connect-web is not classified for supported pi Node runs.
+	// Bundled SDK connect stacks match `cursor-sdk-stack`; this covers unbundled connect-node and excludes connect-web.
 	return stack.includes("@connectrpc/connect-node") && /(?:^|[\\/])pi-cursor-sdk(?:[\\/]|$)/.test(stack);
 }
 

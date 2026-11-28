@@ -1,9 +1,4 @@
-/**
- * Shared capture mechanics for the maintainer debug probes
- * (debug-sdk-events.mjs and debug-provider-events.mjs).
- * Execution stays in the runners; only CLI/artifact boilerplate lives here.
- * Artifact schemas, exit codes, and scrubbing behavior are unchanged.
- */
+// Shared CLI/artifact helpers for debug-sdk-events.mjs and debug-provider-events.mjs.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

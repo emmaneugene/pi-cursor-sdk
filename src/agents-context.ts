@@ -53,22 +53,16 @@ function isPiAgentDirContextFilePath(
 	return normalized.toLowerCase() === expectedPath.toLowerCase();
 }
 
-/** Actual pi agent dir `AGENTS.md` — overlaps Cursor `user` setting source (global agent instructions). */
 export function isPiAgentDirAgentsMdPath(filePath: string, agentDir: string = getAgentDir()): boolean {
 	return isPiAgentDirContextFilePath(filePath, "agents.md", agentDir);
 }
 
-/** Actual pi agent dir `CLAUDE.md` — kept because Cursor user rules use `~/.claude/CLAUDE.md`. */
 export function isPiAgentDirClaudeMdPath(filePath: string, agentDir: string = getAgentDir()): boolean {
 	return isPiAgentDirContextFilePath(filePath, "claude.md", agentDir);
 }
 
-/**
- * Classify whether a pi-loaded context file overlaps Cursor ambient rules.
- * Project/repo `AGENTS.md` and `CLAUDE.md` overlap Cursor `project` sources.
- * Only the actual pi agent dir `AGENTS.md` overlaps Cursor `user`; agent-dir `CLAUDE.md` is kept
- * because Cursor user rules use `~/.claude/CLAUDE.md`, not pi's agent dir path.
- */
+// Agent-dir `CLAUDE.md` does not overlap Cursor `user` rules (Cursor reads `~/.claude/CLAUDE.md`);
+// agent-dir `AGENTS.md` overlaps `user`, and repo `AGENTS.md`/`CLAUDE.md` overlap `project`.
 export function classifyContextFileOverlap(
 	filePath: string,
 	agentDir: string = getAgentDir(),
@@ -108,12 +102,11 @@ export function shouldSuppressPiAgentsContext(
 	return contextFiles.some((file) => shouldRemovePiAgentsContextFile(file, settingSources, agentDir));
 }
 
-/** Exact pi `buildSystemPrompt()` serialization for one context file block (including trailing blank line). */
+// Must match pi's `buildSystemPrompt()` output verbatim so `indexOf()` locates the section.
 export function serializePiProjectInstructionsBlock(file: PiAgentsContextFile): string {
 	return `${PI_PROJECT_INSTRUCTIONS_OPEN_PREFIX}${file.path}">\n${file.content}\n${PI_PROJECT_INSTRUCTIONS_CLOSE}\n\n`;
 }
 
-/** Exact pi `buildSystemPrompt()` serialization for the full project context section. */
 export function serializePiProjectContextSection(contextFiles: readonly PiAgentsContextFile[]): string {
 	if (contextFiles.length === 0) return "";
 	const blocks = contextFiles
@@ -123,7 +116,6 @@ export function serializePiProjectContextSection(contextFiles: readonly PiAgents
 	return `${PI_PROJECT_CONTEXT_OPEN}${blocks}${PI_PROJECT_CONTEXT_CLOSE}`;
 }
 
-/** Remove pi context blocks that overlap Cursor setting sources. */
 export function removePiAgentsContextFromSystemPrompt(
 	systemPrompt: string,
 	contextFiles: readonly PiAgentsContextFile[],

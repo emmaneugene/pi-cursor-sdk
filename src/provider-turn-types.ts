@@ -69,12 +69,6 @@ export interface LiveCursorProviderTurnRuntime extends CursorProviderTurnRuntime
 
 export type CursorProviderTurnRuntime = DirectCursorProviderTurnRuntime | LiveCursorProviderTurnRuntime;
 
-/**
- * Single owned model for a prepared local provider turn.
- *
- * Send, finalize, and cleanup phases receive this immutable object instead of
- * keeping parallel liveRun/turnCoordinator/resource bags in sync by convention.
- */
 export interface CursorProviderTurnPrepareResult {
 	cwd: string;
 	payload: CursorProviderTurnSendPayload;

@@ -4,8 +4,6 @@ import { readCursorSdkTurnUsage, type CursorSdkTurnUsage } from "./usage-account
 
 const BILLED_USAGE_TIMEOUT_MS = 5000;
 
-// ponytail: process-lifetime watermark of billed usage UUIDs per agentId; reset on process exit.
-// Upgrade to session-scoped storage if multi-day processes retain enough agent IDs to matter.
 const seenBilledRunIdsByAgent = new Map<string, Set<string>>();
 
 export function sumCursorSdkTurnUsage(usages: readonly CursorSdkTurnUsage[]): CursorSdkTurnUsage | undefined {

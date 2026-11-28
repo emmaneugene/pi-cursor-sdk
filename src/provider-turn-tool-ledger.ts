@@ -101,7 +101,6 @@ export class CursorToolCompletionLedger {
 		this.completedFallbackToolFingerprints.clear();
 	}
 
-	/** Exposed for incomplete-tool discard iteration. */
 	startedToolCallEntries(): IterableIterator<[string, unknown]> {
 		return this.startedToolCalls.entries();
 	}

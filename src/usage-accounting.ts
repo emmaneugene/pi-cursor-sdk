@@ -85,9 +85,7 @@ export function estimateCursorContextTotalTokens(partial: AssistantMessage, mode
 }
 
 function getCursorSdkUncachedInputTokens(turnUsage: CursorSdkTurnUsage): number {
-	// Observed raw local turn-ended.usage: inputTokens is the full prompt; cache fields partition it.
-	// Map raw turn-ended fields directly (SDK 1.5.2 toTokenUsage now also sets totalTokens = inputTokens + outputTokens,
-	// whereas older SDKs summed all four fields into totalTokens).
+	// Raw SDK `inputTokens` is the full prompt; cacheRead and cacheWrite partition it.
 	return turnUsage.inputTokens - turnUsage.cacheReadTokens - turnUsage.cacheWriteTokens;
 }
 

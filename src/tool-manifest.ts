@@ -1,10 +1,7 @@
 import { loadCursorSdkUserConfig, type CursorSdkConfig } from "./config.js";
 import type { CursorPiToolBridgeSnapshot } from "./pi-tool-bridge-types.js";
 
-/**
- * Representative @cursor/sdk@1.5.2 local-agent ToolType values; actual exposure can vary by run.
- * See docs/native-tool-replay.md#sdk-tooltype-replay-matrix.
- */
+// See docs/native-tool-replay.md#sdk-tooltype-replay-matrix.
 export const CURSOR_HOST_TOOL_MANIFEST_SUMMARY =
 	"read/shell/search/edit/write and other host tools when Cursor exposes them";
 

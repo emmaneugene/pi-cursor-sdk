@@ -15,7 +15,6 @@ export type CursorReplayToolDetailsVariant =
  */
 export const CURSOR_REPLAY_UNREGISTERED_ACTIVITY_TOOL_NAME = "unregisteredActivity" as const;
 
-/** SDK source tool names carried on neutral activity replay cards. */
 export type CursorReplayActivitySourceToolName =
 	| CursorReplayActivitySourceName
 	| typeof CURSOR_REPLAY_UNREGISTERED_ACTIVITY_TOOL_NAME;
@@ -59,7 +58,6 @@ export interface CursorReplayGenerateImageDetails {
 	collapseDetailsByDefault?: boolean;
 }
 
-/** Neutral Cursor activity cards and unknown-tool fallbacks with a display title. */
 export interface CursorReplayActivityDetails {
 	variant: "activity";
 	sourceToolName: CursorReplayActivitySourceToolName;
@@ -69,16 +67,13 @@ export interface CursorReplayActivityDetails {
 	collapseDetailsByDefault?: boolean;
 	path?: string;
 	fileSize?: number;
-	/** Structured unified diff for edit (and similar) activity cards; drives canonical colored diff rendering. */
 	diffString?: string;
 	diff?: string;
 	linesAdded?: number;
 	linesRemoved?: number;
-	/** Optional post-write content for write activity fallbacks (mirrors nativeWrite). */
 	fileContentAfterWrite?: string;
 }
 
-/** Parsed replay details without a display title. */
 export interface CursorReplayGenericFallbackDetails {
 	variant: "genericFallback";
 	sourceToolName: CursorReplayUnknownSourceToolName;
@@ -211,7 +206,6 @@ function resolveParseActivitySourceToolName(sourceToolName: string): CursorRepla
 		: CURSOR_REPLAY_UNREGISTERED_ACTIVITY_TOOL_NAME;
 }
 
-/** Maps incomplete or non-activity replay source names onto activity-card source tool names. */
 export function resolveIncompleteReplayActivitySourceToolName(
 	sourceToolName: string,
 ): CursorReplayActivitySourceToolName {

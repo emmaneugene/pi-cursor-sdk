@@ -21,8 +21,7 @@ const faults = {
 		fsPromises.rename = async (...args) => {
 			if (!firstRename) return originalRename(...args);
 			firstRename = false;
-			// The ref'd timer keeps the child alive so its marker proves publication
-			// happened after the old two-second poll window.
+			// Keep timer ref'd so the child lives long enough to publish the late-winner marker.
 			setTimeout(() => {
 				fs.mkdirSync(join(process.cwd(), "dist"), { recursive: true });
 				fs.writeFileSync(join(process.cwd(), "dist", "late-winner.txt"), "published");
@@ -37,7 +36,6 @@ const faults = {
 			fs.mkdirSync(dist, { recursive: true });
 			fs.writeFileSync(join(dist, "winner.txt"), "published");
 			fs.writeFileSync(join(dist, "index.js"), "winner");
-			// Shared fixture: only pi-mcp-adapter supplies dist-relative runtime assets.
 			for (const asset of (process.env.BUILD_SWAP_RUNTIME_ASSETS ?? "").split(",").filter(Boolean)) {
 				fs.copyFileSync(join(cwd, asset), join(dist, asset));
 			}

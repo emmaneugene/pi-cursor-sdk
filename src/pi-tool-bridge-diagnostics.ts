@@ -166,6 +166,7 @@ export function serializeCursorPiToolBridgeDiagnostic(event: CursorPiToolBridgeD
 	return assertNeverDiagnosticEvent(event);
 }
 
+// Diagnostics must never throw or affect bridge execution.
 export function writeCursorPiToolBridgeDiagnostic(
 	debug: CursorPiToolBridgeConfig["debug"],
 	event: CursorPiToolBridgeDiagnosticEvent,
@@ -173,22 +174,16 @@ export function writeCursorPiToolBridgeDiagnostic(
 ): void {
 	try {
 		debugRecorder?.recordBridgeDiagnostic(event);
-	} catch {
-		// Diagnostics must never affect bridge execution.
-	}
+	} catch {}
 	const serialized = serializeCursorPiToolBridgeDiagnostic(event);
 	const debugFile = debug.file;
 	if (debugFile) {
 		try {
 			appendFileSync(debugFile, `${JSON.stringify(serialized)}\n`);
-		} catch {
-			// Diagnostics must never affect bridge execution.
-		}
+		} catch {}
 	}
 	if (!debug.stderr) return;
 	try {
 		process.stderr.write(`${CURSOR_PI_TOOL_BRIDGE_DIAGNOSTIC_PREFIX} ${JSON.stringify(serialized)}\n`);
-	} catch {
-		// Diagnostics must never affect bridge execution.
-	}
+	} catch {}
 }

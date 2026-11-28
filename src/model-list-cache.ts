@@ -79,8 +79,7 @@ function readCacheFile(): ModelListCacheFile | undefined {
 	}
 }
 
-// One read of the on-disk catalog. Freshness is "stale" when the entry is older
-// than the TTL, or when TTL is zero. Callers skip the network only for "fresh".
+// Single on-disk read; callers skip the network only when freshness is "fresh".
 export function loadCachedModelCatalog(
 	keyFingerprint: string,
 	now: number = Date.now(),
